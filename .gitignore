@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+owg_env/
+
+# IDE
+.vscode/
+.idea/
+
+# PyBullet/Open3D 临时输出
+grasp_6dof/out/
+grasp_6dof/dataset/*.png
+*.log
+
+# 大型数据/模型
+checkpoints/
+weights/
+*.pth
+*.pt
+*.onnx
+
+# OS
+.DS_Store
+Thumbs.db
