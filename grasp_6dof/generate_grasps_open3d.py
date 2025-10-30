@@ -258,8 +258,8 @@ def generate_grasps(args):
     p.setGravity(0,0,-9.8)
     table_id = p.loadURDF("table/table.urdf", basePosition=[0.5,0,-0.63])
     # 物体
-    obj_id = p.loadURDF(args.obj, basePosition=[0.38, 0.00, -0.63 + 0.002 + 0.5*args.cube_scale],
-                        globalScaling=args.cube_scale)
+    obj_id = p.loadURDF(args.obj, basePosition=[0.38, 0.00, 0.002 + 0.5*args.cube_scale],
+                    globalScaling=args.cube_scale)
     p.changeDynamics(obj_id, -1, lateralFriction=1.6, restitution=0.0, rollingFriction=0.05)
     
     # 让物体和接触稳定一下，再拍

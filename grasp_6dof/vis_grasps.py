@@ -7,7 +7,7 @@ import pybullet_data
 
 # ---------------- Camera (仅用于 headless 截图) ----------------
 class CamCfg:
-    def __init__(self, width=1280, height=720, fov=40.0, znear=0.2, zfar=2.0):
+    def __init__(self, width=1280, height=720, fov=40.0, znear=0.2, zfar=6.0):
         self.width  = width
         self.height = height
         self.fov    = fov
@@ -92,7 +92,7 @@ def add_axes_geom(p0, R, L=0.06, rad=0.0025):
 TABLE_POS = [0.5, 0.0, -0.63]
 TABLE_TOP_Z_APPROX = -0.004  # validate 中观测值
 def cube_pos_from_scale(scale: float):
-    return [0.38, 0.00, -0.63 + 0.002 + 0.5*scale]
+    return [0.38, 0.00, 0.002 + 0.5*scale]
 
 def setup_scene(headless: bool, cube_scale: float, obj: str):
     if headless:
@@ -204,10 +204,19 @@ def main():
     print(f"Showing {N} grasps (table_top_z={TABLE_TOP_Z_APPROX:.3f}, cube_z={cube_z:.3f}).")
 
     if headless:
-        cam = CamCfg(width=1280, height=720, fov=40.0)
+        cube_xyz = cube_pos_from_scale(args.cube_scale)
+        # 相机位置：在方块“右后上方”一点点，且离得更近
+        center = np.array(cube_xyz) + np.array([0.60, -0.60, 1.20], dtype=float)
+        target = np.array(cube_xyz) + np.array([0.00,  0.00, 0.02], dtype=float)
+
+        cam = CamCfg(width=1280, height=720, fov=40.0, znear=0.2, zfar=6.0)
+        cam.center = center
+        cam.target = target
+
         snapshot_png(args.out_png, cam)
         p.disconnect()
         return
+
 
     # GUI 循环
     try:
