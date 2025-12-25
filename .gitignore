@@ -1,25 +1,31 @@
-# Python
+# ---- Python ----
 __pycache__/
 *.pyc
-.venv/
-owg_env/
+.ipynb_checkpoints/
+*.pyo
 
-# IDE
-.vscode/
-.idea/
+# ---- Local logs & outputs (do NOT commit) ----
+logs/
+results/
+semantic_pc/
 
-# PyBullet/Open3D 临时输出
+# ---- Generated datasets (do NOT commit) ----
+data/pc/
+data/grasps_raw/
+data/grasps_val/
+grasp_6dof/dataset/
 grasp_6dof/out/
-grasp_6dof/dataset/*.png
-*.log
+grasp_6dof/pc/
 
-# 大型数据/模型
-checkpoints/
-weights/
-*.pth
-*.pt
-*.onnx
+# ---- Large datasets / third-party weights (do NOT commit) ----
+YCB_Dataset/
+cornell-randsplit-*/
+third_party/grconvnet/
 
-# OS
+# ---- Videos / large media ----
+*.mp4
+*.avi
+*.mov
+
+# ---- OS ----
 .DS_Store
-Thumbs.db
