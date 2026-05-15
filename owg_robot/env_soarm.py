@@ -428,18 +428,43 @@ class EnvironmentSoArm:
     def move_ee(self, action, max_step: int = 200, **kwargs):
         """Move EEF to (x, y, z, orn). orn is accepted but currently ignored.
 
-        TODO(6dof-ik): pass orn into _solve_ik once 6-DoF IK is implemented.
-        Returns (success, (pos, quat_placeholder)).
+        vis=True  → smooth interpolation: ctrl interpolated from current to target
+                    over max_step physics steps, viewer.sync() each step.
+        vis=False → fast IK teleport + settle (headless eval path, unchanged).
         """
         x, y, z = action[0], action[1], action[2]
-        # orn = action[3]  # TODO(6dof-ik): use for orientation target
         x = np.clip(x, *self.ee_position_limit[0])
         y = np.clip(y, *self.ee_position_limit[1])
         z = np.clip(z, *self.ee_position_limit[2])
-        ok = self._solve_ik(np.array([x, y, z]))
-        for act_id, adr in zip(self._arm_act_ids, self._arm_qpos_adr):
-            self.data.ctrl[act_id] = self.data.qpos[adr]
-        self._steps(max_step // 4)
+
+        if self.vis:
+            # Save current physical state before IK modifies qpos
+            qpos_saved = self.data.qpos[self._arm_qpos_adr].copy()
+            qvel_saved = self.data.qvel.copy()
+            q_start    = np.array([self.data.ctrl[i] for i in self._arm_act_ids])
+
+            ok = self._solve_ik(np.array([x, y, z]))
+            q_target = np.array([self.data.qpos[adr] for adr in self._arm_qpos_adr])
+
+            # Restore physics state so interpolation starts from actual position
+            for adr, q in zip(self._arm_qpos_adr, qpos_saved):
+                self.data.qpos[adr] = q
+            self.data.qvel[:] = qvel_saved
+            mujoco.mj_forward(self.model, self.data)
+
+            # Drive ctrl from q_start → q_target over max_step steps (smooth motion)
+            for i in range(max_step):
+                t = (i + 1) / max_step
+                for act_id, qs, qt in zip(self._arm_act_ids, q_start, q_target):
+                    self.data.ctrl[act_id] = float(qs + t * (qt - qs))
+                self.step_simulation()
+        else:
+            # Headless: IK teleport + physics settle (original fast path)
+            ok = self._solve_ik(np.array([x, y, z]))
+            for act_id, adr in zip(self._arm_act_ids, self._arm_qpos_adr):
+                self.data.ctrl[act_id] = self.data.qpos[adr]
+            self._steps(max_step // 4)
+
         pos = self._get_eef_pos()
         return ok, (pos, np.array([0, 0, 0, 1]))
 
@@ -611,6 +636,26 @@ class EnvironmentSoArm:
 
     # ── object management ─────────────────────────────────────────────────────
 
+    def preload_pool(self, logical_names: list):
+        """Pre-register all object types so spawn() triggers only ONE model rebuild.
+
+        Call before the spawn loop with the full object list.  load_obj() will
+        find every pool_name already registered and skip the per-object rebuild.
+        """
+        changed = False
+        for name in logical_names:
+            if os.path.isdir(os.path.join(YCB_ROOT, "Ycb" + name)):
+                pool_name = "Ycb" + name
+            elif os.path.isdir(os.path.join(YCB_ROOT, name)):
+                pool_name = name
+            else:
+                pool_name = "Ycb" + name
+            if pool_name not in self._pool_names:
+                self._pool_names.append(pool_name)
+                changed = True
+        if changed:
+            self._rebuild_model()
+
     def load_obj(self, path_or_name, name: Optional[str] = None,
                  pos=None, orn=None,
                  mod_orn: bool = False, mod_stiffness: bool = False,
@@ -692,7 +737,7 @@ class EnvironmentSoArm:
         call remove_all_obj() before the spawn loop.
         """
         r_x = np.random.uniform(-0.15, 0.15)
-        r_y = np.random.uniform(-0.6, -0.3)
+        r_y = np.random.uniform(-0.35, -0.10)   # within arm y-limit (-0.4, 0.4)
         yaw = np.random.uniform(0, np.pi)
         if pos is None:
             pos = [r_x, r_y, self.Z_TABLE_TOP]

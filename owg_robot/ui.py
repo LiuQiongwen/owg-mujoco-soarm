@@ -157,6 +157,10 @@ class RobotEnvUI:
         else:
             obj_list = self.objects.obj_names[:n_objects]
 
+        # Pre-register all object types → single model rebuild before spawn loop
+        if self.backend == "mujoco" and hasattr(self.env, "preload_pool"):
+            self.env.preload_pool(obj_list)
+
         for obj_name in obj_list:
             path, mod_orn, mod_stiffness = self.objects.get_obj_info(obj_name)
             self.env.load_isolated_obj(path, obj_name, mod_orn, mod_stiffness)
