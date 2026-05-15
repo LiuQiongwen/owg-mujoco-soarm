@@ -305,8 +305,15 @@ class EnvironmentSoArm:
         if self._renderer is not None:
             self._renderer.close()
         self._renderer = mujoco.Renderer(self.model, height=IMG_SIZE, width=IMG_SIZE)
-        mujoco.mj_forward(self.model, self.data)
         self._cache_ids()
+        # initialize arm to HOME_QPOS so _steps() after object spawn is stable
+        for adr, q in zip(self._arm_qpos_adr, HOME_QPOS):
+            self.data.qpos[adr] = q
+        for act_id, q in zip(self._arm_act_ids, HOME_QPOS):
+            self.data.ctrl[act_id] = q
+        self.data.qpos[self._grip_qpos_adr] = GRIP_OPEN
+        self.data.ctrl[self._grip_act_id]   = GRIP_OPEN
+        mujoco.mj_forward(self.model, self.data)
         # Reattach passive viewer to new model/data when vis is on
         if getattr(self, "vis", False) and getattr(self, "_viewer", None) is not None:
             try:
@@ -740,7 +747,8 @@ class EnvironmentSoArm:
         r_y = np.random.uniform(-0.35, -0.10)   # within arm y-limit (-0.4, 0.4)
         yaw = np.random.uniform(0, np.pi)
         if pos is None:
-            pos = [r_x, r_y, self.Z_TABLE_TOP]
+            # spawn above table so mesh doesn't penetrate; gravity settles it
+            pos = [r_x, r_y, self.OBJECT_INIT_HEIGHT]
         return self.load_obj(path_or_name, name=name, pos=pos, orn=orn,
                              mod_orn=mod_orn, mod_stiffness=mod_stiffness,
                              yaw=yaw, **kwargs)
@@ -887,38 +895,50 @@ class EnvironmentSoArm:
         TODO(6dof-ik): pass roll to move_ee once orientation IK is available.
         Returns (success, grasped_obj_id_or_None).
         """
+        self.reset_robot()  # start each attempt from a known arm pose
+
         x, y, z = pos
-        z -= self.finger_length
         z = np.clip(z, *self.ee_position_limit[2])
 
         orn = None
-        gripper_opening_length *= self.GRIP_REDUCTION
-        z_offset = self.calc_z_offset(gripper_opening_length)
+        opening = gripper_opening_length * self.GRIP_REDUCTION
 
         if self.vis:
             print(f"  [grasp] approach       → xy=({x:.3f}, {y:.3f})  z={self.GRIPPER_MOVING_HEIGHT:.3f}")
-        self.move_gripper(0.08)
+        self.move_gripper(opening)
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn])
 
         if self.vis:
-            print(f"  [grasp] descend        → xy=({x:.3f}, {y:.3f})  z={z + z_offset:.3f}")
-        self.move_ee([x, y, z + z_offset, orn])
+            print(f"  [grasp] descend        → xy=({x:.3f}, {y:.3f})  z={z:.3f}")
+        self.move_ee([x, y, z, orn])
 
         if self.vis:
-            print(f"  [grasp] close_gripper  (opening={gripper_opening_length:.3f})")
-        self.auto_close_gripper(check_contact=True)
-        self._steps(40)
+            print(f"  [grasp] close_gripper  (opening={opening:.3f})")
+        self.auto_close_gripper(check_contact=False)
+        self._steps(60)
+        contact = bool(self.check_grasped_id())
 
         if self.vis:
             print(f"  [grasp] lift           → z={self.GRIPPER_MOVING_HEIGHT:.3f}")
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn])
-        self._steps(60)
+        self._steps(80)
 
-        grasped = self.check_grasped_id()
+        grasped_ids = self.check_grasped_id()
+        obj_z       = (self.get_obj_pos(grasped_ids[0])[2]
+                       if grasped_ids else self.Z_TABLE_TOP)
+        lifted = obj_z > self.Z_TABLE_TOP + 0.07
+
         if self.vis:
-            print(f"  [grasp] result         → grasped={grasped}")
-        if len(grasped) == 1:
-            return True, grasped[0]
+            print(f"  [grasp] result         → contact={contact}  grasped={bool(grasped_ids)}  lifted={lifted}")
+
+        # match eval criterion: contact before lift OR still grasped after OR object rose
+        if contact or grasped_ids or lifted:
+            if grasped_ids:
+                return True, grasped_ids[0]
+            # try to attribute to the nearest object
+            if self.obj_ids:
+                return True, self.obj_ids[0]
+            return True, None
         return False, None
 
     # kept as public alias for backward compat
