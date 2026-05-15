@@ -92,6 +92,20 @@ class RobotEnvUI:
             mod_stiffness=['Strawberry'],
             seed=self.seed)
         self.objects.shuffle_objects()
+
+        # --object flag: keep only the requested object(s) in the pool
+        pin_object = getattr(self.cfg, "object", None)
+        if pin_object is not None:
+            pin_lower = pin_object.lower()
+            filtered = [n for n in self.objects.obj_names if n.lower() == pin_lower]
+            if not filtered:
+                all_names = self.objects.obj_names[:]
+                raise ValueError(
+                    f"--object '{pin_object}' not found in obj_list.txt. "
+                    f"Valid names: {all_names}"
+                )
+            self.objects.obj_names = filtered
+
         self.env.dummy_simulation_steps(10)
 
         # init OWG policy

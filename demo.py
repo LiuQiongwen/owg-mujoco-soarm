@@ -99,6 +99,9 @@ def main():
     parser.add_argument("--prompt", type=str, default="grasp the red cup")
 
     parser.add_argument("--n_objects", type=int, default=None)
+    parser.add_argument("--object", type=str, default=None,
+                        help="Pin a specific YCB object in the scene (e.g. 'Banana'). "
+                             "Case-insensitive. Overrides random shuffle.")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--vis", type=int, default=None)
     parser.add_argument("--verbose", type=int, default=None)
@@ -121,6 +124,8 @@ def main():
         cfg_set(cfg, "n_objects", args.n_objects)
     if args.seed is not None:
         cfg_set(cfg, "seed", args.seed)
+    if args.object is not None:
+        cfg_set(cfg, "object", args.object)
     if args.vis is not None:
         cfg_set(cfg, "policy.vis", args.vis)
     if args.verbose is not None:
@@ -145,6 +150,8 @@ def main():
                 cfg_set(cfg, "n_objects", args.n_objects)
             if args.seed is not None:
                 cfg_set(cfg, "seed", args.seed)
+            if args.object is not None:
+                cfg_set(cfg, "object", args.object)
             print(f"[INFO] Auto-loaded MuJoCo config: {mj_cfg}")
 
     print("\n=== Loaded Configuration ===")
