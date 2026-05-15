@@ -1,0 +1,18 @@
+yaw_ablation:
+  xyz_only:
+    success_rate: 0.0
+    n_trials: 2
+    detail:
+    - yaw_deg: -45.0
+      success: false
+    - yaw_deg: 0.0
+      success: false
+  top_down_yaw:
+    success_rate: 0.0
+    n_trials: 2
+    detail:
+    - yaw_deg: -45.0
+      success: false
+    - yaw_deg: 0.0
+      success: false
+yaw_mode: top_down_yaw

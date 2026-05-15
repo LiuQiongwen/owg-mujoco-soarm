@@ -15,16 +15,20 @@ else
 fi
 
 STAGE=${2:-4}
+TIMEOUT=${3:-90}   # 每个 trial 最多等待秒数，默认 90s
 SUCCESS=0
 TOTAL=0
 
-echo "Stage $STAGE | $(date)"
+echo "Stage $STAGE | timeout=${TIMEOUT}s | $(date)"
 for obj in "${OBJECTS[@]}"; do
   for seed in "${SEEDS[@]}"; do
     TOTAL=$((TOTAL + 1))
-    OUTPUT=$(conda run -n owg2 python demo.py \
+    OUTPUT=$(timeout "$TIMEOUT" conda run -n owg2 python demo.py \
       --stage "$STAGE" --prompt "$obj" --seed "$seed" --once --verbose 0 2>&1)
-    if echo "$OUTPUT" | grep -q "Done pick"; then
+    EXIT_CODE=$?
+    if [ $EXIT_CODE -eq 124 ]; then
+      echo "  [T] $obj seed=$seed  (timeout ${TIMEOUT}s)"
+    elif echo "$OUTPUT" | grep -q "Done pick"; then
       SUCCESS=$((SUCCESS + 1))
       echo "  [✓] $obj seed=$seed"
     else

@@ -127,16 +127,34 @@ def sample_grasps_from_mesh(
 
     # 1) 载入 mesh（支持 .obj/.stl/.ply 等）
     mesh = o3d.io.read_triangle_mesh(mesh_path)
-    if not mesh.has_vertex_normals():
-        mesh.compute_vertex_normals()
+    is_pc_like = (not mesh.has_triangles())
 
-    # 2) 转点云并体素降采样
-    pcd = mesh.sample_points_poisson_disk(min(n_samples*2, 5000))
-    if down_sample_voxel is not None and down_sample_voxel > 0:
-        pcd = pcd.voxel_down_sample(voxel_size=down_sample_voxel)
-    pcd.estimate_normals(
-        search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=30)
-    )
+    # === 情况 A：正常的三角网格 ===
+    if not is_pc_like:
+        if not mesh.has_vertex_normals():
+            mesh.compute_vertex_normals()
+
+        # 从表面均匀采样点（Poisson disk）
+        pcd = mesh.sample_points_poisson_disk(min(n_samples * 2, 5000))
+        if down_sample_voxel is not None and down_sample_voxel > 0:
+            pcd = pcd.voxel_down_sample(voxel_size=down_sample_voxel)
+        if not pcd.has_normals():
+            pcd.estimate_normals(
+                search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=30)
+            )
+
+    # === 情况 B：当前文件其实是点云（没有三角形） ===
+    else:
+        print(f"[WARN] '{mesh_path}' has no triangles, treat as point cloud.")
+        # 用点云方式重新读取
+        pcd = o3d.io.read_point_cloud(mesh_path)
+        if down_sample_voxel is not None and down_sample_voxel > 0:
+            pcd = pcd.voxel_down_sample(voxel_size=down_sample_voxel)
+        # 给点云估计法向
+        if not pcd.has_normals():
+            pcd.estimate_normals(
+                search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=30)
+            )
 
     pts = np.asarray(pcd.points)
     nrm = np.asarray(pcd.normals)
@@ -196,4 +214,35 @@ def pack_for_json(grasps: List[GraspPose], topk: Optional[int] = None):
             "score":    float(g.score),
         })
     return out
+# ---------- compatibility wrapper for demo.py ----------
+def sample_grasps(
+    mesh_path: str,
+    n_samples: int = 500,
+    output_dir: str = "grasp_6dof/dataset",
+    seed: int = 19,
+    **kwargs
+) -> str:
+    """
+    Backward-compatible API used by demo.py.
+    Returns: path to a json file that stores sampled grasps.
+    """
+    import json
+    import time
+    from pathlib import Path
+
+    grasps = sample_grasps_from_mesh(
+        mesh_path=mesh_path,
+        n_samples=n_samples,
+        seed=seed,
+        **kwargs
+    )
+
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"grasps_{Path(mesh_path).stem}_{int(time.time())}.json"
+
+    data = pack_for_json(grasps, topk=None)
+    out_path.write_text(json.dumps(data, indent=2))
+
+    return str(out_path)
 

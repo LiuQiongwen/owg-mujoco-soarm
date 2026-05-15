@@ -1,0 +1,305 @@
+b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
+No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frameb3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
+ee_linkb3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: left_inner_finger_pad
+b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: right_inner_finger_pad
+b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: left_inner_finger_pad
+b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: right_inner_finger_pad
+224 224
+
+========================================================
+  seed=1  spawning 8 objects ...
+  scene: ['Banana', 'MustardBottle', 'Scissors', 'TomatoSoupCan', 'PowerDrill', 'TennisBall', 'MediumClamp', 'MasterChefCan']
+
+  -- Stage 3 | baseline --
+    [3|seed=1] 'Banana'             ... 🔹 obj_ids: [ 6  7  8  9 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'TomatoSoupCan', 10: 'PowerDrill', 11: 'TennisBall', 12: 'MediumClamp', 13: 'MasterChefCan'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'TomatoSoupCan', 'PowerDrill', 'TennisBall', 'MediumClamp', 'MasterChefCan']
+✓  root_cause=success
+    [3|seed=1] 'MustardBottle'      ... 🔹 obj_ids: [ 6  7  8  9 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'TomatoSoupCan', 10: 'PowerDrill', 11: 'TennisBall', 12: 'MediumClamp', 13: 'MasterChefCan'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'TomatoSoupCan', 'PowerDrill', 'TennisBall', 'MediumClamp', 'MasterChefCan']
+Grasped wrong object Scissors
+Grasping failed. Exitting
+✗  root_cause=grasp_failed
+    [3|seed=1] 'Scissors'           ... 🔹 obj_ids: [ 6  7  8  9 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'TomatoSoupCan', 10: 'PowerDrill', 11: 'TennisBall', 12: 'MediumClamp', 13: 'MasterChefCan'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'TomatoSoupCan', 'PowerDrill', 'TennisBall', 'MediumClamp', 'MasterChefCan']
+✓  root_cause=success
+
+  -- Stage 4 | strategy=margin_0.00 --
+    [4/margin_0.00|seed=1] 'Banana'         ... [LGGSN diag] per-candidate features + scores:
+  idx         x         y         z      roll     pitch       yaw     width     score        dz   dz_lift   need_dz         H    logit   score  spread_from_c0
+    0   -0.2153   -0.3846    0.8108    3.1416    0.0000    1.2070    0.0286    0.0000    0.0000    0.0000    0.0000    0.0258  -7.2197  0.0007         +0.0000
+    1   -0.2117   -0.2871    0.8136    3.1416    0.0000   -1.3146    0.0286    0.0000    0.0000    0.0000    0.0000    0.0286  -6.8807  0.0010         +0.0003
+  score spread (max-min): 0.000295
+  constant features (no within-episode variance): ['roll', 'pitch', 'score', 'dz', 'dz_lift', 'need_dz']
+🔹 obj_ids: [ 6  7  8  9 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'TomatoSoupCan', 10: 'PowerDrill', 11: 'TennisBall', 12: 'MediumClamp', 13: 'MasterChefCan'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'TomatoSoupCan', 'PowerDrill', 'TennisBall', 'MediumClamp', 'MasterChefCan']
+✓  sel=1  changed=True  lggsn=0.0010263788281008601
+    [4/margin_0.00|seed=1] 'MustardBottle'  ... [LGGSN diag] per-candidate features + scores:
+  idx         x         y         z      roll     pitch       yaw     width     score        dz   dz_lift   need_dz         H    logit   score  spread_from_c0
+    0    0.2540   -0.7420    0.7849    3.1416    0.0000   -1.3314    0.0410    0.0000    0.0000    0.0000    0.0000   -0.0001  -7.9574  0.0003         +0.0000
+    1    0.2070   -0.7240    0.7849    3.1416    0.0000   -1.1351    0.0506    0.0000    0.0000    0.0000    0.0000   -0.0001  -7.9063  0.0004         +0.0000
+    2    0.2215   -0.8323    0.8397    3.1416    0.0000   -1.4496    0.0456    0.0000    0.0000    0.0000    0.0000    0.0547  -8.2321  0.0003         -0.0001
+    3    0.1962   -0.7745    0.8330    3.1416    0.0000   -1.4247    0.0384    0.0000    0.0000    0.0000    0.0000    0.0480  -8.0495  0.0003         -0.0000
+  score spread (max-min): 0.000102
+  constant features (no within-episode variance): ['roll', 'pitch', 'score', 'dz', 'dz_lift', 'need_dz']
+🔹 obj_ids: [ 6  7  8  9 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'TomatoSoupCan', 10: 'PowerDrill', 11: 'TennisBall', 12: 'MediumClamp', 13: 'MasterChefCan'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'TomatoSoupCan', 'PowerDrill', 'TennisBall', 'MediumClamp', 'MasterChefCan']
+Grasped wrong object Scissors
+Grasping failed. Exitting
+✗  sel=1  changed=True  lggsn=0.0003682954702526331
+    [4/margin_0.00|seed=1] 'Scissors'       ... b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
+No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frameb3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
+ee_linkb3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: left_inner_finger_pad
+b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: right_inner_finger_pad
+b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: left_inner_finger_pad
+b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: right_inner_finger_pad
+[LGGSN diag] per-candidate features + scores:
+  idx         x         y         z      roll     pitch       yaw     width     score        dz   dz_lift   need_dz         H    logit   score  spread_from_c0
+    0    0.1962   -0.6806    0.8403    3.1416    0.0000    0.1748    0.0478    0.0000    0.0000    0.0000    0.0000    0.0553  -7.7994  0.0004         +0.0000
+    1    0.2468   -0.7276    0.7849    3.1416    0.0000    0.1970    0.0374    0.0000    0.0000    0.0000    0.0000   -0.0001  -8.0538  0.0003         -0.0001
+    2    0.1168   -0.6879    0.8120    3.1416    0.0000    0.1613    0.0360    0.0000    0.0000    0.0000    0.0000    0.0270  -7.9351  0.0004         -0.0001
+  score spread (max-min): 0.000092
+  constant features (no within-episode variance): ['roll', 'pitch', 'score', 'dz', 'dz_lift', 'need_dz']
+🔹 obj_ids: [ 6  7  8  9 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'TomatoSoupCan', 10: 'PowerDrill', 11: 'TennisBall', 12: 'MediumClamp', 13: 'MasterChefCan'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'TomatoSoupCan', 'PowerDrill', 'TennisBall', 'MediumClamp', 'MasterChefCan']
+✗  sel=0  changed=False  lggsn=0.0004098064673598856
+
+========================================================
+  seed=2  spawning 8 objects ...
+  scene: ['Banana', 'MustardBottle', 'Scissors', 'PottedMeatCan', 'GelatinBox', 'MediumClamp', 'Strawberry', 'PowerDrill']
+
+  -- Stage 3 | baseline --
+    [3|seed=2] 'Banana'             ... 🔹 obj_ids: [ 6  7  8  9 10 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'PottedMeatCan', 10: 'GelatinBox', 11: 'MediumClamp', 12: 'Strawberry', 13: 'PowerDrill'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PottedMeatCan', 'GelatinBox', 'PowerDrill']
+✓  root_cause=success
+    [3|seed=2] 'MustardBottle'      ... 🔹 obj_ids: [ 6  7  8  9 10 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'PottedMeatCan', 10: 'GelatinBox', 11: 'MediumClamp', 12: 'Strawberry', 13: 'PowerDrill'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PottedMeatCan', 'GelatinBox', 'PowerDrill']
+Grasping failed. Retrying...
+Grasping failed. Retrying...
+Grasping failed. Retrying...
+Grasping failed. Exitting
+✗  root_cause=grasp_failed
+    [3|seed=2] 'Scissors'           ... 🔹 obj_ids: [ 6  7  8  9 10 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'PottedMeatCan', 10: 'GelatinBox', 11: 'MediumClamp', 12: 'Strawberry', 13: 'PowerDrill'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PottedMeatCan', 'GelatinBox', 'PowerDrill']
+✓  root_cause=success
+
+  -- Stage 4 | strategy=margin_0.00 --
+    [4/margin_0.00|seed=2] 'Banana'         ... [LGGSN diag] per-candidate features + scores:
+  idx         x         y         z      roll     pitch       yaw     width     score        dz   dz_lift   need_dz         H    logit   score  spread_from_c0
+    0    0.3153   -0.3955    0.8222    3.1416    0.0000    0.7217    0.0376    0.0000    0.0000    0.0000    0.0000    0.0372  -7.2810  0.0007         +0.0000
+    1    0.4200   -0.4496    0.8166    3.1416    0.0000    0.1081    0.0333    0.0000    0.0000    0.0000    0.0000    0.0316  -7.3716  0.0006         -0.0001
+  score spread (max-min): 0.000060
+  constant features (no within-episode variance): ['roll', 'pitch', 'score', 'dz', 'dz_lift', 'need_dz']
+🔹 obj_ids: [ 6  7  8  9 10 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'PottedMeatCan', 10: 'GelatinBox', 11: 'MediumClamp', 12: 'Strawberry', 13: 'PowerDrill'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PottedMeatCan', 'GelatinBox', 'PowerDrill']
+Grasping failed. Retrying...
+Grasping failed. Retrying...
+Grasping failed. Exitting
+✗  sel=0  changed=False  lggsn=0.0006880472064949572
+    [4/margin_0.00|seed=2] 'MustardBottle'  ... [LGGSN diag] per-candidate features + scores:
+  idx         x         y         z      roll     pitch       yaw     width     score        dz   dz_lift   need_dz         H    logit   score  spread_from_c0
+    0    0.2792   -0.5760    0.8393    3.1416    0.0000   -1.2926    0.0483    0.0000    0.0000    0.0000    0.0000    0.0543  -7.4259  0.0006         +0.0000
+    1    0.3117   -0.5038    0.7849    3.1416    0.0000   -1.1569    0.0465    0.0000    0.0000    0.0000    0.0000   -0.0001  -7.3409  0.0006         +0.0001
+    2    0.3117   -0.4749    0.8585    3.1416    0.0000   -1.2088    0.0428    0.0000    0.0000    0.0000    0.0000    0.0735  -7.2353  0.0007         +0.0001
+    3    0.3117   -0.4460    0.8671    3.1416    0.0000   -1.0938    0.0414    0.0000    0.0000    0.0000    0.0000    0.0821  -7.1923  0.0008         +0.0002
+    4    0.2540   -0.4785    0.8534    3.1416    0.0000   -1.2441    0.0508    0.0000    0.0000    0.0000    0.0000    0.0684  -7.2166  0.0007         +0.0001
+  score spread (max-min): 0.000157
+  constant features (no within-episode variance): ['roll', 'pitch', 'score', 'dz', 'dz_lift', 'need_dz']
+🔹 obj_ids: [ 6  7  8  9 10 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'PottedMeatCan', 10: 'GelatinBox', 11: 'MediumClamp', 12: 'Strawberry', 13: 'PowerDrill'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PottedMeatCan', 'GelatinBox', 'PowerDrill']
+Grasping failed. Retrying...
+Grasping failed. Retrying...
+Grasping failed. Retrying...
+Grasping failed. Retrying...
+Grasped wrong object GelatinBox
+Grasping failed. Exitting
+✗  sel=3  changed=True  lggsn=0.0007517775520682335
+    [4/margin_0.00|seed=2] 'Scissors'       ... b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
+No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frameb3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
+ee_linkb3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: left_inner_finger_pad
+b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: right_inner_finger_pad
+b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: left_inner_finger_pad
+b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+Bad inertia tensor properties, setting inertia to zero for link: right_inner_finger_pad
+[LGGSN diag] per-candidate features + scores:
+  idx         x         y         z      roll     pitch       yaw     width     score        dz   dz_lift   need_dz         H    logit   score  spread_from_c0
+    0    0.2792   -0.5146    0.7849    3.1416    0.0000    0.1857    0.0362    0.0000    0.0000    0.0000    0.0000   -0.0001  -7.5295  0.0005         +0.0000
+    1    0.3081   -0.4749    0.7849    3.1416    0.0000    0.1986    0.0315    0.0000    0.0000    0.0000    0.0000   -0.0001  -7.4685  0.0006         +0.0000
+    2    0.4056   -0.5579    0.7849    3.1416    0.0000    1.0566    0.0177    0.0000    0.0000    0.0000    0.0000   -0.0001  -7.6242  0.0005         -0.0000
+    3    0.4345   -0.5362    0.7849    3.1416    0.0000    1.1223    0.0303    0.0000    0.0000    0.0000    0.0000   -0.0001  -7.5327  0.0005         -0.0000
+  score spread (max-min): 0.000082
+  constant features (no within-episode variance): ['z', 'roll', 'pitch', 'score', 'dz', 'dz_lift', 'need_dz', 'H']
+🔹 obj_ids: [ 6  7  8  9 10 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'PottedMeatCan', 10: 'GelatinBox', 11: 'MediumClamp', 12: 'Strawberry', 13: 'PowerDrill'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PottedMeatCan', 'GelatinBox', 'PowerDrill']
+✓  sel=1  changed=True  lggsn=0.000570465752389282
+
+========================================================
+  seed=3  spawning 8 objects ...
+  scene: ['Banana', 'MustardBottle', 'Scissors', 'Strawberry', 'PowerDrill', 'MediumClamp', 'TomatoSoupCan', 'Hammer']
+
+  -- Stage 3 | baseline --
+    [3|seed=3] 'Banana'             ... 🔹 obj_ids: [ 6  7  8 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'Strawberry', 10: 'PowerDrill', 11: 'MediumClamp', 12: 'TomatoSoupCan', 13: 'Hammer'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PowerDrill', 'MediumClamp', 'TomatoSoupCan', 'Hammer']
+✓  root_cause=success
+    [3|seed=3] 'MustardBottle'      ... 🔹 obj_ids: [ 6  7  8 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'Strawberry', 10: 'PowerDrill', 11: 'MediumClamp', 12: 'TomatoSoupCan', 13: 'Hammer'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PowerDrill', 'MediumClamp', 'TomatoSoupCan', 'Hammer']
+✓  root_cause=success
+    [3|seed=3] 'Scissors'           ... 🔹 obj_ids: [ 6  7  8 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'Strawberry', 10: 'PowerDrill', 11: 'MediumClamp', 12: 'TomatoSoupCan', 13: 'Hammer'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PowerDrill', 'MediumClamp', 'TomatoSoupCan', 'Hammer']
+✓  root_cause=success
+
+  -- Stage 4 | strategy=margin_0.00 --
+    [4/margin_0.00|seed=3] 'Banana'         ... [LGGSN diag] per-candidate features + scores:
+  idx         x         y         z      roll     pitch       yaw     width     score        dz   dz_lift   need_dz         H    logit   score  spread_from_c0
+    0   -0.1468   -0.3991    0.8235    3.1416    0.0000    1.3196    0.0293    0.0000    0.0000    0.0000    0.0000    0.0385  -7.2067  0.0007         +0.0000
+    1   -0.1359   -0.4207    0.8233    3.1416    0.0000    1.1206    0.0296    0.0000    0.0000    0.0000    0.0000    0.0383  -7.3167  0.0007         -0.0001
+    2   -0.0962   -0.4532    0.8118    3.1416    0.0000    0.9714    0.0341    0.0000    0.0000    0.0000    0.0000    0.0268  -7.4079  0.0006         -0.0001
+  score spread (max-min): 0.000135
+  constant features (no within-episode variance): ['roll', 'pitch', 'score', 'dz', 'dz_lift', 'need_dz']
+🔹 obj_ids: [ 6  7  8 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'Strawberry', 10: 'PowerDrill', 11: 'MediumClamp', 12: 'TomatoSoupCan', 13: 'Hammer'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PowerDrill', 'MediumClamp', 'TomatoSoupCan', 'Hammer']
+✓  sel=0  changed=False  lggsn=0.0007410611724480987
+    [4/margin_0.00|seed=3] 'MustardBottle'  ... [LGGSN diag] per-candidate features + scores:
+  idx         x         y         z      roll     pitch       yaw     width     score        dz   dz_lift   need_dz         H    logit   score  spread_from_c0
+    0    0.0518   -0.5832    0.8379    3.1416    0.0000    0.3666    0.0627    0.0000    0.0000    0.0000    0.0000    0.0529  -7.5572  0.0005         +0.0000
+    1    0.0662   -0.5290    0.8328    3.1416    0.0000    0.3138    0.0601    0.0000    0.0000    0.0000    0.0000    0.0478  -7.4629  0.0006         +0.0001
+    2    0.1132   -0.5832    0.8401    3.1416    0.0000    0.2824    0.0678    0.0000    0.0000    0.0000    0.0000    0.0551  -7.5288  0.0005         +0.0000
+    3    0.1096   -0.6121    0.8398    3.1416    0.0000    0.2939    0.0644    0.0000    0.0000    0.0000    0.0000    0.0548  -7.5948  0.0005         -0.0000
+  score spread (max-min): 0.000071
+  constant features (no within-episode variance): ['roll', 'pitch', 'score', 'dz', 'dz_lift', 'need_dz']
+🔹 obj_ids: [ 6  7  8 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'Strawberry', 10: 'PowerDrill', 11: 'MediumClamp', 12: 'TomatoSoupCan', 13: 'Hammer'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PowerDrill', 'MediumClamp', 'TomatoSoupCan', 'Hammer']
+Grasping failed. Retrying...
+✓  sel=1  changed=True  lggsn=0.000573671015445143
+    [4/margin_0.00|seed=3] 'Scissors'       ... [LGGSN diag] per-candidate features + scores:
+  idx         x         y         z      roll     pitch       yaw     width     score        dz   dz_lift   need_dz         H    logit   score  spread_from_c0
+    0   -0.1612   -0.6843    0.8077    3.1416    0.0000    0.5545    0.0357    0.0000    0.0000    0.0000    0.0000    0.0227  -8.1271  0.0003         +0.0000
+    1   -0.1395   -0.6806    0.7849    3.1416    0.0000    0.5078    0.0390    0.0000    0.0000    0.0000    0.0000   -0.0001  -8.1195  0.0003         +0.0000
+    2   -0.0745   -0.7853    0.7849    3.1416    0.0000    1.5154    0.0341    0.0000    0.0000    0.0000    0.0000   -0.0001  -8.4228  0.0002         -0.0001
+    3   -0.0312   -0.7240    0.7849    3.1416    0.0000   -0.3260    0.0442    0.0000    0.0000    0.0000    0.0000   -0.0001  -8.1372  0.0003         -0.0000
+    4   -0.0962   -0.7348    0.8163    3.1416    0.0000    0.1916    0.0463    0.0000    0.0000    0.0000    0.0000    0.0313  -8.2153  0.0003         -0.0000
+  score spread (max-min): 0.000078
+  constant features (no within-episode variance): ['roll', 'pitch', 'score', 'dz', 'dz_lift', 'need_dz']
+🔹 obj_ids: [ 6  7  8 10 11 12 13]
+🔹 id_to_name: {6: 'Banana', 7: 'MustardBottle', 8: 'Scissors', 9: 'Strawberry', 10: 'PowerDrill', 11: 'MediumClamp', 12: 'TomatoSoupCan', 13: 'Hammer'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['Banana', 'MustardBottle', 'Scissors', 'PowerDrill', 'MediumClamp', 'TomatoSoupCan', 'Hammer']
+✓  sel=0  changed=False  lggsn=0.0002975953393615782
+
+Done. logs/batch_s3s4.jsonl
+
+ scene  stage strategy     prompt              sel_idx  lggsn_top1  success  root_cause
+----------------------------------------------------------------------------------------------------
+     1      3 —            Banana                    0           —     True  success
+     1      3 —            MustardBottle             0           —    False  grasp_failed
+     1      3 —            Scissors                  0           —     True  success
+     1      4 margin_0.00  Banana                    1       0.001     True  success
+     1      4 margin_0.00  MustardBottle             1       0.000    False  grasp_failed
+     1      4 margin_0.00  Scissors                  0       0.000    False  place_failed
+     2      3 —            Banana                    0           —     True  success
+     2      3 —            MustardBottle             0           —    False  grasp_failed
+     2      3 —            Scissors                  0           —     True  success
+     2      4 margin_0.00  Banana                    0       0.001    False  grasp_failed
+     2      4 margin_0.00  MustardBottle             3       0.001    False  grasp_failed
+     2      4 margin_0.00  Scissors                  1       0.001     True  success
+     3      3 —            Banana                    0           —     True  success
+     3      3 —            MustardBottle             0           —     True  success
+     3      3 —            Scissors                  0           —     True  success
+     3      4 margin_0.00  Banana                    0       0.001     True  success
+     3      4 margin_0.00  MustardBottle             1       0.001     True  success
+     3      4 margin_0.00  Scissors                  0       0.000     True  success
+
+strategy        consistent_success   ranking_improvement       non_determinism    consistent_failure    ranking_regression   net_improvement
+--------------------------------------------------------------------------------------------------------------------------------------------
+margin_0.00                      5                     0                     2                     2                     0                +0
+
+(net_improvement = ranking_improvement − ranking_regression; higher is better)
+
+── lggsn_score_delta distribution per strategy ──
+strategy          N  changed      p25     p50     p75     p90   non_det_at_delta0
+--------------------------------------------------------------------------------
+margin_0.00       9        5    0.000   0.000   0.000   0.000                   2
+pybullet build time: Jan 29 2025 23:16:28
+INFO:root:CUDA detected. Running with GPU acceleration.
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQNjOPrtF8KiIM6nVKRT0vB4Pa04', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237000, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Banana"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 426, 'completion_tokens': 8, 'total_tokens': 434, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 1, 'content_filter_results': {}}, {'prompt_index': 0, 'content_filter_results': {}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQNo5QXPVeUKpI169H1wvInOsEKY', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237005, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "MustardBottle"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 428, 'completion_tokens': 9, 'total_tokens': 437, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQNtdZrLf6hxI8cvI48chrlmKynb', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237010, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Scissors"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 427, 'completion_tokens': 8, 'total_tokens': 435, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQNzxzwqGQmuXJT0XwEgVQjwDt58', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237016, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Banana"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 426, 'completion_tokens': 8, 'total_tokens': 434, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 1, 'content_filter_results': {}}, {'prompt_index': 0, 'content_filter_results': {}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQO5bOqvtmsauGCeQqXhboHjpjTh', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237021, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "MustardBottle"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'protected_material_code': {'filtered': False}, 'protected_material_text': {'filtered': False}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 428, 'completion_tokens': 9, 'total_tokens': 437, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}, 'jailbreak': {'filtered': False}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQO9sb44BkClkKKEDczqEh7PhEXl', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237026, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Scissors"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 427, 'completion_tokens': 8, 'total_tokens': 435, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQOIoGGOTURffWmGr3MOcEN2jPcw', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237034, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Banana"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 426, 'completion_tokens': 8, 'total_tokens': 434, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 1, 'content_filter_results': {}}, {'prompt_index': 0, 'content_filter_results': {}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQOM4QgROhU65WT4t6NsmTvusx37', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237039, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "MustardBottle"}'}, 'finish_reason': 'stop'}], 'usage': {'prompt_tokens': 428, 'completion_tokens': 9, 'total_tokens': 437, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7'}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQORPeP9fRmZ42jXEWk4ChHExqm9', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237044, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Scissors"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 427, 'completion_tokens': 8, 'total_tokens': 435, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQOWL5zCKsPUHpLaSrITH5BUVsfH', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237049, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Banana"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 426, 'completion_tokens': 8, 'total_tokens': 434, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQOcdRf9Fu2vExAEyOovSi7nCnCH', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237054, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "MustardBottle"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'protected_material_code': {'filtered': False}, 'protected_material_text': {'filtered': False}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 428, 'completion_tokens': 9, 'total_tokens': 437, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}, 'jailbreak': {'filtered': False}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQOiZTtO2yanEHtVuDLIHmL3BTQq', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237061, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Scissors"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 427, 'completion_tokens': 8, 'total_tokens': 435, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQOpuJMQYIvUff6G1wIlrZzMaKbQ', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237068, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Banana"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 426, 'completion_tokens': 8, 'total_tokens': 434, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQOuwC7cekT2H7JHe34iu0Ez81Kd', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237075, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "MustardBottle"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'protected_material_code': {'filtered': False}, 'protected_material_text': {'filtered': False}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 428, 'completion_tokens': 9, 'total_tokens': 437, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}, 'jailbreak': {'filtered': False}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQP0pT65WDeMqKCTtEmUnSPlrlR7', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237079, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Scissors"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 427, 'completion_tokens': 8, 'total_tokens': 435, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQP5JNad4J2NZttQqLCVVYGkQ06J', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237084, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Banana"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 426, 'completion_tokens': 8, 'total_tokens': 434, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}]}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQPAlPg0vnTZjTNX9vebqpWRVQnZ', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237088, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "MustardBottle"}'}, 'finish_reason': 'stop'}], 'usage': {'prompt_tokens': 428, 'completion_tokens': 9, 'total_tokens': 437, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7'}
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMQPGkUX9S1rTm1UvIATA6FXhfnEF', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774237094, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Scissors"}'}, 'finish_reason': 'stop', 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}], 'usage': {'prompt_tokens': 427, 'completion_tokens': 8, 'total_tokens': 435, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7', 'prompt_filter_results': [{'prompt_index': 0, 'content_filter_results': {'hate': {'filtered': False, 'severity': 'safe'}, 'self_harm': {'filtered': False, 'severity': 'safe'}, 'sexual': {'filtered': False, 'severity': 'safe'}, 'violence': {'filtered': False, 'severity': 'safe'}}}]}
+
+

@@ -1,0 +1,379 @@
+from typing import List, Dict, Any, Optional
+from owg.visual_prompt import VisualPrompterPlanning, VisualPrompterGrounding, VisualPrompterGraspRanking
+from owg.utils.image import display_image
+from owg.utils.grasp import Grasp2D
+from owg.utils.pointcloud import to_o3d
+import numpy as np
+from PIL import Image
+import json, ast, re
+from owg_robot.grasp_ranker_lggsn import LggsnGraspRanker
+import os, time
+from owg.gpt_utils import parse_llm_payload
+
+GROUND_LOG_DIR = "logs/grounding_examples"
+os.makedirs(GROUND_LOG_DIR, exist_ok=True)
+
+def _safe_get_from_raw(resp: dict, *keys):
+    """
+    Safely return the first present, non-None value for keys from resp dict.
+    Avoid evaluating truthiness of numpy arrays (which raises ValueError).
+    """
+    if not isinstance(resp, dict):
+        return None
+    for k in keys:
+        if k in resp:
+            v = resp[k]
+            # treat None as missing, but accept numpy arrays, lists, scalars (even empty)
+            if v is not None:
+                return v
+    return None
+
+
+
+
+def safe_json_parse(raw_resp):
+    """Robustly parse LLM JSON-like responses, even with code blocks or single quotes."""
+    if raw_resp is None:
+        return None
+
+    if not isinstance(raw_resp, str):
+        raw_resp = str(raw_resp)
+
+    # 去掉 ``` 或 ```json 的代码块标识
+    raw_resp = raw_resp.strip()
+    raw_resp = re.sub(r"^```[a-zA-Z]*\s*", "", raw_resp)
+    raw_resp = re.sub(r"\s*```$", "", raw_resp)
+
+    # 将单引号改成双引号，但只对最外层JSON有效
+    if raw_resp.startswith("[") or raw_resp.startswith("{"):
+        raw_resp = raw_resp.replace("'", '"')
+
+    try:
+        return json.loads(raw_resp)
+    except Exception:
+        try:
+            return ast.literal_eval(raw_resp)
+        except Exception as e2:
+            print("⚠️ safe_json_parse failed:", e2)
+            print("🔹 原始响应:", raw_resp)
+            return None
+
+
+
+
+
+
+
+class OwgPolicy:
+    """
+    Debug version of OWG policy with detailed logging and robust JSON parsing.
+    """
+
+    def __init__(self, config_path: str, verbose: bool = True, vis: bool = False, use_grasp_ranker: bool = True):
+        self.vis = vis
+        self.verbose = verbose
+        self.grounder = VisualPrompterGrounding(config_path, debug=verbose)
+        self.planner = VisualPrompterPlanning(config_path, debug=verbose)
+
+        self.use_grasp_ranker = use_grasp_ranker
+        self.grasp_ranker = None
+
+        if use_grasp_ranker:
+            # ✅ 优先尝试用 LG-GSN 几何 ranker
+            try:
+                self.grasp_ranker = LggsnGraspRanker(
+                    model_path="grasp_6dof/models/lggsn_pairwise_live.pt",
+                    device="cuda",
+                )
+                if verbose:
+                    print("🟢 Using LGGSN geometry grasp ranker.")
+            except Exception as e:
+                print("⚠️ Failed to init LGGSN ranker, disable grasp ranker:", e)
+                self.grasp_ranker = None
+                self.use_grasp_ranker = False   # 关键：直接关掉，不再 fallback
+    def predict(self, obs, user_input, all_grasps, obj_names=None, env_obj_ids=None):
+        """
+        Robust predict method for OwgPolicy. Replace the original predict with this.
+        """
+        image, seg = obs['image'], obs['seg']
+        grasps = all_grasps
+        # 尝试拿一下深度和相机参数（没有就算了，不会报错）
+        depth = obs.get('depth') if isinstance(obs, dict) else None
+        K = obs.get('K') if isinstance(obs, dict) else None
+        pose_cam = obs.get('cam_pose') if isinstance(obs, dict) else None
+
+        # ---------------- Object masks ----------------
+        # 先拿到所有 ID，然后去掉背景 0
+        obj_ids = np.unique(seg)
+        obj_ids = obj_ids[obj_ids != 0]
+
+        # 🧱 防止 np.stack([]) 崩掉：如果没检测到任何物体，直接 fail
+        if obj_ids.size == 0:
+            if getattr(self, "verbose", False):
+                print("⚠️ No objects detected in segmentation. Aborting this action.")
+            return {'action': 'fail'}
+
+        # 正常情况：对每个 obj_id 生成一个 mask，然后 stack
+        all_masks = np.stack([seg == objID for objID in obj_ids], axis=0)
+        # 用环境里的 obj_ids -> obj_names 做映射
+        id_to_name = {}
+        if env_obj_ids is not None and obj_names is not None:
+            id_to_name = {int(i): str(n) for i, n in zip(env_obj_ids, obj_names)}
+
+        labels = [id_to_name.get(int(obj_id), str(int(obj_id))) for obj_id in obj_ids]
+
+        marker_data = {'masks': all_masks, 'labels': labels}
+
+        print("🔹 obj_ids:", obj_ids)
+        print("🔹 id_to_name:", id_to_name)
+        print("🔹 marker_data keys:", marker_data.keys())
+        print("🔹 labels:", marker_data["labels"])
+
+        if getattr(self, "vis", False):
+            visual_prompt, _ = self.grounder.prepare_image_prompt(image.copy(), marker_data)
+            Image.fromarray(visual_prompt[-1]).show()
+        forced_id = None
+        # --- numeric tid fast-path: used by :all evaluation ---
+        if isinstance(user_input, str) and user_input.strip().isdigit():
+            tid = int(user_input.strip())
+            action = {"action": "pick", "input": tid, "target_id": tid}
+
+            # attach candidate grasps
+            if isinstance(grasps, dict) and tid in grasps:
+                action["grasps"] = grasps[tid]
+            else:
+                action["grasps"] = None
+
+            # optional: rank grasps if enabled (stage4)
+            if self.use_grasp_ranker and action["grasps"] is not None:
+                try:
+                    order, scores = self.grasp_ranker.rank(
+                        action["grasps"], query_text=f"id {tid}"
+                    )
+                    action["grasps"] = order.tolist()
+                except Exception as e:
+                    print(f"[WARN] grasp ranking failed in numeric path: {e}")
+
+            return action
+
+        # ---------------- Grounding ----------------
+        q = str(user_input).strip()
+        if q.isdigit():
+            tid = int(q)
+            if tid not in obj_ids:
+                return {'action': 'fail'}
+
+            # 直接构造 pick action（不走 grounder/planner）
+            action = {'action': 'pick', 'input': tid, 'target_id': tid}
+
+            # 给后面的 grasp 选择逻辑用
+            if isinstance(grasps, dict) and tid in grasps:
+                action['grasps'] = list(range(len(grasps[tid])))
+            else:
+                action['grasps'] = []
+
+            # 下面继续沿用你原来的 grasp_ranker / top-k 逻辑（不要 return）
+            # （也就是让它走到你现在已有的 “LGGSN grasp scores/top5 + action['grasps']=...” 那段）
+
+        raw_resp = self.grounder.request(
+            text_query=user_input,
+            image=image.copy(),
+            data=marker_data
+        )
+        if getattr(self, "verbose", False):
+            print("🟢 Grounder raw response:", raw_resp)
+
+        # ---- 统一解析 Grounder 的返回（支持 dict / tuple / target_label）----
+        dets = None
+        target_mask = None
+        target_ids = None
+
+        if isinstance(raw_resp, dict):
+            # 常见检测输出
+            dets = raw_resp.get("outputs", None)
+            if dets is None:
+                dets = raw_resp.get("dets", None)
+            if dets is None:
+                dets = raw_resp.get("detections", None)
+
+            # 常见 mask 输出
+            if "mask" in raw_resp:
+                target_mask = raw_resp["mask"]
+            elif "target_mask" in raw_resp:
+                target_mask = raw_resp["target_mask"]
+
+            # 常见 id 输出
+            if "ids" in raw_resp:
+                target_ids = raw_resp["ids"]
+            elif "target_ids" in raw_resp:
+                target_ids = raw_resp["target_ids"]
+
+            # 新增：支持 {"target_label": "..."} 这种返回
+            if target_ids is None and "target_label" in raw_resp:
+                target_label = raw_resp["target_label"]
+
+                if target_label is None:
+                    target_ids = []
+                else:
+                    labels = marker_data["labels"]
+
+                    # 先精确匹配
+                    matched_idx = None
+                    for i, lbl in enumerate(labels):
+                        if str(lbl) == str(target_label):
+                            matched_idx = i
+                            break
+
+                    # 再大小写不敏感匹配
+                    if matched_idx is None:
+                        target_label_lower = str(target_label).strip().lower()
+                        for i, lbl in enumerate(labels):
+                            if str(lbl).strip().lower() == target_label_lower:
+                                matched_idx = i
+                                break
+
+                    if matched_idx is None:
+                        print(f"❌ Grounding label not found. target_label={target_label}, labels={labels}")
+                        target_ids = []
+                    else:
+                        # matched_idx 对应 obj_ids / masks 的同一索引
+                        target_ids = [int(obj_ids[matched_idx])]
+                        target_mask = marker_data["masks"][matched_idx]
+                        if getattr(self, "verbose", False):
+                            print(f"✅ Grounding matched label: {target_label} -> obj_id={target_ids[0]}, idx={matched_idx}")
+
+        elif isinstance(raw_resp, (list, tuple, np.ndarray)) and len(raw_resp) >= 3:
+            dets, target_mask, target_ids = raw_resp[:3]
+        else:
+            print("❌ Grounding returned unsupported format:", type(raw_resp), raw_resp)
+            return {"action": "fail"}
+
+        # ---- 只根据 target_ids 来判断是否成功 ----
+        if target_ids is None or (
+            isinstance(target_ids, (list, tuple, np.ndarray)) and len(target_ids) == 0
+        ):
+            print("❌ Grounding failed. Raw response:", raw_resp)
+            return {"action": "fail"}
+
+        # 统一成 list[int]
+        if isinstance(target_ids, (list, tuple, np.ndarray)):
+            target_ids = [int(i) for i in target_ids]
+        else:
+            target_ids = [int(target_ids)]
+
+        if getattr(self, "verbose", False):
+            print("✅ target_ids:", target_ids)
+
+        # ---------- 这里开始：保存 grounding 日志 ----------
+        try:
+            # 统一成一维数组形式
+            if isinstance(target_ids, (list, tuple, np.ndarray)):
+                sel_ids = np.array(target_ids, dtype=int)
+            else:
+                sel_ids = np.array([int(target_ids)], dtype=int)
+
+            log_dict = {
+                "image": image.astype(np.uint8),
+                "masks": marker_data["masks"].astype(bool),
+                "labels": np.array(marker_data["labels"]),
+                "selected_ids": sel_ids,
+                "query": user_input,
+            }
+            # 可选：有 depth / K / pose_cam 就一起存
+            if depth is not None:
+                log_dict["depth"] = np.array(depth)
+            if K is not None:
+                log_dict["K"] = np.array(K)
+            if pose_cam is not None:
+                log_dict["pose_cam"] = np.array(pose_cam)
+
+            ts = time.time()
+            fname = os.path.join(GROUND_LOG_DIR, f"ground_{ts:.3f}.npz")
+            np.savez_compressed(fname, **log_dict)
+
+            if getattr(self, "verbose", False):
+                print(f"📝 Saved grounding log → {fname}")
+        except Exception as e:
+            if getattr(self, "verbose", False):
+                print("⚠️ Failed to log grounding example:", e)
+
+        # ---------------- Planning ----------------
+        if isinstance(target_ids, (list, tuple, np.ndarray)):
+            if len(target_ids) == 0:
+                print("❌ target_ids empty")
+                return {'action': 'fail'}
+            qid = target_ids[0]
+        else:
+            qid = target_ids
+
+        try:
+            if isinstance(qid, (np.integer,)):
+                query_id = str(int(qid))
+            else:
+                query_id = str(qid)
+        except Exception:
+            query_id = str(qid)
+
+        # ---------------- Planning ----------------
+        # 临时跳过 LLM planner，直接给一个最小可运行 action
+        action = {
+            "action": "pick",
+            "input": int(target_ids[0]) if isinstance(target_ids, (list, tuple, np.ndarray)) else int(target_ids),
+        }
+
+        if getattr(self, "verbose", False):
+            print("🟢 Using fallback planner action:", action)
+
+        # ---------------- Grasp Assignment ----------------
+        try:
+            if isinstance(target_ids, (list, tuple, np.ndarray)):
+                action['target_id'] = target_ids[0]
+            else:
+                action['target_id'] = target_ids
+
+            if grasps is not None:
+                if isinstance(grasps, dict):
+                    action['grasps'] = list(range(len(grasps.get(action['input'], []))))
+                else:
+                    try:
+                        action['grasps'] = list(range(len(grasps[action['input']])))
+                    except Exception:
+                        action['grasps'] = []
+            else:
+                action['grasps'] = []
+        except Exception as e:
+            print("⚠️ Grasp assignment error:", e)
+            return {'action': 'fail'}
+
+        # ---------------- Grasp Ranking ----------------
+        if getattr(self, "use_grasp_ranker", False) and grasps is not None and getattr(self, "grasp_ranker", None) is not None:
+            # 取出当前目标物体的 grasps
+            if isinstance(grasps, dict):
+                obj_grasps = grasps.get(action['input'], [])
+            else:
+                if isinstance(action.get('input'), (int, np.integer)) and action['input'] <     len(grasps):
+                    obj_grasps = grasps[action['input']]
+                else:
+                    obj_grasps = []
+
+            if len(obj_grasps) == 0:
+                action['grasps'] = []
+            else:
+                # 用 LGGSN 对 3D grasps 打分并排序
+                order, scores = self.grasp_ranker.rank(
+                    obj_grasps,
+                    query_text=user_input,
+                    obj_type=None,
+                )
+                action['grasps'] = order.tolist()
+                if getattr(self, "verbose", False) and len(order) > 0:
+                    print("🟢 LGGSN grasp scores (top 5):", scores[order[:5]])
+
+            if getattr(self, "verbose", False):
+                print("🟢 Final action:", action)
+
+        return action
+
+        
+        
+

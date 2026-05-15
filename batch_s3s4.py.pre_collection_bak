@@ -1,0 +1,501 @@
+#!/usr/bin/env python3
+"""
+Minimal Stage 3 vs Stage 4 validation batch.
+
+2 stages × 2 seeds × 3 prompts = 12 trials.
+Output: logs/batch_s3s4.jsonl
+
+Output schema per line:
+{
+  "ts":                    str   ISO-8601 timestamp
+  "stage":                 int   3 or 4
+  "seed":                  int   pybullet/YCB shuffle seed
+  "prompt":                str   natural-language query
+  "target_present_in_scene": bool  is the named object in the spawned scene?
+  "n_grasps":              int|null  candidate grasps for target object (null if absent)
+  "lggsn_score_top1":      float|null  LGGSN score of best-ranked grasp (null for stage 3 or absent target)
+  "success":               bool  grasp AND place both succeeded
+  "root_cause":            str   one of: success | grounding_failed | grasp_failed |
+                                         place_failed | target_not_in_scene
+}
+"""
+
+import cv2
+import json
+import os
+import time
+
+import numpy as np
+from PIL import Image
+
+from owg.policy import OwgPolicy
+from owg.utils.config import load_config
+from owg.utils.grasp import Grasp2D
+from owg_robot.camera import Camera
+from owg_robot.env import Environment
+from owg_robot.objects import YcbObjects
+from third_party.grconvnet import load_grasp_generator
+
+# ── experiment config ────────────────────────────────────────────────────────
+SEEDS        = [1, 2, 3]
+PROMPTS      = ["Banana", "MustardBottle", "Scissors"]
+N_OBJ        = 8
+CFG_PATH     = "config/pyb/env.yaml"
+OUT_PATH     = "logs/batch_s3s4.jsonl"
+
+# Stage-4 margin sweep: thresholds to compare against Stage-3 baseline
+SWEEP_MARGINS = [0.0]
+S4_STRATEGIES = [f"margin_{m:.2f}" for m in SWEEP_MARGINS]
+HYBRID_ALPHA  = 0.5    # kept for reference, not used in this sweep
+# ─────────────────────────────────────────────────────────────────────────────
+
+os.makedirs("logs", exist_ok=True)
+
+
+def log_record(record: dict) -> None:
+    with open(OUT_PATH, "a") as f:
+        f.write(json.dumps(record) + "\n")
+
+
+CAND_PATH = "logs/lggsn_live_candidates.jsonl"
+
+def _emit_lggsn_candidates(obj_grasps: list, success: bool,
+                            prompt: str, scene_id: int) -> None:
+    """
+    Write one row per candidate grasp to CAND_PATH using Strategy B:
+    all candidates in the episode share the episode-level success label.
+
+    Each row schema matches all_lggsn.csv feature columns exactly:
+      x, y, z, roll, pitch, yaw, width, score,
+      dz, dz_lift, need_dz, H, label, query,
+      scene_id, candidate_idx          ← stripped before training
+    """
+    if not obj_grasps:
+        return
+    label = 1 if success else 0
+    with open(CAND_PATH, "a") as f:
+        for idx, g in enumerate(obj_grasps):
+            # raw 7-tuple: (x, y, z, yaw, opening_len, obj_height, quality)
+            vals = [float(v) for v in g]
+            while len(vals) < 7:
+                vals.append(0.0)
+            x, y, z, yaw, width, H, score = vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6]
+            row = dict(
+                x=round(x, 6), y=round(y, 6), z=round(z, 6),
+                roll=3.141593, pitch=0.0, yaw=round(yaw, 6),
+                width=round(width, 6), score=round(score, 6),
+                dz=0.0, dz_lift=0.0, need_dz=0.0, H=round(H, 6),
+                label=label, query=prompt,
+                scene_id=scene_id, candidate_idx=idx,
+            )
+            f.write(json.dumps(row) + "\n")
+
+
+def make_camera(cfg) -> Camera:
+    return Camera(
+        (cfg.camera.center_x, cfg.camera.center_y, cfg.camera.center_z),
+        (cfg.camera.target_x, cfg.camera.target_y, cfg.camera.target_z),
+        cfg.camera.znear,
+        cfg.camera.zfar,
+        (cfg.camera.img_size, cfg.camera.img_size),
+        cfg.camera.fov,
+    )
+
+
+def make_scene(cfg, seed: int, n_obj: int):
+    """Spin up a fresh headless pybullet env, spawn n_obj objects, return (env, init_state, obs)."""
+    camera = make_camera(cfg)
+    env = Environment(
+        camera,
+        vis=False,
+        asset_root="./owg_robot/assets",
+        finger_length=cfg.finger_length,
+        n_grasp_attempts=cfg.n_grasp_attempts,
+    )
+    objects = YcbObjects(
+        "./owg_robot/assets/ycb_objects",
+        mod_orn=["ChipsCan", "MustardBottle", "TomatoSoupCan"],
+        mod_stiffness=["Strawberry"],
+        seed=seed,
+    )
+    objects.shuffle_objects()
+    # pin PROMPTS targets to the front; fill remaining slots with shuffled rest
+    pinned = [n for n in PROMPTS if n in objects.obj_names]
+    rest   = [n for n in objects.obj_names if n not in PROMPTS]
+    objects.obj_names = (pinned + rest)[:n_obj]
+    for obj_name in objects.obj_names:
+        path, mod_orn, mod_stiff = objects.get_obj_info(obj_name)
+        env.load_isolated_obj(path, obj_name, mod_orn, mod_stiff)
+        env.dummy_simulation_steps(30)
+    env.dummy_simulation_steps(10)
+    init_state = env.get_obj_states()
+    obs = env.get_obs()
+    return env, init_state, obs
+
+
+def setup_grasps(env: Environment, grasp_gen, n_grasps: int, obs: dict) -> None:
+    """Replicate ui.RobotEnvUI.setup_grasps() without the visualise branch."""
+    rgb, depth, seg = obs["image"], obs["depth"], obs["seg"]
+    img_size = grasp_gen.IMG_WIDTH
+    w = env.camera.width
+    if img_size != w:
+        rgb   = cv2.resize(rgb,   (img_size, img_size))
+        depth = cv2.resize(depth, (img_size, img_size))
+    for obj_id in env.obj_ids:
+        mask = seg == obj_id
+        if img_size != w:
+            mask = np.array(
+                Image.fromarray(mask).resize((img_size, img_size), Image.LANCZOS)
+            )
+        grasps, grasp_rects = grasp_gen.predict_grasp_from_mask(
+            rgb, depth, mask, n_grasps=n_grasps, show_output=False
+        )
+        if img_size != w:
+            for j, gr in enumerate(grasp_rects):
+                grasp_rects[j][0] = int(gr[0] / img_size * w)
+                grasp_rects[j][1] = int(gr[1] / img_size * w)
+                grasp_rects[j][4] = int(gr[4] / img_size * w)
+                grasp_rects[j][3] = int(gr[3] / img_size * w)
+        grasp_rects = [
+            Grasp2D.from_vector(
+                x=g[1], y=g[0], w=g[4], h=g[3], theta=g[2],
+                W=w, H=w, normalized=False, line_offset=5,
+            )
+            for g in grasp_rects
+        ]
+        env.set_obj_grasps(obj_id, grasps, grasp_rects)
+
+
+def refresh(env: Environment, init_state, grasp_gen, n_grasps: int):
+    """Reset robot + restore object positions, then recompute grasps."""
+    env.reset_robot()
+    env.set_obj_state(init_state)
+    env.dummy_simulation_steps(30)
+    env.update_obj_states()
+    obs = env.get_obs()
+    setup_grasps(env, grasp_gen, n_grasps, obs)
+    env.dummy_simulation_steps(10)
+    return obs
+
+
+def apply_ranking_strategy(lggsn_scores_all: list, n: int, strategy: str) -> list:
+    """
+    Compute a conservative grasp order from LGGSN scores.
+
+    GR-ConvNet baseline order is always [0, 1, …, n-1]
+    (index 0 = highest GR-ConvNet quality, already a strong prior).
+
+    strategy:
+      full      — raw LGGSN ranking (current Stage-4 default)
+      margin    — only override index 0 when LGGSN gain > MARGIN
+      hybrid    — blend LGGSN score with GR-ConvNet rank prior (HYBRID_ALPHA)
+      top2_only — LGGSN picks between its top-2 only; rest stays in GR-ConvNet order
+    """
+    scores          = np.array(lggsn_scores_all)
+    lggsn_order     = np.argsort(-scores).tolist()
+    grconvnet_order = list(range(n))
+
+    # "margin_0.05" — parse threshold from strategy name
+    if strategy.startswith("margin_"):
+        threshold = float(strategy.split("_", 1)[1])
+        gain = float(scores[lggsn_order[0]]) - float(scores[grconvnet_order[0]])
+        return lggsn_order if gain > threshold else grconvnet_order
+
+    return grconvnet_order  # safe fallback
+
+
+def run_trial(
+    env: Environment,
+    policy: OwgPolicy,
+    obs: dict,
+    prompt: str,
+    stage: int,
+    strategy: str = "full",
+    scene_id: int = 0,
+) -> dict:
+    target_present = prompt in env.obj_names
+
+    # collect candidate grasps (3D path — LGGSN ranker has use_3d_prompt=True)
+    all_grasps = {int(k): env.get_obj_grasps(k) for k in env.obj_ids}
+
+    obj_grasps         = []   # hoisted so grasp-level fields are always defined
+    n_grasps           = None
+    lggsn_score_top1   = None
+    lggsn_scores_all   = None
+    _lggsn_score_delta = None
+
+    if target_present:
+        try:
+            tid        = env.get_obj_id_by_name(prompt)
+            obj_grasps = all_grasps.get(tid, [])
+            n_grasps   = len(obj_grasps)
+            # call ranker directly so we capture the score independently of policy internals
+            if stage == 4 and getattr(policy, "grasp_ranker", None) is not None and n_grasps > 0:
+                order, scores    = policy.grasp_ranker.rank(obj_grasps, verbose=True)
+                lggsn_score_top1 = float(scores[order[0]])
+                lggsn_scores_all = [round(float(s), 4) for s in scores.tolist()]
+                # delta: how much LGGSN prefers its top pick over GR-ConvNet's index-0
+                # (index 0 = GR-ConvNet's best; order[0] = LGGSN's best)
+                _lggsn_score_delta = round(float(scores[order[0]]) - float(scores[0]), 4)
+        except Exception as e:
+            print(f"      [WARN] pre-rank failed: {e}")
+
+    # policy predict
+    action = policy.predict(
+        obs,
+        prompt,
+        all_grasps,
+        obj_names=getattr(env, "obj_names", None),
+        env_obj_ids=getattr(env, "obj_ids", None),
+    )
+
+    # for stage 4: replace policy's full-LGGSN order with the chosen strategy
+    if stage == 4 and lggsn_scores_all is not None and n_grasps:
+        action["grasps"] = apply_ranking_strategy(lggsn_scores_all, n_grasps, strategy)
+
+    # which grasp was tried first, and where is it in 3D space
+    grasps_order       = action.get("grasps") or []
+    grasp_selected_idx = int(grasps_order[0]) if grasps_order else None
+    grasp_top1_xyz     = None
+    grasp_all_xyz      = None
+    grasp_top3_xyz     = None
+    if obj_grasps:
+        grasp_all_xyz = [[round(float(g[0]), 4), round(float(g[1]), 4), round(float(g[2]), 4)]
+                         for g in obj_grasps]
+        grasp_top3_xyz = [grasp_all_xyz[i]
+                          for i in grasps_order[:3]
+                          if i < len(grasp_all_xyz)]
+    if grasp_selected_idx is not None and grasp_selected_idx < len(obj_grasps):
+        g              = obj_grasps[grasp_selected_idx]
+        grasp_top1_xyz = [round(float(g[0]), 4), round(float(g[1]), 4), round(float(g[2]), 4)]
+
+    # stage 4 changes the grasp when LGGSN promotes something other than index 0
+    ranking_changed_grasp = (stage == 4
+                             and grasp_selected_idx is not None
+                             and grasp_selected_idx != 0)
+
+    # execute
+    grasped_obj_id   = None
+    grasped_obj_name = None
+    if action["action"] == "fail":
+        root_cause = "target_not_in_scene" if not target_present else "grounding_failed"
+        success    = False
+    else:
+        success_grasp, success_target = env.put_obj_in_tray(
+            action["input"], grasp_indices=action.get("grasps", [])
+        )
+        for _ in range(30):
+            env.step_simulation()
+        success = bool(success_grasp and success_target)
+        if success:
+            root_cause = "success"
+        elif not success_grasp:
+            root_cause = "grasp_failed"
+        else:
+            root_cause = "place_failed"
+
+        # read the actual grasped object from the env's own grasp log (last line)
+        try:
+            with open("logs/ui_grasp_exec.jsonl") as _lf:
+                last_entry = json.loads(_lf.readlines()[-1])
+            grasped_obj_id = last_entry.get("obj_id")
+            if grasped_obj_id is not None and grasped_obj_id in env.obj_ids:
+                grasped_obj_name = env.obj_names[env.obj_ids.index(grasped_obj_id)]
+        except Exception:
+            pass
+
+    # Emit candidate-level training rows for Stage 3 (unbiased by LGGSN).
+    # Stage 3 tries GR-ConvNet's natural order; success/failure is clean ground truth.
+    if stage == 3 and target_present and obj_grasps:
+        _emit_lggsn_candidates(obj_grasps, success, prompt, scene_id=scene_id)
+
+    return {
+        "ts":                      time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "stage":                   stage,
+        "seed":                    None,   # filled by caller
+        "prompt":                  prompt,
+        "target_present_in_scene": target_present,
+        "n_grasps":                n_grasps,
+        "lggsn_score_top1":        lggsn_score_top1,
+        "lggsn_scores_all":        lggsn_scores_all,
+        "grasp_ranked_order":      grasps_order,
+        "grasp_selected_idx":      grasp_selected_idx,
+        "grasp_top1_xyz":          grasp_top1_xyz,
+        "grasp_top3_xyz":          grasp_top3_xyz,
+        "grasp_all_xyz":           grasp_all_xyz,
+        "ranking_changed_grasp":   ranking_changed_grasp,
+        "lggsn_score_delta":       _lggsn_score_delta,
+        "grasped_obj_id":          grasped_obj_id,
+        "grasped_obj_name":        grasped_obj_name,
+        "ranking_strategy":        strategy if stage == 4 else None,
+        "success":                 success,
+        "root_cause":              root_cause,
+    }
+
+
+def main():
+    # overwrite output file so stale rows from previous runs never mix in
+    open(OUT_PATH, "w").close()
+
+    cfg = load_config(CFG_PATH)
+
+    # one grasp generator shared across all trials (same camera config)
+    shared_camera = make_camera(cfg)
+    grasp_gen     = load_grasp_generator(shared_camera)
+
+    # policies: one without ranker (stage 3), one with ranker (stage 4 all strategies)
+    policies = {
+        3: OwgPolicy(cfg.policy.config_path, verbose=False, vis=False, use_grasp_ranker=False),
+        4: OwgPolicy(cfg.policy.config_path, verbose=False, vis=False, use_grasp_ranker=True),
+    }
+
+    # outer loop: seed — one pybullet env per seed, shared by stage 3 + all stage-4 variants
+    for seed in SEEDS:
+        print(f"\n{'='*56}")
+        print(f"  seed={seed}  spawning {N_OBJ} objects ...")
+        env, init_state, obs = make_scene(cfg, seed, N_OBJ)
+        setup_grasps(env, grasp_gen, cfg.n_grasp_attempts, obs)
+        print(f"  scene: {env.obj_names}")
+
+        # Stage 3 baseline (no ranker, no strategy)
+        print(f"\n  -- Stage 3 | baseline --")
+        for prompt in PROMPTS:
+            obs    = refresh(env, init_state, grasp_gen, cfg.n_grasp_attempts)
+            print(f"    [3|seed={seed}] {prompt!r:20s} ... ", end="", flush=True)
+            record             = run_trial(env, policies[3], obs, prompt, stage=3, scene_id=seed)
+            record["seed"]     = seed
+            record["scene_id"] = seed
+            log_record(record)
+            flag = "✓" if record["success"] else "✗"
+            print(f"{flag}  root_cause={record['root_cause']}")
+
+        # Stage 4 — one pass per strategy, same scene each time
+        for strategy in S4_STRATEGIES:
+            print(f"\n  -- Stage 4 | strategy={strategy} --")
+            for prompt in PROMPTS:
+                obs    = refresh(env, init_state, grasp_gen, cfg.n_grasp_attempts)
+                print(f"    [4/{strategy}|seed={seed}] {prompt!r:16s} ... ", end="", flush=True)
+                record             = run_trial(env, policies[4], obs, prompt,
+                                               stage=4, strategy=strategy)
+                record["seed"]     = seed
+                record["scene_id"] = seed
+                log_record(record)
+                flag = "✓" if record["success"] else "✗"
+                print(f"{flag}  sel={record['grasp_selected_idx']}  "
+                      f"changed={record['ranking_changed_grasp']}  "
+                      f"lggsn={record['lggsn_score_top1']}")
+
+        env.close()  # one close per seed, after all variants done
+
+    print(f"\nDone. {OUT_PATH}")
+    _print_summary()
+
+
+def _classify_pair(r3: dict, r4: dict) -> str:
+    """Classify one (stage-3, stage-4) paired trial."""
+    changed = bool(r4.get("ranking_changed_grasp", False))
+    s3_ok, s4_ok = r3["success"], r4["success"]
+    if s3_ok and s4_ok:
+        return "consistent_success"
+    if changed and s3_ok and not s4_ok:
+        return "ranking_regression"
+    if changed and not s3_ok and s4_ok:
+        return "ranking_improvement"
+    if not changed and s3_ok != s4_ok:
+        return "non_determinism"
+    return "consistent_failure"
+
+
+def _print_summary():
+    """Per-trial table + per-strategy paired classification counts."""
+    records = []
+    with open(OUT_PATH) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                records.append(json.loads(line))
+
+    # ── per-trial table ───────────────────────────────────────────────────────
+    print(f"\n{'scene':>6} {'stage':>6} {'strategy':<12} {'prompt':<18} "
+          f"{'sel_idx':>8} {'lggsn_top1':>11} {'success':>8}  {'root_cause'}")
+    print("-" * 100)
+    for r in records:
+        score    = f"{r['lggsn_score_top1']:.3f}" if r["lggsn_score_top1"] is not None else "   —"
+        sel_idx  = str(r.get("grasp_selected_idx", "?"))
+        strategy = r.get("ranking_strategy") or "—"
+        print(f"{str(r.get('scene_id', '?')):>6} {r['stage']:>6} {strategy:<12} "
+              f"{r['prompt']:<18} "
+              f"{sel_idx:>8} {score:>11} {str(r['success']):>8}  {r['root_cause']}")
+
+    # ── per-strategy paired classification ───────────────────────────────────
+    # Index stage-3 records by (scene_id, prompt).
+    s3_index: dict = {}
+    for r in records:
+        if r["stage"] == 3:
+            key = (r.get("scene_id", r.get("seed")), r["prompt"])
+            s3_index[key] = r
+
+    LABELS = ["consistent_success", "ranking_improvement", "non_determinism",
+              "consistent_failure", "ranking_regression"]
+
+    # collect per-strategy counts
+    strategy_counts: dict = {s: {lb: 0 for lb in LABELS} for s in S4_STRATEGIES}
+    for r in records:
+        if r["stage"] != 4:
+            continue
+        strat = r.get("ranking_strategy", "full")
+        key   = (r.get("scene_id", r.get("seed")), r["prompt"])
+        r3    = s3_index.get(key)
+        if r3 is None:
+            continue
+        label = _classify_pair(r3, r)
+        strategy_counts[strat][label] = strategy_counts[strat].get(label, 0) + 1
+
+    # print comparison table
+    col_w = 22
+    header = f"\n{'strategy':<12}" + "".join(f"{lb[:col_w]:>{col_w}}" for lb in LABELS) + f"  {'net_improvement':>16}"
+    print(header)
+    print("-" * (12 + col_w * len(LABELS) + 18))
+    for strat in S4_STRATEGIES:
+        c   = strategy_counts[strat]
+        net = c.get("ranking_improvement", 0) - c.get("ranking_regression", 0)
+        row = f"{strat:<12}" + "".join(f"{c.get(lb,0):>{col_w}}" for lb in LABELS) + f"  {net:>+16}"
+        print(row)
+
+    print("\n(net_improvement = ranking_improvement − ranking_regression;"
+          " higher is better)")
+
+    # ── LGGSN score delta distribution ───────────────────────────────────────
+    # For each strategy, show: how many trials had delta > threshold (= ranking
+    # actually changed), and the percentile distribution of deltas.  This lets
+    # us read off whether non_determinism is from physics noise (delta ≈ 0,
+    # grasp unchanged) or from threshold conservatism (delta > 0 but < threshold).
+    print("\n── lggsn_score_delta distribution per strategy ──")
+    print(f"{'strategy':<14} {'N':>4} {'changed':>8}  "
+          f"{'p25':>7} {'p50':>7} {'p75':>7} {'p90':>7}  {'non_det_at_delta0':>18}")
+    print("-" * 80)
+    for strat in S4_STRATEGIES:
+        strat_records = [r for r in records if r.get("ranking_strategy") == strat
+                         and r.get("lggsn_score_delta") is not None]
+        if not strat_records:
+            print(f"{strat:<14}  (no data)")
+            continue
+        deltas  = np.array([r["lggsn_score_delta"] for r in strat_records])
+        changed = int(np.sum([r.get("ranking_changed_grasp", False) for r in strat_records]))
+        # non-determinism cases where delta ≈ 0 (LGGSN agreed with GR-ConvNet)
+        nd_at_delta0 = sum(
+            1 for r in strat_records
+            if not r.get("ranking_changed_grasp", False)
+            and r.get("lggsn_score_delta", 0) <= 0.01
+            and _classify_pair(
+                s3_index.get((r.get("scene_id", r.get("seed")), r["prompt"]), {}),
+                r
+            ) == "non_determinism"
+        )
+        p25, p50, p75, p90 = np.percentile(deltas, [25, 50, 75, 90])
+        print(f"{strat:<14} {len(strat_records):>4} {changed:>8}  "
+              f"{p25:>7.3f} {p50:>7.3f} {p75:>7.3f} {p90:>7.3f}  {nd_at_delta0:>18}")
+
+
+if __name__ == "__main__":
+    main()

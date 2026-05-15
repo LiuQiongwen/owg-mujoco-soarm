@@ -1,0 +1,54 @@
+project:
+  name: "owg-grasp-research"
+  mode: "semi-auto"
+
+research:
+  topic: >
+    Open-world robotic grasping with language-guided 6DoF grasp selection.
+    Using pairwise BPR-trained LGGSN scoring model in PyBullet simulation.
+    Goal: improve grasp success rate over random baseline using learned grasp scoring.
+  domains: ["robotics", "computer-vision", "machine-learning"]
+  keywords:
+    - "language-conditioned robotic grasping"
+    - "6DoF grasp quality estimation"
+    - "pairwise learning to rank grasps"
+    - "open-world grasping VLM"
+  daily_paper_count: 8
+  quality_threshold: 3.5
+
+runtime:
+  timezone: "Asia/Shanghai"
+  max_parallel_tasks: 2
+  approval_timeout_hours: 12
+  retry_limit: 2
+  acp_timeout: 1800
+
+notifications:
+  channel: "none"
+
+knowledge_base:
+  root: "/home/lina/OWG-main/arc_kb"
+
+llm:
+  provider: "acp"
+  acp:
+    agent: "claude"
+    cwd: "/home/lina/OWG-main"
+
+output:
+  format: "latex"
+  venue: "ICRA"
+  sections:
+    - abstract
+    - introduction
+    - related_work
+    - method
+    - experiments
+    - conclusion
+
+experiment:
+  environment: "PyBullet simulation"
+  baseline: "Stage 3 random grasp planner 16/20 (80%)"
+  proposed: "Stage 4 LGGSN pairwise BPR scoring"
+  metric: "grasp success rate"
+  eval_command: "bash scripts/quick_eval.sh"

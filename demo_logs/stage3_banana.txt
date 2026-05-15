@@ -1,0 +1,102 @@
+pybullet build time: Jan 29 2025 23:16:28
+INFO:root:CUDA detected. Running with GPU acceleration.
+INFO:root:LLM raw status: 200
+INFO:root:LLM raw json: {'id': 'chatcmpl-DMYeONNKTNkyJzBCarPMVHJaPQg7F', 'model': 'gpt-4o', 'object': 'chat.completion', 'created': 1774268784, 'choices': [{'index': 0, 'message': {'role': 'assistant', 'content': '{"target_label": "Banana"}'}, 'finish_reason': 'stop'}], 'usage': {'prompt_tokens': 426, 'completion_tokens': 8, 'total_tokens': 434, 'prompt_tokens_details': {'cached_tokens': 0, 'cached_creation_tokens': 0, 'audio_tokens': 0}, 'completion_tokens_details': {'audio_tokens': 0, 'reasoning_tokens': 0, 'accepted_prediction_tokens': 0, 'rejected_prediction_tokens': 0}, 'input_tokens': 0, 'output_tokens': 0, 'input_tokens_details': None}, 'system_fingerprint': 'fp_e9b9b028d7'}
+
+
+=== Loaded Configuration ===
+{'n_objects': 11, 'n_grasp_attempts': 10, 'n_action_attempts': 3, 'finger_length': 0.06, 'seed': 1, 'camera': {'center_x': 0.05, 'center_y': -0.52, 'center_z': 1.9, 'target_x': 0.05, 'target_y': -0.52, 'target_z': 0.785, 'znear': 0.2, 'zfar': 2.0, 'img_size': 448, 'fov': 40}, 'policy': {'config_path': './config/pyb/OWG.yaml', 'verbose': True, 'vis': False, 'use_grasp_ranker': False, 'enable_semantic': True, 'enable_grasp_sampling': True, 'grasp_samples': 100}, 'prompt': 'Banana'}
+============================
+
+[DEBUG] cfg.use_grasp_ranker = False, policy.use_grasp_ranker = False
+224 224
+[INFO] Using prompt: "Banana"
+[AUTO] Using query: "Banana"
+UI env obj_ids: [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+UI env obj_names: ['TomatoSoupCan', 'PowerDrill', 'Banana', 'TennisBall', 'MediumClamp', 'MasterChefCan', 'GelatinBox', 'Pear', 'MustardBottle', 'Scissors', 'Hammer']
+🔹 obj_ids: [ 6  7  8  9 10 11 12 13 14 15 16]
+🔹 id_to_name: {6: 'TomatoSoupCan', 7: 'PowerDrill', 8: 'Banana', 9: 'TennisBall', 10: 'MediumClamp', 11: 'MasterChefCan', 12: 'GelatinBox', 13: 'Pear', 14: 'MustardBottle', 15: 'Scissors', 16: 'Hammer'}
+🔹 marker_data keys: dict_keys(['masks', 'labels'])
+🔹 labels: ['TomatoSoupCan', 'PowerDrill', 'Banana', 'TennisBall', 'MediumClamp', 'MasterChefCan', 'GelatinBox', 'Pear', 'MustardBottle', 'Scissors', 'Hammer']
+🟢 Grounder raw response: {'target_label': 'Banana'}
+✅ Grounding matched label: Banana -> obj_id=8, idx=2
+✅ target_ids: [8]
+📝 Saved grounding log → logs/grounding_examples/ground_1774268784.926.npz
+🟢 Using fallback planner action: {'action': 'pick', 'input': 8}
+Done pick 8
+startThreads creating 1 threads.
+starting thread 0
+started thread 0 
+argc=2
+argv[0] = --unused
+argv[1] = --start_demo_name=Physics Server
+ExampleBrowserThreadFunc started
+X11 functions dynamically loaded using dlopen/dlsym OK!
+X11 functions dynamically loaded using dlopen/dlsym OK!
+Creating context
+Created GL 3.3 context
+Direct GLX rendering context obtained
+Making context current
+GL_VENDOR=NVIDIA Corporation
+GL_RENDERER=NVIDIA GeForce RTX 3060 Laptop GPU/PCIe/SSE2
+GL_VERSION=3.3.0 NVIDIA 580.95.05
+GL_SHADING_LANGUAGE_VERSION=3.30 NVIDIA via Cg compiler
+pthread_getconcurrency()=0
+Version = 3.3.0 NVIDIA 580.95.05
+Vendor = NVIDIA Corporation
+Renderer = NVIDIA GeForce RTX 3060 Laptop GPU/PCIe/SSE2
+b3Printf: Selected demo: Physics Server
+startThreads creating 1 threads.
+starting thread 0
+started thread 0 
+MotionThreadFunc thread started
+ven = NVIDIA Corporation
+ven = NVIDIA Corporation
+b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
+
+b3Printf: No inertial data for link, using mass=1, localinertiadiagonal = 1,1,1, identity local inertial frame
+b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,126]:
+
+b3Printf: ee_link
+b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+
+b3Printf: Bad inertia tensor properties, setting inertia to zero for link: left_inner_finger_pad
+
+b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+
+b3Printf: Bad inertia tensor properties, setting inertia to zero for link: right_inner_finger_pad
+
+b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+
+b3Printf: Bad inertia tensor properties, setting inertia to zero for link: left_inner_finger_pad
+
+b3Printf: b3Warning[examples/Importers/ImportURDFDemo/BulletUrdfImporter.cpp,467]:
+
+b3Printf: Bad inertia tensor properties, setting inertia to zero for link: right_inner_finger_pad
+
+b3Printf: PosixSharedMemory::releaseSharedMemory detached shared memory
+
+b3Printf: PosixSharedMemory::releaseSharedMemory removed shared memory
+b3Printf: PosixSharedMemory::releaseSharedMemory detached shared memory
+
+b3Printf: PosixSharedMemory::releaseSharedMemory removed shared memory
+b3Printf: PosixSharedMemory::releaseSharedMemory detached shared memory
+
+numActiveThreads = 0
+stopping threads
+Thread with taskId 0 exiting
+Thread TERMINATED
+destroy semaphore
+semaphore destroyed
+destroy main semaphore
+main semaphore destroyed
+finished
+numActiveThreads = 0
+btShutDownExampleBrowser stopping threads
+Thread with taskId 0 exiting
+Thread TERMINATED
+destroy semaphore
+semaphore destroyed
+destroy main semaphore
+main semaphore destroyed
+

@@ -48,39 +48,43 @@ def pb_capture_depth_and_seg(cam: CamCfg, renderer=None):
     # 连接方式与 EGL 状态
     conn = p.getConnectionInfo().get("connectionMethod", None)
     has_egl = os.environ.get("PYBULLET_EGL", "0") == "1"
-
+    
+    # 把字符串标志映射到 Bullet 常量
+    if isinstance(renderer, str):
+        rmap = {
+            "tiny": p.ER_TINY_RENDERER,
+            "opengl": p.ER_BULLET_HARDWARE_OPENGL,
+            "auto": None,
+        }
+        renderer = rmap.get(renderer.lower(), None)
+    
     # 解析 renderer 参数 → 目标 renderer_id
-    if renderer in (None, "auto"):
-        # DIRECT 且无 EGL → Tiny；其他情况（GUI 或 DIRECT+EGL）→ HW-OpenGL
-        use_tiny = (conn == p.DIRECT and not has_egl)
-        renderer_id = p.ER_TINY_RENDERER if use_tiny else p.ER_BULLET_HARDWARE_OPENGL
-    elif renderer == "tiny":
-        renderer_id = p.ER_TINY_RENDERER
-    elif renderer == "opengl":
-        # 只有在 GUI 或已加载 EGL 时才安全使用 HW-OpenGL，否则回退 Tiny
-        if conn == p.DIRECT and not has_egl:
-            print("[WARN] No EGL in DIRECT: forcing Tiny renderer")
-            renderer_id = p.ER_TINY_RENDERER
-        else:
-            renderer_id = p.ER_BULLET_HARDWARE_OPENGL
-    else:
-        renderer_id = p.ER_TINY_RENDERER
+    if renderer is None:
+        # auto: 在 DIRECT（无 GUI）强制 Tiny；在 GUI 走 OpenGL
+        use_tiny = (p.getConnectionInfo().get("connectionMethod", None) == p.DIRECT)
+        renderer = p.ER_TINY_RENDERER if use_tiny else p.ER_BULLET_HARDWARE_OPENGL
 
     print("[INFO] Capturing frame with renderer =",
-          "TINY" if renderer_id == p.ER_TINY_RENDERER else "HW-OpenGL")
+          "TINY" if renderer == p.ER_TINY_RENDERER else "HW-OpenGL")
 
-    # 抓图
+    view = p.computeViewMatrix(
+        cam.center.tolist(),
+        cam.target.tolist(),
+        cam.up.tolist()
+    )
+    proj = p.computeProjectionMatrixFOV(
+        fov=cam.fov, aspect=float(cam.width)/cam.height,
+        nearVal=cam.znear, farVal=cam.zfar
+    )
+
     w, h, rgb, depth, seg = p.getCameraImage(
         cam.width, cam.height, view, proj,
-        renderer=renderer_id
+        renderer=renderer
     )
     depth = np.array(depth, dtype=np.float32)
-    # 反投影成真实 Z
     z = cam.zfar * cam.znear / (cam.zfar - (cam.zfar - cam.znear) * depth + 1e-8)
     seg = np.array(seg, dtype=np.int32)
     return z, seg, view, proj
-
-
 
 
 def depth_to_pointcloud_world(depth_z, view, proj, cam: CamCfg):
@@ -203,8 +207,23 @@ def quick_clearance_score(pt, n, pcd, finger_half=0.01, depth=0.03):
     sub = pnts[idx]
     dl = np.min(np.linalg.norm(sub - left, axis=1))
     dr = np.min(np.linalg.norm(sub - right, axis=1))
+    est_opening = 2.0 * min(dl, dr)
+    score = max(0.0, min(1.0, (dl+dr) / (2*max(1e-3, finger_half))))
     # 手指深度方向不细抠，给个软阈
-    return max(0.0, min(1.0, (dl+dr) / (2*max(1e-3, finger_half))))
+    return score, est_opening
+    
+def ray_table_top_z(around_xy, table_guess=-0.004):
+    """
+    用一根竖直射线在 (x,y) 处测桌面高度。失败则回退到经验值。
+    """
+    x, y = float(around_xy[0]), float(around_xy[1])
+    # 从上往下打一根长射线
+    start = [x, y,  1.0]
+    end   = [x, y, -1.5]
+    hit = p.rayTest(start, end)[0]
+    if hit[0] >= 0:
+        return float(hit[3][2])  # hit position z
+    return float(table_guess)
 
 def gravity_lever_score(pt, com, n):
     """越靠近质心越好，且抓取法线与“抗重力方向”一致性越好"""
@@ -212,6 +231,85 @@ def gravity_lever_score(pt, com, n):
     lever_s = math.exp(-lever / 0.1)  # 10cm 衰减
     align = max(0.0, np.dot(n/ (np.linalg.norm(n)+1e-8), np.array([0,0,1.0]))) # 向上更好
     return 0.6*lever_s + 0.4*align
+    
+def local_density_score(pcd, p0, radius=None, min_pts=22, k=None):
+    """
+    邻域密度评分，支持两种模式：
+    - 半径计数：传 radius(+min_pts)。半径内点数 >= min_pts 趋近 1，线性归一。
+    - KNN 稠密度：传 k。以第 k 近邻距离衡量密度，越小越稠密，score 趋近 1。
+    """
+    import numpy as np
+    pts = np.asarray(pcd.points)
+    if pts.size == 0:
+        return 0.0
+
+    p0 = np.asarray(p0, dtype=float)
+    diff = pts - p0
+
+    # KNN 模式
+    if k is not None:
+        d = np.linalg.norm(diff, axis=1)
+        if len(d) <= max(1, int(k)):
+            return 0.0
+        dk = np.partition(d, int(k))[:int(k)+1].max()  # 第k近邻的距离近似
+        # 将“第k近邻距离”映射为[0,1]密度分：距离越小越稠密
+        alpha = 0.02  # 2cm 的经验尺度
+        s = np.exp(-dk / alpha)
+        return float(np.clip(s, 0.0, 1.0))
+
+    # 半径计数模式
+    if radius is None:
+        radius = 0.010
+    diff2 = (diff * diff).sum(axis=1)
+    cnt = int((diff2 <= (radius * radius)).sum())
+    s = (cnt - min_pts) / max(1, min_pts)
+    return float(np.clip(s, 0.0, 1.0))
+
+
+def anti_table_penalty(pos_z, table_top_z, finger_depth=0.03, z_margin=0.004):
+    """
+    若抓取末端（沿 -Z 进入 finger_depth）会侵入到桌面上方 z_margin 内，则给惩罚（0~1，1为最差）。
+    这里用简单的高度判断近似抗碰（比射线快很多）。
+    """
+    min_clear = pos_z - finger_depth - table_top_z
+    if min_clear >= z_margin:
+        return 0.0
+    # 线性惩罚：clear 越小越惩
+    lack = max(0.0, z_margin - min_clear)
+    # 把 0~(z_margin+1cm) 映射到 0~1
+    return float(np.clip(lack / (z_margin + 0.01), 0.0, 1.0))
+
+def anti_table_ray_score(p0_world, n_world, *, table_top_z=-0.004, z_margin=0.003):
+    """
+    目的：给“避免朝向桌面”的抓取一个 [0,1] 的惩罚分。
+    - 要求抓取点高于桌面 z_margin。
+    - 方向上，若抓取法线指向“上”（远离桌面，nz>=0）最好；越朝下（nz->-1）越差。
+    """
+    p0z = float(p0_world[2])
+    nz  = float(n_world[2])
+
+    # 1) 高度安全：高于桌面 + z_margin 才给分
+    plane_ok = 1.0 if (p0z >= table_top_z + float(z_margin)) else 0.0
+
+    # 2) 方向安全：把 nz ∈ [-1,1] 映射到 [0,1]，nz=-1(直指桌面)→0，nz=+1(远离桌面)→1
+    dir_s = max(0.0, min(1.0, 0.5 * (1.0 + nz)))
+
+    return plane_ok * dir_s
+
+def load_obj_with_target_height(urdf_path: str, target_h: float, table_top_z: float, xy=(0.38, 0.0)):
+    """按目标高度 target_h（米）自适应计算 globalScaling，任何 URDF 都能统一尺寸。"""
+    # 先探测原始高度 h0
+    probe_id = p.loadURDF(urdf_path, basePosition=[0,0,1.0], globalScaling=1.0)
+    a0 = p.getAABB(probe_id, -1)
+    h0 = max(1e-6, a0[1][2] - a0[0][2])
+    p.removeBody(probe_id)
+
+    sf = float(target_h) / h0
+    base_z = table_top_z + 0.002 + 0.5 * float(target_h)
+    obj_id = p.loadURDF(urdf_path,
+                        basePosition=[xy[0], xy[1], base_z],
+                        globalScaling=sf)
+    return obj_id, sf, base_z, float(target_h)
 
 # -------------------- 主流程：生成抓取 --------------------
 def generate_grasps(args):
@@ -257,10 +355,18 @@ def generate_grasps(args):
     p.setAdditionalSearchPath(pybullet_data.getDataPath())
     p.setGravity(0,0,-9.8)
     table_id = p.loadURDF("table/table.urdf", basePosition=[0.5,0,-0.63])
+    table_top_z = p.getAABB(table_id)[1][2]  # 桌面顶面 z
     # 物体
-    obj_id = p.loadURDF(args.obj, basePosition=[0.38, 0.00, 0.002 + 0.5*args.cube_scale],
-                    globalScaling=args.cube_scale)
+    table_id = p.loadURDF("table/table.urdf", basePosition=[0.5, 0, -0.63], useFixedBase=True)
+    table_top = max(p.getAABB(table_id, -1)[1][2], -0.004)
+    obj_id, sf, base_z, target_h = load_obj_with_target_height(args.obj, args.cube_scale, table_top)
+    print(f"[INFO] target_h={target_h:.3f}m, auto_scale={sf:.3f}, placed_z={base_z:.3f}")
+
     p.changeDynamics(obj_id, -1, lateralFriction=1.6, restitution=0.0, rollingFriction=0.05)
+    
+    obj_aabb = p.getAABB(obj_id, -1)
+    cube_top_z = float(obj_aabb[1][2])
+    print(f"[INFO] cube_top_z={cube_top_z:.3f}, z_margin={args.z_margin:.3f}")
     
     # 让物体和接触稳定一下，再拍
     for _ in range(240):
@@ -292,23 +398,40 @@ def generate_grasps(args):
     nrm = np.asarray(obj_pcd.normals)
     if len(pts) == 0:
         print("[WARN] object point cloud empty, fall back to top-down")
-        return fallback_topdown(args)
+        return fallback_topdown(args, cube_top_z)
 
     # 估个物体质心（点云均值近似）
     com = np.mean(pts, axis=0)
+    # 估桌面高度（用于“手指下探”快筛）
+    table_top_z = ray_table_top_z([com[0], com[1]], table_guess=-0.004)
+    # 物体几何尺寸（cube 的边长 ~= scale）
+    obj_width = float(args.cube_scale)
+    min_w = max(0.5*obj_width, 0.01)     # 下限：物体 50% 或 1cm
+    max_w = 1.2*obj_width                # 上限：物体 120%
+    margin = float(args.table_margin)    # 手指与桌面的安全裕度    
 
     # 4) 采样候选
     cand = []
+    
+    pts = np.asarray(obj_pcd.points)
+    nrm = np.asarray(obj_pcd.normals)
+    
     base_k = min(len(pts), args.n_cand)
     pick_idx = uniform_sample_indices(len(pts), base_k)
     yaws = np.linspace(-math.pi, math.pi, args.yaw_samples, endpoint=False)
-
+    
+    z_margin = getattr(args, "z_margin", 0.004)  # 默认 4mm
+    
     for idx in pick_idx:
         p0 = pts[idx].copy()
         n0 = nrm[idx].copy()
         # 先抬离表面一点（避免一上来就穿模）
         n0u = n0 / (np.linalg.norm(n0)+1e-8)
         p0_lift = p0 + max(0.02, args.approach_clear) * n0u
+        
+        if p0_lift[2] < cube_top_z + args.z_margin:
+            p0_lift[2] = cube_top_z + args.z_margin
+
 
         # 再强制一个最小 z（方块顶面上方 2cm）
         cube_top = TABLE_TOP_Z + 0.5*args.cube_scale + 0.002   # 0.002 是方块与桌面间薄片
@@ -319,28 +442,68 @@ def generate_grasps(args):
         TABLE_Z = -0.004          # 来自 validate 的检测值
         cube_top = TABLE_Z + 0.002 + 0.5*args.cube_scale
         min_safe = cube_top + 0.020  # 方块上方 2cm
+        
 
         p0_lift = p0 + max(0.02, args.approach_clear) * (n0 / (np.linalg.norm(n0)+1e-8))
         p0_lift[2] = max(p0_lift[2], min_safe)
 
-        # 清隙快速分
-        clear_s = quick_clearance_score(p0, n0, obj_pcd, finger_half=args.finger_half, depth=args.finger_depth)
+        # 清隙快速分 + 估计开口
+        clear_s, est_open = quick_clearance_score(
+            p0, n0, obj_pcd, finger_half=args.finger_half, depth=args.finger_depth
+        )
         if clear_s < 0.2:
             continue
+        # 计算手指最深处的 z（粗略）：末端位置向物体法线方向推进 finger_depth
+        z_contact = p0_lift[2] - args.finger_depth
+        # 桌面碰撞快筛：如果下探会低于桌面+裕度，则丢弃
+        if z_contact < table_top_z + margin:
+            continue            
+        
+        # 局部密度（避免薄片/边缘）
+        dens_s  = local_density_score(obj_pcd, p0, k=24)
+
+        # 物体质心相关的“重力/杠杆”项
+        score_g = gravity_lever_score(p0, com, n0)
+
+        # 末端进入深度对桌面 clearance；候选末端会先抬高一点点（同你原来的 lift）
+        p0_lift = p0 + 0.5 * args.approach_clear * (n0 / (np.linalg.norm(n0)+1e-8))
+        pen_table = anti_table_penalty(pos_z=float(p0_lift[2]),
+                                    table_top_z=float(table_top_z),
+                                    finger_depth=float(args.finger_depth),
+                                    z_margin=float(z_margin))
+            
         for yaw in yaws:
             r,pit,yw = rot_from_normal(n0, yaw)
             score_g = gravity_lever_score(p0, com, n0)
-            score = 0.5*clear_s + 0.5*score_g
+            density_s = local_density_score(obj_pcd, p0, radius=0.010, min_pts=22)
+            anti_table_s = anti_table_ray_score(p0_lift, n0, table_top_z=-0.004,        z_margin=getattr(args, "z_margin", 0.003))
+
+            # 组合权重（可微调）：清隙 35% + 重力 25% + 密度 25% + 抗桌 15%
+            score = (
+                0.35 * clear_s +
+                0.25 * score_g +
+                0.25 * dens_s +
+                0.15 * (1.0 - pen_table)
+            )
+
+            # 估计夹爪宽度：把局部开口裁剪到 [min_w, max_w]
+            width = float(np.clip(est_open, min_w, max_w))            
             cand.append({
                 "position": [float(p0_lift[0]), float(p0_lift[1]), float(p0_lift[2])],
                 "rpy": [float(r), float(pit), float(yw)],
                 "width": float(2*args.finger_half),
-                "score": float(score)
+                "score": float(score),
+                "meta": {
+                    "clear": float(clear_s),
+                    "dens": float(dens_s),
+                    "grav": float(score_g),
+                    "anti_table": float(1.0 - pen_table)
+                }
             })
 
     if len(cand) == 0:
         print("[WARN] no candidates after clearance check, fallback")
-        return fallback_topdown(args)
+        return fallback_topdown(args, cube_top_z)
 
     # 5) 选 Top-M 进入 PyBullet 细筛（碰撞+IK 可达）
     cand = sorted(cand, key=lambda x: x["score"], reverse=True)[:max(args.topk_bullet*3, args.topk)]
@@ -363,7 +526,7 @@ def generate_grasps(args):
 
     if len(cand2) == 0:
         print("[WARN] IK all failed, fallback topdown")
-        return fallback_topdown(args)
+        return fallback_topdown(args, cube_top_z)
 
     # 6) 输出 JSON（给验证器用）
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
@@ -373,9 +536,9 @@ def generate_grasps(args):
 
     p.disconnect()
 
-def fallback_topdown(args):
+def fallback_topdown(args, cube_top_z):
     # 和你现在验证器的兜底一致：围绕物体上方一圈 yaw
-    z_above = -0.63 + 0.002 + 0.5*args.cube_scale + 0.12
+    z_above = cube_top_z + max(0.10, args.z_margin + 0.07)  # 顶面上方至少 10cm，且 ≥ z-margin+7cm
     yaw_list = np.linspace(-np.pi, np.pi, 12, endpoint=False)
     grasps = [{
         "position": [0.38, 0.00, float(z_above)],
@@ -406,12 +569,14 @@ def build_argparser():
     ap.add_argument("--topk-bullet", type=int, default=120, help="进入 IK 细筛的数量（会先取更大的 Top 再过滤）")
     ap.add_argument("--ee-index", type=int, default=11)
     ap.add_argument("--ik-iters", type=int, default=400)
-
+    ap.add_argument("--z-margin", type=float, default=0.003,
+                    help="min safe Z above cube top for grasp pose (meters)")
     ap.add_argument("--seed", type=int, default=123)
     ap.add_argument("--fast", action="store_true")
     ap.add_argument("--renderer", choices=["auto","tiny","opengl","egl"], default="auto")
     ap.add_argument("--img", type=int, nargs=2, default=[448,448], help="camera width height")
     ap.add_argument("--vis", type=int, default=0)
+    ap.add_argument("--table-margin", type=float, default=0.003, help="手指与桌面的最小安全裕度")
     return ap
 
 if __name__ == "__main__":
