@@ -679,8 +679,10 @@ class EnvironmentSoArm:
         PyBullet signature: load_isolated_obj(path, name, mod_orn, mod_stiffness)
         MuJoCo signature:   load_isolated_obj(obj_name, pos, orn)
         Both are handled via the load_obj resolver above.
+
+        Does NOT clear existing objects — callers that want a fresh scene should
+        call remove_all_obj() before the spawn loop.
         """
-        self.remove_all_obj()
         r_x = np.random.uniform(-0.15, 0.15)
         r_y = np.random.uniform(-0.6, -0.3)
         yaw = np.random.uniform(0, np.pi)

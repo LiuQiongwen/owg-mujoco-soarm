@@ -1,3 +1,4 @@
+import numpy as np
 import time
 from pygments import highlight
 from pygments.lexers import PythonLexer
@@ -146,10 +147,12 @@ class RobotEnvUI:
 
     def spawn(self, n_objects):
         self.n_objects = n_objects
+        self.env.remove_all_obj()
         for obj_name in self.objects.obj_names[:self.n_objects]:
             path, mod_orn, mod_stiffness = self.objects.get_obj_info(obj_name)
             self.env.load_isolated_obj(path, obj_name, mod_orn, mod_stiffness)
             self.env.dummy_simulation_steps(30)
+        print(f"[DEBUG] loaded objects: {list(zip(self.env.obj_ids, self.env.obj_names))}")
         self.init_obj_state = self.env.get_obj_states()
         obs = self.env.get_obs()
         return obs
@@ -190,13 +193,38 @@ class RobotEnvUI:
         self.env.dummy_simulation_steps(10)
         return obs
 
+    def _setup_grasps_mujoco(self):
+        """MuJoCo backend: generate centroid-based grasps from actual object pose.
+
+        GR-ConvNet's camera→robot coordinate transform is calibrated for PyBullet
+        and produces wrong x/y in MuJoCo. Instead, sample grasps directly from
+        the object's 3D position — identical to the collect_mujoco_transitions approach.
+        """
+        rng = np.random.default_rng(self.seed)
+        for obj_id in self.env.obj_ids:
+            pos = self.env.get_obj_pos(obj_id)
+            grasps = []
+            for _ in range(self.n_grasp_attempts):
+                x   = float(pos[0] + rng.uniform(-0.04, 0.04))
+                y   = float(pos[1] + rng.uniform(-0.04, 0.04))
+                z   = float(pos[2] + 0.025)
+                yaw = float(rng.uniform(-np.pi / 2, np.pi / 2))
+                opening = float(rng.uniform(0.04, 0.09))
+                grasps.append(np.array([x, y, z, yaw, opening, 0.05], dtype=np.float32))
+            self.env.set_obj_grasps(obj_id, grasps, grasp_rects=[])
+
     def setup_grasps(self,
                      obs: Dict[str, Any],
                      visualise_grasps: bool = False):
         """
         Run inference with GR-ConvNet grasp generator on current observation
         """
+        if self.backend == "mujoco":
+            self._setup_grasps_mujoco()
+            return
+
         rgb, depth, seg = obs['image'], obs['depth'], obs['seg']
+
         img_size = self.grasp_generator.IMG_WIDTH
         if img_size != self.env.camera.width:
             rgb = cv2.resize(rgb, (img_size, img_size))
