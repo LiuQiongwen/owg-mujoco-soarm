@@ -536,6 +536,14 @@ class EnvironmentSoArm:
         qpos = self._obj_qpos(self._obj_pool_slot(obj_id))
         return {"position": qpos[:3], "quaternion": qpos[3:7]}
 
+    def get_object_pose(self) -> Dict[str, np.ndarray]:
+        """mujoco_validator interface: pose of first loaded object.
+        Returns table-surface height stub when no objects are loaded."""
+        if self.obj_ids:
+            return self.get_obj_pose(self.obj_ids[0])
+        return {"position": np.array([0.0, -0.45, TABLE_TOP_Z]),
+                "quaternion": np.array([1.0, 0.0, 0.0, 0.0])}
+
     def get_obj_states(self) -> list:
         return [{'id': oid, 'name': name,
                  'pos': self.get_obj_pos(oid),
@@ -800,6 +808,7 @@ class EnvironmentSoArm:
             'depth': depth,
             'seg':   seg,
             'obj_ids': np.array(self.obj_ids),
+            'object_pose': self.get_object_pose(),
             # aliases
             'rgb':          rgb,
             'segmentation': seg,
@@ -1050,6 +1059,6 @@ class EnvironmentSoArm:
             self._renderer.close()
 
 
-# ── PyBullet-compatible module-level alias ────────────────────────────────────
-# Allows: from owg_robot.env_soarm import Environment, FailToReachTargetError
-Environment = EnvironmentSoArm
+# ── Module-level aliases ──────────────────────────────────────────────────────
+Environment     = EnvironmentSoArm   # PyBullet-compatible name
+MujocoGraspEnv  = EnvironmentSoArm  # mujoco_validator expected name

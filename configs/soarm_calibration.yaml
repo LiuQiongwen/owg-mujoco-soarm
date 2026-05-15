@@ -1,18 +1,303 @@
+cam_to_robot_base:
+  cam_pos: 0.05 -0.52 1.9
+  n_points: 7
+  rmse_m: 0.0195
+  x_bias: 0.01877
+  y_bias: -0.00413
+  correction_xy:
+  - -0.01877
+  - 0.00413
+  points:
+  - true_x: 0.0
+    true_y: -0.45
+    pred_x: 0.0193
+    pred_y: -0.452
+    err_x: 0.0193
+    err_y: -0.002
+    err_m: 0.0194
+    px: 105.9
+    py: 98.5
+    depth: 1.0841
+  - true_x: 0.12
+    true_y: -0.45
+    pred_x: 0.1367
+    pred_y: -0.4573
+    err_x: 0.0167
+    err_y: -0.0073
+    err_m: 0.0183
+    px: 129.2
+    py: 99.6
+    depth: 1.0845
+  - true_x: -0.12
+    true_y: -0.45
+    pred_x: -0.1002
+    pred_y: -0.4523
+    err_x: 0.0198
+    err_y: -0.0023
+    err_m: 0.0199
+    px: 82.2
+    py: 98.6
+    depth: 1.0842
+  - true_x: 0.0
+    true_y: -0.33
+    pred_x: 0.0189
+    pred_y: -0.3409
+    err_x: 0.0189
+    err_y: -0.0109
+    err_m: 0.0218
+    px: 105.8
+    py: 76.5
+    depth: 1.0849
+  - true_x: 0.0
+    true_y: -0.57
+    pred_x: 0.0189
+    pred_y: -0.571
+    err_x: 0.0189
+    err_y: -0.001
+    err_m: 0.0189
+    px: 105.8
+    py: 122.1
+    depth: 1.0844
+  - true_x: 0.1
+    true_y: -0.35
+    pred_x: 0.1174
+    pred_y: -0.3511
+    err_x: 0.0174
+    err_y: -0.0011
+    err_m: 0.0174
+    px: 125.4
+    py: 78.5
+    depth: 1.084
+  - true_x: -0.1
+    true_y: -0.55
+    pred_x: -0.0796
+    pred_y: -0.5543
+    err_x: 0.0204
+    err_y: -0.0043
+    err_m: 0.0208
+    px: 86.3
+    py: 118.8
+    depth: 1.0852
+gripper_opening_scale: 0.85
+gripper_max_tracking_err_rad: 0.10276
+gripper_ctrl_range_rad:
+- 0.05
+- 1.0
+gripper_note: 'Physical jaw gap not computed (hinge joint — requires mesh geometry).
+  Update recommended_scale after real-hardware caliper measurement: scale = measured_max_gap_m
+  / 0.10'
+gripper_samples:
+- ctrl: 0.05
+  qpos_rad: 0.1528
+  tracking_err_rad: 0.10276
+  target_m: 0.0
+- ctrl: 0.1364
+  qpos_rad: 0.1363
+  tracking_err_rad: 6.0e-05
+  target_m: 0.0091
+- ctrl: 0.2227
+  qpos_rad: 0.2227
+  tracking_err_rad: 3.0e-05
+  target_m: 0.0182
+- ctrl: 0.3091
+  qpos_rad: 0.3091
+  tracking_err_rad: 3.0e-05
+  target_m: 0.0273
+- ctrl: 0.3955
+  qpos_rad: 0.3954
+  tracking_err_rad: 3.0e-05
+  target_m: 0.0364
+- ctrl: 0.4818
+  qpos_rad: 0.4818
+  tracking_err_rad: 3.0e-05
+  target_m: 0.0455
+- ctrl: 0.5682
+  qpos_rad: 0.5682
+  tracking_err_rad: 3.0e-05
+  target_m: 0.0545
+- ctrl: 0.6545
+  qpos_rad: 0.6545
+  tracking_err_rad: 3.0e-05
+  target_m: 0.0636
+- ctrl: 0.7409
+  qpos_rad: 0.7409
+  tracking_err_rad: 3.0e-05
+  target_m: 0.0727
+- ctrl: 0.8273
+  qpos_rad: 0.8272
+  tracking_err_rad: 3.0e-05
+  target_m: 0.0818
+- ctrl: 0.9136
+  qpos_rad: 0.9136
+  tracking_err_rad: 3.0e-05
+  target_m: 0.0909
+- ctrl: 1.0
+  qpos_rad: 1.0
+  tracking_err_rad: 3.0e-05
+  target_m: 0.1
 yaw_ablation:
   xyz_only:
-    success_rate: 0.0
-    n_trials: 2
+    success_rate: 1.0
+    n_trials: 4
     detail:
     - yaw_deg: -45.0
-      success: false
+      success: true
     - yaw_deg: 0.0
-      success: false
+      success: true
+    - yaw_deg: 45.0
+      success: true
+    - yaw_deg: 90.0
+      success: true
   top_down_yaw:
-    success_rate: 0.0
-    n_trials: 2
+    success_rate: 1.0
+    n_trials: 4
     detail:
     - yaw_deg: -45.0
-      success: false
+      success: true
     - yaw_deg: 0.0
-      success: false
+      success: true
+    - yaw_deg: 45.0
+      success: true
+    - yaw_deg: 90.0
+      success: true
+yaw_ablation_per_object:
+  banana:
+    xyz_only:
+      success_rate: 1.0
+      n_trials: 4
+      detail:
+      - yaw_deg: -45.0
+        success: true
+      - yaw_deg: 0.0
+        success: true
+      - yaw_deg: 45.0
+        success: true
+      - yaw_deg: 90.0
+        success: true
+    top_down_yaw:
+      success_rate: 1.0
+      n_trials: 4
+      detail:
+      - yaw_deg: -45.0
+        success: true
+      - yaw_deg: 0.0
+        success: true
+      - yaw_deg: 45.0
+        success: true
+      - yaw_deg: 90.0
+        success: true
+  cylinder:
+    xyz_only:
+      success_rate: 0.0
+      n_trials: 4
+      detail:
+      - yaw_deg: -45.0
+        success: false
+      - yaw_deg: 0.0
+        success: false
+      - yaw_deg: 45.0
+        success: false
+      - yaw_deg: 90.0
+        success: false
+    top_down_yaw:
+      success_rate: 0.5
+      n_trials: 4
+      detail:
+      - yaw_deg: -45.0
+        success: true
+      - yaw_deg: 0.0
+        success: false
+      - yaw_deg: 45.0
+        success: false
+      - yaw_deg: 90.0
+        success: true
+  scissors:
+    xyz_only:
+      success_rate: 0.0
+      n_trials: 4
+      detail:
+      - yaw_deg: -45.0
+        success: false
+      - yaw_deg: 0.0
+        success: false
+      - yaw_deg: 45.0
+        success: false
+      - yaw_deg: 90.0
+        success: false
+    top_down_yaw:
+      success_rate: 0.0
+      n_trials: 4
+      detail:
+      - yaw_deg: -45.0
+        success: false
+      - yaw_deg: 0.0
+        success: false
+      - yaw_deg: 45.0
+        success: false
+      - yaw_deg: 90.0
+        success: false
 yaw_mode: top_down_yaw
+validation:
+  banana:
+    obj: banana
+    success_rate: 1.0
+    n_trials: 5
+    yaw_mode: top_down_yaw
+    detail:
+    - trial: 1
+      yaw_deg: 32.9
+      success: true
+    - trial: 2
+      yaw_deg: -7.3
+      success: true
+    - trial: 3
+      yaw_deg: 43.0
+      success: true
+    - trial: 4
+      yaw_deg: 23.7
+      success: true
+    - trial: 5
+      yaw_deg: -48.7
+      success: true
+  cylinder:
+    obj: cylinder
+    success_rate: 0.2
+    n_trials: 5
+    yaw_mode: top_down_yaw
+    detail:
+    - trial: 1
+      yaw_deg: 32.9
+      success: false
+    - trial: 2
+      yaw_deg: -7.3
+      success: false
+    - trial: 3
+      yaw_deg: 43.0
+      success: false
+    - trial: 4
+      yaw_deg: 23.7
+      success: false
+    - trial: 5
+      yaw_deg: -48.7
+      success: true
+  scissors:
+    obj: scissors
+    success_rate: 0.0
+    n_trials: 5
+    yaw_mode: top_down_yaw
+    detail:
+    - trial: 1
+      yaw_deg: 32.9
+      success: false
+    - trial: 2
+      yaw_deg: -7.3
+      success: false
+    - trial: 3
+      yaw_deg: 43.0
+      success: false
+    - trial: 4
+      yaw_deg: 23.7
+      success: false
+    - trial: 5
+      yaw_deg: -48.7
+      success: false

@@ -423,10 +423,23 @@ def validate_object(env: EnvironmentSoArm, obj_key: str, calib: dict,
 
 # ── save / load calibration YAML ─────────────────────────────────────────────
 
+def _to_native(obj):
+    """Recursively convert numpy scalars/arrays to native Python types for clean YAML."""
+    if isinstance(obj, dict):
+        return {k: _to_native(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_to_native(v) for v in obj]
+    if hasattr(obj, "item"):          # numpy scalar
+        return obj.item()
+    if hasattr(obj, "tolist"):        # numpy array
+        return obj.tolist()
+    return obj
+
+
 def save_calibration(data: dict, path: str = DEFAULT_OUT):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
-        yaml.dump(data, f, default_flow_style=False, sort_keys=False,
+        yaml.dump(_to_native(data), f, default_flow_style=False, sort_keys=False,
                   allow_unicode=True)
     print(f"\n[INFO] calibration saved → {path}")
 
@@ -463,15 +476,15 @@ Examples:
   # Validate on scissors (most yaw-sensitive)
   python scripts/calibrate_soarm_mujoco.py --validate scissors
 """)
-    ap.add_argument("--task", choices=["all", "cam", "gripper", "yaw"],
-                    default="all",
-                    help="Which calibration task to run (default: all)")
+    ap.add_argument("--task", choices=["all", "cam", "gripper", "yaw", "none"],
+                    default=None,
+                    help="Which calibration task to run (default: all, or none when --validate is given)")
     ap.add_argument("--validate", metavar="OBJ",
                     choices=list(TEST_OBJECTS.keys()),
                     help="Run post-calibration validation on this object")
     ap.add_argument("--obj", default="banana",
-                    choices=list(TEST_OBJECTS.keys()),
-                    help="Target object for yaw ablation (default: banana)")
+                    choices=list(TEST_OBJECTS.keys()) + ["all"],
+                    help="Target object for yaw ablation, or 'all' (default: banana)")
     ap.add_argument("--yaw_modes", nargs="+", default=["xyz_only", "top_down_yaw"],
                     choices=YAW_MODES,
                     help="Yaw modes to compare in ablation")
@@ -484,6 +497,10 @@ Examples:
     ap.add_argument("--quiet", action="store_true",
                     help="Suppress per-step output")
     args = ap.parse_args()
+
+    # default: run all calibration tasks unless only --validate was given
+    if args.task is None:
+        args.task = "none" if args.validate else "all"
 
     verbose = not args.quiet
     env     = EnvironmentSoArm(vis=args.vis, debug=False)
@@ -507,33 +524,42 @@ Examples:
 
     # ── yaw ablation ──────────────────────────────────────────────────────────
     if args.task in ("all", "yaw"):
-        print(f"\n=== Yaw Ablation: {args.obj} "
-              f"({TEST_OBJECTS[args.obj]['note']}) ===")
-        yaw_results = run_yaw_ablation(
-            env, obj_key=args.obj,
-            n_trials=args.n_trials,
-            yaw_modes=args.yaw_modes,
-            verbose=verbose,
-        )
-        out["yaw_ablation"] = {
-            mode: dict(success_rate=v["success_rate"], n_trials=v["n_trials"],
-                       detail=v["detail"])
-            for mode, v in yaw_results.items()
-        }
-        # pick best yaw mode by success rate (prefer top_down_yaw on tie)
-        best = max(yaw_results,
-                   key=lambda m: (yaw_results[m]["success_rate"],
+        obj_keys = list(TEST_OBJECTS.keys()) if args.obj == "all" else [args.obj]
+        per_obj  = {}
+        for ok in obj_keys:
+            print(f"\n=== Yaw Ablation: {ok} ({TEST_OBJECTS[ok]['note']}) ===")
+            yaw_results = run_yaw_ablation(
+                env, obj_key=ok,
+                n_trials=args.n_trials,
+                yaw_modes=args.yaw_modes,
+                verbose=verbose,
+            )
+            per_obj[ok] = {
+                mode: dict(success_rate=v["success_rate"], n_trials=v["n_trials"],
+                           detail=v["detail"])
+                for mode, v in yaw_results.items()
+            }
+
+        # For the primary / first object pick best mode and store summary
+        primary_obj = obj_keys[0]
+        primary_res = {m: per_obj[primary_obj][m] for m in args.yaw_modes
+                       if m in per_obj[primary_obj]}
+        best = max(primary_res,
+                   key=lambda m: (primary_res[m]["success_rate"],
                                   m == "top_down_yaw"))
+        out["yaw_ablation"] = per_obj[primary_obj]
+        out["yaw_ablation_per_object"] = per_obj
         out["yaw_mode"] = best
         if verbose:
-            print(f"  → recommended yaw_mode: {best}")
+            print(f"\n  → recommended yaw_mode: {best}")
 
     # ── validation ────────────────────────────────────────────────────────────
     if args.validate:
-        calib_data = out if out else {}
-        if not calib_data and os.path.exists(args.out):
-            calib_data = load_calibration(args.out)
+        if not out and os.path.exists(args.out):
+            # load existing calibration as base so we don't overwrite it
+            out = load_calibration(args.out)
             print(f"[INFO] loaded existing calibration from {args.out}")
+        calib_data = out
         print(f"\n=== Validation: {args.validate} ===")
         val = validate_object(env, obj_key=args.validate,
                               calib=calib_data,
