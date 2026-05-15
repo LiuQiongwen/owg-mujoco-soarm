@@ -28,6 +28,7 @@ import json
 import math
 import time
 import xml.etree.ElementTree as ET
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -112,18 +113,43 @@ def _so101_fragment() -> Tuple[str, str, str, str]:
     return defaults, assets, wbody_inner, actuators
 
 
+
+def _find_ycb_mesh(obj_dir):
+    candidates = [
+        "textured_simple_reoriented.obj",
+        "textured_reoriented.obj",
+        "textured_simple.obj",
+        "textured.obj",
+        "collision_vhacd.obj",
+    ]
+    for name in candidates:
+        path = Path(obj_dir) / name
+        if path.exists():
+            return str(path)
+    raise FileNotFoundError(f"No valid YCB mesh found in {obj_dir}")
+
 def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
-    obj_dir  = os.path.join(YCB_ROOT, obj_name)
-    vis_mesh = os.path.join(obj_dir, "textured_simple_reoriented.obj")
+    obj_dir = os.path.join(YCB_ROOT, obj_name)
+    vis_mesh = _find_ycb_mesh(obj_dir)
+    print(f"[INFO] Using mesh for {obj_name}: {Path(vis_mesh).name}")
+
     col_mesh = os.path.join(obj_dir, "collision_vhacd.obj")
+    if not os.path.isfile(col_mesh):
+        col_mesh = vis_mesh
+
     tex_file = os.path.join(obj_dir, "texture_map.png")
+    if not os.path.isfile(tex_file):
+        tex_file = ""
+
+    material_block = (
+        f'  <texture name="ycb_tex_{obj_idx}" type="2d" file="{tex_file}"/>\n'
+        f'  <material name="ycb_mat_{obj_idx}" texture="ycb_tex_{obj_idx}"/>\n'
+    ) if tex_file else f'  <material name="ycb_mat_{obj_idx}" rgba="0.8 0.8 0.8 1"/>\n'
 
     asset = f"""
   <mesh name="ycb_vis_{obj_idx}" file="{vis_mesh}"/>
   <mesh name="ycb_col_{obj_idx}" file="{col_mesh}"/>
-  <texture name="ycb_tex_{obj_idx}" type="2d" file="{tex_file}"/>
-  <material name="ycb_mat_{obj_idx}" texture="ycb_tex_{obj_idx}"/>
-"""
+{material_block}"""
     body = f"""
     <body name="obj_{obj_idx}" pos="0 0 -100">
       <freejoint name="obj_joint_{obj_idx}"/>
