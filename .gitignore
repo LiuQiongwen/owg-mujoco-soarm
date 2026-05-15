@@ -30,3 +30,6 @@ third_party/grconvnet/
 # ---- OS ----
 .DS_Store
 autoresearch.log
+data/transitions/
+*.npz
+*.pkl
