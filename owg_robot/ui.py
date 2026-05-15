@@ -55,8 +55,9 @@ class RobotEnvUI:
 
         if self.backend == "mujoco":
             # ── MuJoCo / SO-ARM101 backend ─────────────────────────────────
+            _mj_vis = bool(getattr(self.cfg.policy, "vis", False))
             self.env = EnvironmentSoArm(
-                vis=False,   # passive viewer causes issues in headless eval
+                vis=_mj_vis,
                 debug=False,
                 finger_length=self.cfg.finger_length,
                 n_grasp_attempts=self.cfg.n_grasp_attempts,

@@ -307,6 +307,13 @@ class EnvironmentSoArm:
         self._renderer = mujoco.Renderer(self.model, height=IMG_SIZE, width=IMG_SIZE)
         mujoco.mj_forward(self.model, self.data)
         self._cache_ids()
+        # Reattach passive viewer to new model/data when vis is on
+        if getattr(self, "vis", False) and getattr(self, "_viewer", None) is not None:
+            try:
+                self._viewer.close()
+            except Exception:
+                pass
+            self._viewer = mujoco.viewer.launch_passive(self.model, self.data)
 
     def _cache_ids(self):
         self._arm_jnt_ids   = [self.model.joint(n).id for n in ARM_JOINTS]
@@ -330,6 +337,7 @@ class EnvironmentSoArm:
         mujoco.mj_step(self.model, self.data)
         if self.vis and self._viewer is not None:
             self._viewer.sync()
+            time.sleep(1 / 60)
 
     def step(self):
         """Alias for step_simulation() (PyBullet compatibility)."""
@@ -838,23 +846,32 @@ class EnvironmentSoArm:
         z -= self.finger_length
         z = np.clip(z, *self.ee_position_limit[2])
 
-        # approach
-        self.move_gripper(0.08)
-        # TODO(6dof-ik): orn = [roll, pi/2, 0] once orientation IK is ready
         orn = None
-        self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn])
-
         gripper_opening_length *= self.GRIP_REDUCTION
         z_offset = self.calc_z_offset(gripper_opening_length)
+
+        if self.vis:
+            print(f"  [grasp] approach       → xy=({x:.3f}, {y:.3f})  z={self.GRIPPER_MOVING_HEIGHT:.3f}")
+        self.move_gripper(0.08)
+        self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn])
+
+        if self.vis:
+            print(f"  [grasp] descend        → xy=({x:.3f}, {y:.3f})  z={z + z_offset:.3f}")
         self.move_ee([x, y, z + z_offset, orn])
 
-        # close and lift
+        if self.vis:
+            print(f"  [grasp] close_gripper  (opening={gripper_opening_length:.3f})")
         self.auto_close_gripper(check_contact=True)
         self._steps(40)
+
+        if self.vis:
+            print(f"  [grasp] lift           → z={self.GRIPPER_MOVING_HEIGHT:.3f}")
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn])
         self._steps(60)
 
         grasped = self.check_grasped_id()
+        if self.vis:
+            print(f"  [grasp] result         → grasped={grasped}")
         if len(grasped) == 1:
             return True, grasped[0]
         return False, None
