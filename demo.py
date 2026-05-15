@@ -154,6 +154,20 @@ def main():
                 cfg_set(cfg, "object", args.object)
             print(f"[INFO] Auto-loaded MuJoCo config: {mj_cfg}")
 
+    # ---- MuJoCo stage-3 semantic demo: deterministic scene selection ----
+    if args.backend == "mujoco" and args.stage == 3:
+        _p = args.prompt.lower()
+        _SCENES = {
+            "banana":  ["Banana", "Pear", "MustardBottle"],
+            "mustard": ["MustardBottle", "Pear", "Banana"],
+        }
+        for keyword, objects in _SCENES.items():
+            if keyword in _p:
+                cfg_set(cfg, "scene_objects", objects)
+                print(f"[INFO] Semantic demo: prompt contains '{keyword}' "
+                      f"→ scene_objects={objects}")
+                break
+
     print("\n=== Loaded Configuration ===")
     print(cfg)
     print("============================\n")

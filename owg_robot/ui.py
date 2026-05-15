@@ -148,7 +148,15 @@ class RobotEnvUI:
     def spawn(self, n_objects):
         self.n_objects = n_objects
         self.env.remove_all_obj()
-        for obj_name in self.objects.obj_names[:self.n_objects]:
+
+        # MuJoCo semantic demo: cfg.scene_objects overrides the random pool
+        scene_objects = getattr(self.cfg, "scene_objects", None)
+        if scene_objects is not None and self.backend == "mujoco":
+            obj_list = scene_objects[:n_objects]
+        else:
+            obj_list = self.objects.obj_names[:n_objects]
+
+        for obj_name in obj_list:
             path, mod_orn, mod_stiffness = self.objects.get_obj_info(obj_name)
             self.env.load_isolated_obj(path, obj_name, mod_orn, mod_stiffness)
             self.env.dummy_simulation_steps(30)
