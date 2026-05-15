@@ -14,10 +14,28 @@ from sklearn.cluster import KMeans
 import string
 
 import supervision as sv
+
+# supervision compatibility
+if not hasattr(sv, "BoundingBoxAnnotator") and hasattr(sv, "RoundBoxAnnotator"):
+    sv.BoundingBoxAnnotator = sv.RoundBoxAnnotator
 from supervision.annotators.base import BaseAnnotator
 from supervision.annotators.utils import ColorLookup, Trace, resolve_color
 from supervision.detection.core import Detections
-from supervision.detection.utils import clip_boxes, mask_to_polygons
+try:
+    from supervision.detection.utils import mask_to_polygons
+except ImportError:
+    mask_to_polygons = None
+
+
+def clip_boxes(boxes, shape):
+    import numpy as np
+    boxes = np.asarray(boxes).copy()
+    h, w = shape[:2]
+    boxes[..., 0] = np.clip(boxes[..., 0], 0, w)
+    boxes[..., 2] = np.clip(boxes[..., 2], 0, w)
+    boxes[..., 1] = np.clip(boxes[..., 1], 0, h)
+    boxes[..., 3] = np.clip(boxes[..., 3], 0, h)
+    return boxes
 from supervision.draw.color import Color, ColorPalette
 from supervision.draw.utils import draw_polygon
 from supervision.geometry.core import Position
