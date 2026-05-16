@@ -1,0 +1,39 @@
+<!-- YCB PowerDrill (035_power_drill) — standalone MuJoCo MJCF.
+     Physical properties from YCB dataset (model.urdf) and
+     configs/objects/ycb_mujoco_manifest.yaml.
+     Load from project root:
+       mujoco.MjModel.from_xml_path("owg_robot/assets/ycb/drill.xml")
+     Paths are relative to this file's directory (owg_robot/assets/ycb/). -->
+<mujoco model="ycb_power_drill">
+  <compiler autolimits="true" angle="radian"/>
+  <option gravity="0 0 -9.81" timestep="0.002"/>
+
+  <asset>
+    <texture name="drill_tex" type="2d"
+             file="../ycb_objects/YcbPowerDrill/texture_map.png"/>
+    <material name="drill_mat" texture="drill_tex"/>
+    <!-- Visual mesh: high-poly textured surface, no collision contribution -->
+    <mesh name="drill_vis"
+          file="../ycb_objects/YcbPowerDrill/textured_simple_reoriented.obj"
+          scale="1 1 1"/>
+    <!-- Collision mesh: VHACD convex decomposition -->
+    <mesh name="drill_col"
+          file="../ycb_objects/YcbPowerDrill/collision_vhacd.obj"
+          scale="1 1 1"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" diffuse="0.8 0.8 0.8"/>
+    <geom type="plane" size="1 1 0.1" pos="0 0 0"/>
+    <body name="power_drill" pos="0 0 0.10">
+      <freejoint/>
+      <!-- Visual geometry: rendered, excluded from collision pipeline -->
+      <geom name="drill_visual" type="mesh" mesh="drill_vis"
+            material="drill_mat" contype="0" conaffinity="0" group="2"/>
+      <!-- Collision geometry: mass=0.895 kg (YCB), higher friction for rubber grip -->
+      <geom name="drill_collision" type="mesh" mesh="drill_col"
+            mass="0.895" friction="2.5 0.05 0.01"
+            contype="1" conaffinity="1"/>
+    </body>
+  </worldbody>
+</mujoco>

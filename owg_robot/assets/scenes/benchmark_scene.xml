@@ -1,0 +1,127 @@
+<!-- OWG Benchmark Scene — four YCB objects for physics-mode pick-and-place evaluation.
+     Objects: Banana, MustardBottle, PowerDrill, Pear.
+     Grasp mode: physics  (default — see config/mujoco/env.yaml).
+     The SO-ARM101 robot is loaded at runtime by env_soarm._build_scene_xml();
+     this file describes the static scene geometry and object set.
+
+     Standalone usage (no robot arm, for scene inspection / object physics tests):
+       mujoco.MjModel.from_xml_path("owg_robot/assets/scenes/benchmark_scene.xml")
+     Must be run from the project root.
+
+     meshdir points to SO-ARM101 STL assets; YCB mesh paths are then relative
+     to that directory (../../ycb_objects/<Name>/...).
+     Texture paths are relative to this file's directory (../ycb_objects/<Name>/...).
+-->
+<mujoco model="owg_benchmark">
+  <compiler meshdir="../so101/assets" autolimits="true" angle="radian"/>
+  <option gravity="0 0 -9.81" timestep="0.002"/>
+
+  <asset>
+    <texture name="skybox" type="skybox" builtin="gradient"
+             rgb1=".4 .6 .8" rgb2="0 0 0" width="512" height="512"/>
+    <texture name="table_tex" type="2d" builtin="flat"
+             rgb1=".8 .7 .6" width="64" height="64"/>
+    <material name="table_mat" texture="table_tex" texrepeat="4 4"/>
+
+    <!-- Banana (011_banana) — mass 0.166 kg -->
+    <texture name="banana_tex" type="2d"
+             file="../../ycb_objects/YcbBanana/texture_map.png"/>
+    <material name="banana_mat" texture="banana_tex"/>
+    <mesh name="banana_vis"
+          file="../../ycb_objects/YcbBanana/textured_simple_reoriented.obj"/>
+    <mesh name="banana_col"
+          file="../../ycb_objects/YcbBanana/collision_vhacd.obj"/>
+
+    <!-- MustardBottle (006_mustard_bottle) — mass 0.603 kg -->
+    <texture name="mustard_tex" type="2d"
+             file="../../ycb_objects/YcbMustardBottle/texture_map.png"/>
+    <material name="mustard_mat" texture="mustard_tex"/>
+    <mesh name="mustard_vis"
+          file="../../ycb_objects/YcbMustardBottle/textured_simple_reoriented.obj"/>
+    <mesh name="mustard_col"
+          file="../../ycb_objects/YcbMustardBottle/collision_vhacd.obj"/>
+
+    <!-- PowerDrill (035_power_drill) — mass 0.895 kg -->
+    <texture name="drill_tex" type="2d"
+             file="../../ycb_objects/YcbPowerDrill/texture_map.png"/>
+    <material name="drill_mat" texture="drill_tex"/>
+    <mesh name="drill_vis"
+          file="../../ycb_objects/YcbPowerDrill/textured_simple_reoriented.obj"/>
+    <mesh name="drill_col"
+          file="../../ycb_objects/YcbPowerDrill/collision_vhacd.obj"/>
+
+    <!-- Pear (016_pear) — mass 0.049 kg -->
+    <texture name="pear_tex" type="2d"
+             file="../../ycb_objects/YcbPear/texture_map.png"/>
+    <material name="pear_mat" texture="pear_tex"/>
+    <mesh name="pear_vis"
+          file="../../ycb_objects/YcbPear/textured_reoriented.obj"/>
+    <mesh name="pear_col"
+          file="../../ycb_objects/YcbPear/collision_vhacd.obj"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 2.5" dir="0 0 -1" diffuse="0.8 0.8 0.8" specular="0.2 0.2 0.2"/>
+    <geom name="floor" type="plane" size="2 2 0.1" pos="0 0 0" material="table_mat"/>
+    <geom name="table_top" type="box"
+          size="0.45 0.45 0.02" pos="0 -0.45 0.765"
+          material="table_mat" contype="1" conaffinity="1"/>
+
+    <!-- Tray: target delivery zone (matches TARGET_ZONE_POS in env_soarm.py) -->
+    <body name="tray" pos="0.20 0.25 0.785">
+      <geom name="tray_bottom" type="box" size="0.12 0.12 0.005"
+            pos="0 0 0.005" rgba="0.4 0.6 0.4 0.8" contype="1" conaffinity="1"/>
+      <geom name="tray_w1" type="box" size="0.005 0.12 0.02"
+            pos=" 0.125 0 0.02" rgba="0.4 0.6 0.4 0.8"/>
+      <geom name="tray_w2" type="box" size="0.005 0.12 0.02"
+            pos="-0.125 0 0.02" rgba="0.4 0.6 0.4 0.8"/>
+      <geom name="tray_w3" type="box" size="0.12 0.005 0.02"
+            pos="0  0.125 0.02" rgba="0.4 0.6 0.4 0.8"/>
+      <geom name="tray_w4" type="box" size="0.12 0.005 0.02"
+            pos="0 -0.125 0.02" rgba="0.4 0.6 0.4 0.8"/>
+    </body>
+
+    <!-- Overhead camera: matches CAM_POS / FOVY in env_soarm.py -->
+    <camera name="overhead" pos="0.05 -0.52 1.9" euler="0 0 0" fovy="55"/>
+
+    <!-- Robot arm placeholder: loaded by env_soarm._build_scene_xml() at runtime.
+         In standalone mode the table is empty and the arm is absent. -->
+
+    <!-- Objects: parked off-world; spawned to table by env_soarm.load_obj() -->
+    <body name="obj_0" pos="0 0 -100">
+      <freejoint name="obj_joint_0"/>
+      <geom name="ycb_vis_geom_0" type="mesh" mesh="banana_vis"
+            material="banana_mat" contype="0" conaffinity="0" group="2"/>
+      <geom name="ycb_col_geom_0" type="mesh" mesh="banana_col"
+            mass="0.166" friction="2.0 0.05 0.01"
+            contype="1" conaffinity="1"/>
+    </body>
+
+    <body name="obj_1" pos="0 0 -100">
+      <freejoint name="obj_joint_1"/>
+      <geom name="ycb_vis_geom_1" type="mesh" mesh="mustard_vis"
+            material="mustard_mat" contype="0" conaffinity="0" group="2"/>
+      <geom name="ycb_col_geom_1" type="mesh" mesh="mustard_col"
+            mass="0.603" friction="2.0 0.05 0.01"
+            contype="1" conaffinity="1"/>
+    </body>
+
+    <body name="obj_2" pos="0 0 -100">
+      <freejoint name="obj_joint_2"/>
+      <geom name="ycb_vis_geom_2" type="mesh" mesh="drill_vis"
+            material="drill_mat" contype="0" conaffinity="0" group="2"/>
+      <geom name="ycb_col_geom_2" type="mesh" mesh="drill_col"
+            mass="0.895" friction="2.5 0.05 0.01"
+            contype="1" conaffinity="1"/>
+    </body>
+
+    <body name="obj_3" pos="0 0 -100">
+      <freejoint name="obj_joint_3"/>
+      <geom name="ycb_vis_geom_3" type="mesh" mesh="pear_vis"
+            material="pear_mat" contype="0" conaffinity="0" group="2"/>
+      <geom name="ycb_col_geom_3" type="mesh" mesh="pear_col"
+            mass="0.049" friction="1.5 0.05 0.01"
+            contype="1" conaffinity="1"/>
+    </body>
+  </worldbody>
+</mujoco>

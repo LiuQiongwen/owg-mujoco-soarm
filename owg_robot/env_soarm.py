@@ -37,9 +37,11 @@ import mujoco.viewer
 
 # ── paths ────────────────────────────────────────────────────────────────────
 _DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJ_ROOT = os.path.dirname(_DIR)             # project root (parent of owg_robot/)
 SO101_XML  = os.path.join(_DIR, "assets", "so101", "so101.xml")
 SO101_MESH = os.path.join(_DIR, "assets", "so101", "assets")
 YCB_ROOT   = os.path.join(_DIR, "assets", "ycb_objects")
+_MANIFEST_PATH = os.path.join(_PROJ_ROOT, "configs", "objects", "ycb_mujoco_manifest.yaml")
 
 # ── scene constants ───────────────────────────────────────────────────────────
 TABLE_TOP_Z    = 0.785
@@ -132,7 +134,51 @@ def _so101_fragment() -> Tuple[str, str, str, str]:
 
 
 
-def _find_ycb_mesh(obj_dir):
+# ── object manifest (Menagerie-style) ─────────────────────────────────────────
+# Lazily loaded from configs/objects/ycb_mujoco_manifest.yaml.
+# Provides per-object mass, friction, scale, and mesh names so these values
+# are defined in one place rather than scattered through env_soarm.py.
+_MANIFEST_CACHE: Optional[dict] = None
+
+
+def _load_manifest() -> dict:
+    """Return the parsed ycb_mujoco_manifest.yaml, loading it once."""
+    global _MANIFEST_CACHE
+    if _MANIFEST_CACHE is None:
+        if os.path.isfile(_MANIFEST_PATH):
+            try:
+                import yaml
+                with open(_MANIFEST_PATH) as f:
+                    _MANIFEST_CACHE = yaml.safe_load(f) or {}
+            except Exception as e:
+                print(f"[WARN] Could not load YCB manifest ({e}); using defaults.")
+                _MANIFEST_CACHE = {}
+        else:
+            print(f"[WARN] YCB manifest not found at {_MANIFEST_PATH}; using defaults.")
+            _MANIFEST_CACHE = {}
+    return _MANIFEST_CACHE
+
+
+def _manifest_entry(obj_name: str) -> dict:
+    """Look up the manifest entry for obj_name.
+
+    Accepts both pool names ("YcbBanana") and logical names ("Banana").
+    Returns an empty dict if the object is not listed in the manifest.
+    """
+    manifest = _load_manifest()
+    objects  = manifest.get("objects", {})
+    # Direct lookup first (logical name as key)
+    if obj_name in objects:
+        return objects[obj_name]
+    # Strip "Ycb" prefix and try again
+    logical = obj_name[3:] if obj_name.startswith("Ycb") else obj_name
+    return objects.get(logical, {})
+
+
+# ── mesh helpers ──────────────────────────────────────────────────────────────
+
+def _find_ycb_mesh(obj_dir: str) -> str:
+    """Auto-discover the best available visual mesh for a YCB object directory."""
     candidates = [
         "textured_simple_reoriented.obj",
         "textured_reoriented.obj",
@@ -146,35 +192,69 @@ def _find_ycb_mesh(obj_dir):
             return str(path)
     raise FileNotFoundError(f"No valid YCB mesh found in {obj_dir}")
 
+
 def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
+    """Build MuJoCo <asset> and <body> XML snippets for one YCB pool slot.
+
+    Physical properties (mass, friction, scale) and mesh filenames are read
+    from configs/objects/ycb_mujoco_manifest.yaml when the object is listed
+    there.  Falls back to dynamic mesh discovery and hardcoded defaults for
+    objects not in the manifest.
+    """
     obj_dir = os.path.join(YCB_ROOT, obj_name)
-    vis_mesh = _find_ycb_mesh(obj_dir)
-    print(f"[INFO] Using mesh for {obj_name}: {Path(vis_mesh).name}")
+    entry   = _manifest_entry(obj_name)
 
-    col_mesh = os.path.join(obj_dir, "collision_vhacd.obj")
-    if not os.path.isfile(col_mesh):
-        col_mesh = vis_mesh
+    # ── mesh resolution ───────────────────────────────────────────────────────
+    if entry:
+        vis_name = entry.get("visual_mesh", "")
+        col_name = entry.get("collision_mesh", "collision_vhacd.obj")
+        vis_mesh = (os.path.join(obj_dir, vis_name) if vis_name
+                    else _find_ycb_mesh(obj_dir))
+        col_path = os.path.join(obj_dir, col_name)
+        col_mesh = col_path if os.path.isfile(col_path) else vis_mesh
+    else:
+        vis_mesh = _find_ycb_mesh(obj_dir)
+        col_path = os.path.join(obj_dir, "collision_vhacd.obj")
+        col_mesh = col_path if os.path.isfile(col_path) else vis_mesh
 
+    print(f"[INFO] Using mesh for {obj_name}: {Path(vis_mesh).name}"
+          + ("" if entry else "  (manifest entry missing — using defaults)"))
+
+    # ── physical properties from manifest (or hardcoded defaults) ─────────────
+    scale    = float(entry.get("scale",   1.0))
+    mass     = float(entry.get("mass",    0.1))
+    friction = entry.get("friction", [2.0, 0.05, 0.01])
+
+    scale_str    = f"{scale} {scale} {scale}"
+    friction_str = " ".join(str(v) for v in friction)
+
+    # ── texture / material ────────────────────────────────────────────────────
     tex_file = os.path.join(obj_dir, "texture_map.png")
     if not os.path.isfile(tex_file):
         tex_file = ""
 
-    material_block = (
-        f'  <texture name="ycb_tex_{obj_idx}" type="2d" file="{tex_file}"/>\n'
-        f'  <material name="ycb_mat_{obj_idx}" texture="ycb_tex_{obj_idx}"/>\n'
-    ) if tex_file else f'  <material name="ycb_mat_{obj_idx}" rgba="0.8 0.8 0.8 1"/>\n'
+    if tex_file:
+        material_block = (
+            f'  <texture name="ycb_tex_{obj_idx}" type="2d" file="{tex_file}"/>\n'
+            f'  <material name="ycb_mat_{obj_idx}" texture="ycb_tex_{obj_idx}"/>\n'
+        )
+    else:
+        material_block = f'  <material name="ycb_mat_{obj_idx}" rgba="0.8 0.8 0.8 1"/>\n'
 
+    # ── XML assembly ──────────────────────────────────────────────────────────
     asset = f"""
-  <mesh name="ycb_vis_{obj_idx}" file="{vis_mesh}"/>
-  <mesh name="ycb_col_{obj_idx}" file="{col_mesh}"/>
+  <mesh name="ycb_vis_{obj_idx}" file="{vis_mesh}" scale="{scale_str}"/>
+  <mesh name="ycb_col_{obj_idx}" file="{col_mesh}" scale="{scale_str}"/>
 {material_block}"""
+
     body = f"""
     <body name="obj_{obj_idx}" pos="0 0 -100">
       <freejoint name="obj_joint_{obj_idx}"/>
       <geom name="ycb_vis_geom_{obj_idx}" type="mesh" mesh="ycb_vis_{obj_idx}"
             material="ycb_mat_{obj_idx}" contype="0" conaffinity="0" group="2"/>
       <geom name="ycb_col_geom_{obj_idx}" type="mesh" mesh="ycb_col_{obj_idx}"
-            contype="1" conaffinity="1" friction="2.0 0.05 0.01"/>
+            mass="{mass}" friction="{friction_str}"
+            contype="1" conaffinity="1"/>
     </body>
 """
     return asset, body
@@ -399,7 +479,14 @@ class EnvironmentSoArm:
             return False
 
     def _sync_kinematic_grasp(self) -> None:
-        """Move the kinematically attached object to follow the EEF each step."""
+        """Move the kinematically attached object to follow the EEF each step.
+
+        Also zeros the object's linear velocity so that contact impulses from
+        the arm's geometry do not accumulate.  Without this, heavy objects
+        (e.g., MustardBottle at 0.603 kg) would exert large reaction forces
+        on the arm joints during lift, preventing the arm from reaching its
+        target height.
+        """
         if self._welded_obj_id is None:
             return
         try:
@@ -408,7 +495,9 @@ class EnvironmentSoArm:
             slot     = self._obj_pool_slot(self._welded_obj_id)
             jnt      = self.model.joint(f"obj_joint_{slot}")
             adr      = jnt.qposadr[0]
+            adr_v    = jnt.dofadr[0]
             self.data.qpos[adr:adr + 3] = new_pos
+            self.data.qvel[adr_v:adr_v + 3] = 0.0   # kill linear velocity each step
         except Exception:
             self._welded_obj_id = None
 

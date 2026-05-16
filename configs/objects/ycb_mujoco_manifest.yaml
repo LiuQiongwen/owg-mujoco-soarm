@@ -1,0 +1,74 @@
+# YCB object manifest for OWG MuJoCo simulation.
+#
+# Inspired by MuJoCo Menagerie: centralises every per-object physical property
+# and mesh reference in one place.  env_soarm.py reads this file at model-build
+# time; adding a new object only requires a new entry here plus a corresponding
+# XML file in owg_robot/assets/ycb/.
+#
+# Fields
+# ──────
+#   pool_name       YCB directory name under owg_robot/assets/ycb_objects/
+#   visual_mesh     High-poly textured mesh for rendering (no collision)
+#   collision_mesh  VHACD convex-decomposition mesh for contact physics
+#   mass            Object mass in kg (YCB dataset ground truth)
+#   friction        MuJoCo friction triplet: [sliding, torsional, rolling]
+#   scale           Uniform scale applied to both visual and collision meshes.
+#                   Most YCB objects are at 1:1 scale; MediumClamp uses 1.75×.
+#   spawn_z_offset  Additional height above TABLE_TOP_Z (0.785 m) to drop the
+#                   object from on spawn.  Larger values give more settling time.
+#   xml             Per-object MJCF for standalone testing / documentation
+#                   (relative to project root).
+
+version: "1.0"
+
+objects:
+
+  Banana:
+    pool_name:      YcbBanana
+    visual_mesh:    textured_simple_reoriented.obj
+    collision_mesh: collision_vhacd.obj
+    mass:           0.166          # kg
+    friction:       [2.0, 0.05, 0.01]
+    scale:          1.0
+    spawn_z_offset: 0.10
+    xml:            owg_robot/assets/ycb/banana.xml
+
+  Pear:
+    pool_name:      YcbPear
+    visual_mesh:    textured_reoriented.obj
+    collision_mesh: collision_vhacd.obj
+    mass:           0.049          # kg
+    friction:       [1.5, 0.05, 0.01]
+    scale:          1.0
+    spawn_z_offset: 0.10
+    xml:            owg_robot/assets/ycb/pear.xml
+
+  MustardBottle:
+    pool_name:      YcbMustardBottle
+    visual_mesh:    textured_simple_reoriented.obj
+    collision_mesh: collision_vhacd.obj
+    mass:           0.603          # kg
+    friction:       [2.0, 0.05, 0.01]
+    scale:          1.0
+    spawn_z_offset: 0.15
+    xml:            owg_robot/assets/ycb/mustard.xml
+
+  PowerDrill:
+    pool_name:      YcbPowerDrill
+    visual_mesh:    textured_simple_reoriented.obj
+    collision_mesh: collision_vhacd.obj
+    mass:           0.895          # kg
+    friction:       [2.5, 0.05, 0.01]
+    scale:          1.0
+    spawn_z_offset: 0.15
+    xml:            owg_robot/assets/ycb/drill.xml
+
+  MediumClamp:
+    pool_name:      YcbMediumClamp
+    visual_mesh:    textured_reoriented.obj
+    collision_mesh: collision_vhacd.obj
+    mass:           0.259          # kg
+    friction:       [1.5, 0.05, 0.01]
+    scale:          1.75           # matches model.urdf scale="1.75 1.75 1.75"
+    spawn_z_offset: 0.12
+    xml:            owg_robot/assets/ycb/cylinder.xml
