@@ -63,6 +63,16 @@ objects:
     spawn_z_offset: 0.15
     xml:            owg_robot/assets/ycb/drill.xml
 
+  CrackerBox:
+    pool_name:      YcbCrackerBox
+    visual_mesh:    textured_simple_reoriented.obj
+    collision_mesh: collision_vhacd.obj
+    mass:           0.411          # kg
+    friction:       [1.8, 0.05, 0.01]
+    scale:          1.0
+    spawn_z_offset: 0.15
+    xml:            owg_robot/assets/ycb/cracker.xml
+
   MediumClamp:
     pool_name:      YcbMediumClamp
     visual_mesh:    textured_reoriented.obj

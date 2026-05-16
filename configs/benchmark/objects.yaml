@@ -1,0 +1,67 @@
+# Per-object benchmark settings.
+# Overrides default spawn and stability parameters for objects that need special treatment.
+#
+# Fields:
+#   ycb_name      : YCB pool name (must match ycb_mujoco_manifest.yaml)
+#   mass_kg       : object mass in kg (informational, loaded from manifest)
+#   settle_steps  : settle steps after spawn (heavier / taller objects need more)
+#   spawn_z_off   : extra drop height above TABLE_TOP_Z (0.785 m)
+#   opening_lo    : min gripper opening for this object
+#   opening_hi    : max gripper opening for this object
+#   notes         : why this object needs special treatment
+
+objects:
+
+  banana:
+    ycb_name:     YcbBanana
+    mass_kg:      0.166
+    settle_steps: 300
+    spawn_z_off:  0.10
+    opening_lo:   0.04
+    opening_hi:   0.08
+    notes: "Curved shape; low mass; tends to roll"
+
+  pear:
+    ycb_name:     YcbPear
+    mass_kg:      0.049
+    settle_steps: 300
+    spawn_z_off:  0.10
+    opening_lo:   0.04
+    opening_hi:   0.07
+    notes: "Lightest object; CoM below TABLE_TOP_Z; arm descent can knock it"
+
+  mustard:
+    ycb_name:     YcbMustardBottle
+    mass_kg:      0.603
+    settle_steps: 400
+    spawn_z_off:  0.15
+    opening_lo:   0.06
+    opening_hi:   0.09
+    notes: "Heaviest upright object; kinematic velocity damping required"
+
+  cracker:
+    ycb_name:     YcbCrackerBox
+    mass_kg:      0.411
+    settle_steps: 350
+    spawn_z_off:  0.15
+    opening_lo:   0.06
+    opening_hi:   0.09
+    notes: "Box shape; may land on edge or face; stable once settled"
+
+  drill:
+    ycb_name:     YcbPowerDrill
+    mass_kg:      0.895
+    settle_steps: 400
+    spawn_z_off:  0.15
+    opening_lo:   0.05
+    opening_hi:   0.09
+    notes: "Heaviest object; asymmetric; high friction; handle poses difficulty"
+
+  cylinder:
+    ycb_name:     YcbMediumClamp
+    mass_kg:      0.259
+    settle_steps: 300
+    spawn_z_off:  0.12
+    opening_lo:   0.04
+    opening_hi:   0.07
+    notes: "MediumClamp at 1.75x scale; low friction metal; tends to slide"

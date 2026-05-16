@@ -1,0 +1,73 @@
+# OWG Grasp Benchmark — default configuration
+# Inspired by boschresearch/mj-grasp-sim evaluation style.
+#
+# Run:
+#   MUJOCO_GL=egl conda run -n bridge python scripts/run_benchmark.py
+#   MUJOCO_GL=egl conda run -n bridge python scripts/run_benchmark.py --config configs/benchmark/default.yaml
+#
+# Override individual fields:
+#   python scripts/run_benchmark.py --objects banana,pear --seeds 1-5 --methods geometry,lggsn
+
+run_id: default
+
+# ── objects ───────────────────────────────────────────────────────────────────
+# Short names mapped to YCB pool names in benchmark/runner.py OBJECT_REGISTRY.
+objects:
+  - banana
+  - pear
+  - mustard
+  - cracker
+  - drill
+  - cylinder
+
+# ── evaluation ────────────────────────────────────────────────────────────────
+seeds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25]
+
+methods:
+  - geometry
+  - lggsn
+  # - random        # uncomment to add pure random baseline
+  # - world_model   # requires trained data/world_model_ckpt.pt
+  # - hybrid        # requires both lggsn ckpt and world_model ckpt
+
+# execution_mode: physics  (benchmark) | demo_attach (visual demo, do NOT use for papers)
+execution_mode: physics
+
+n_grasp_candidates: 10    # candidates sampled around object centroid per trial
+n_grasp_attempts: 3       # try the top-K ranked candidates until success
+settle_steps: 300         # physics steps after spawn before grasp attempt
+
+stability_check: true     # skip unstable scenes (explosion, fell off, still moving)
+verbose: true
+
+# ── checkpoints (optional) ────────────────────────────────────────────────────
+# lggsn_ckpt: grasp_6dof/models/lggsn_pairwise_live.pt   # default from env var
+# wm_ckpt:    data/world_model_ckpt.pt
+
+# ── spawn parameters ──────────────────────────────────────────────────────────
+spawn:
+  centre_y:   -0.40    # m — arm-reachable table centre Y
+  spread_xy:   0.06    # m — random XY scatter radius
+  drop_z_off:  0.12    # m — drop height above TABLE_TOP_Z (0.785 m)
+
+# ── grasp candidate sampling ──────────────────────────────────────────────────
+sampling:
+  spread_xy:  0.04             # m — candidate XY scatter around centroid
+  z_offset:   0.025            # m — above object centroid Z
+  yaw_lo:    -1.5708           # rad — minimum wrist yaw  (−π/2)
+  yaw_hi:     1.5708           # rad — maximum wrist yaw  (+π/2)
+  opening_lo: 0.04             # m — minimum gripper opening
+  opening_hi: 0.09             # m — maximum gripper opening
+
+# ── stability thresholds ──────────────────────────────────────────────────────
+stability:
+  max_pos_z:     1.185         # m — above this → explosion detected
+  min_pos_z:     0.705         # m — below this → fell off table (pear CoM ~0.768 is valid)
+  max_xy_radius: 0.44          # m — from (0, -0.45) table centre
+  max_velocity:  0.05          # m/s sum of |qvel| — still-moving threshold
+  table_centre: [0.0, -0.45]   # m XY
+
+# ── output paths ──────────────────────────────────────────────────────────────
+results_dir: results/
+plots_dir:   plots/
