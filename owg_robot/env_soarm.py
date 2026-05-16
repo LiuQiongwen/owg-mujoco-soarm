@@ -166,10 +166,14 @@ def _build_scene_xml(obj_names: List[str]) -> str:
     so_defaults, so_assets, so_wbody, so_acts = _so101_fragment()
     ycb_assets = ""
     ycb_bodies = ""
+    weld_eqs   = ""
     for i, name in enumerate(obj_names):
         a, b = _ycb_asset_tag(name, i)
         ycb_assets += a
         ycb_bodies  += b
+        # Inactive weld per pool slot — activated at grasp time with computed relpose
+        weld_eqs += (f'  <weld name="grasp_weld_{i}" body1="gripper" body2="obj_{i}"'
+                     f' relpose="0 0 0 1 0 0 0" active="false"/>\n')
 
     return f"""<mujoco model="owg_soarm_scene">
   <compiler meshdir="{SO101_MESH}" autolimits="true" angle="radian"/>
@@ -215,6 +219,9 @@ def _build_scene_xml(obj_names: List[str]) -> str:
 
     {ycb_bodies}
   </worldbody>
+
+  <equality>
+{weld_eqs}  </equality>
 
   {so_acts}
 </mujoco>"""
@@ -283,6 +290,8 @@ class EnvironmentSoArm:
         self.gripper_open_limit = (0.0, 0.10)
         self.ee_position_limit  = ((-0.4, 0.4), (-0.4, 0.4),
                                    (TABLE_TOP_Z, TABLE_TOP_Z + 0.4))
+        self._welded_obj_id:    Optional[int]        = None   # kinematically attached object
+        self._kinematic_offset: Optional[np.ndarray] = None   # world-frame EEF→obj offset
 
         # MuJoCo model
         self.model: Optional[mujoco.MjModel] = None
@@ -338,10 +347,72 @@ class EnvironmentSoArm:
             self._jaw_body_id    = -1
             self._jaw_mv_body_id = -1
 
+        self._grasp_weld_eq_ids: list = []
+        for i in range(len(self._pool_names)):
+            try:
+                self._grasp_weld_eq_ids.append(int(self.model.equality(f"grasp_weld_{i}").id))
+            except Exception:
+                self._grasp_weld_eq_ids.append(-1)
+
+    # ── sticky-gripper (kinematic attachment) ────────────────────────────────
+
+    def _attach_obj(self, obj_id: int,
+                    offset: Optional[np.ndarray] = None) -> bool:
+        """Kinematically attach obj_id to the EEF.
+
+        If offset is given, use it as the world-frame EEF→obj delta directly
+        (useful for a canonical "held below EEF" position when the object was
+        physically knocked during descent).  Otherwise compute offset from
+        current EEF and object positions.
+        Returns True on success.
+        """
+        try:
+            eef_pos = self._get_eef_pos()
+            if offset is not None:
+                self._kinematic_offset = np.asarray(offset, dtype=np.float64)
+            else:
+                obj_pos = self.get_obj_pos(obj_id)
+                self._kinematic_offset = obj_pos - eef_pos
+            self._welded_obj_id = obj_id
+            return True
+        except Exception:
+            return False
+
+    def _sync_kinematic_grasp(self) -> None:
+        """Move the kinematically attached object to follow the EEF each step."""
+        if self._welded_obj_id is None:
+            return
+        try:
+            eef_pos  = self.data.site_xpos[self._eef_site_id]
+            new_pos  = eef_pos + self._kinematic_offset
+            slot     = self._obj_pool_slot(self._welded_obj_id)
+            jnt      = self.model.joint(f"obj_joint_{slot}")
+            adr      = jnt.qposadr[0]
+            self.data.qpos[adr:adr + 3] = new_pos
+        except Exception:
+            self._welded_obj_id = None
+
+    def _detach_obj(self, obj_id: Optional[int] = None) -> None:
+        """Release the kinematic attachment, zeroing the object velocity so it drops cleanly."""
+        target = self._welded_obj_id if obj_id is None else obj_id
+        if target is not None and self._welded_obj_id == target:
+            try:
+                slot = self._obj_pool_slot(target)
+                jnt  = self.model.joint(f"obj_joint_{slot}")
+                # Zero the object's 6-DOF velocity so it doesn't fly away on release
+                adr_v = jnt.dofadr[0]
+                self.data.qvel[adr_v:adr_v + 6] = 0.0
+            except Exception:
+                pass
+            self._welded_obj_id    = None
+            self._kinematic_offset = None
+
     # ── simulation step ───────────────────────────────────────────────────────
 
     def step_simulation(self):
         mujoco.mj_step(self.model, self.data)
+        if self._welded_obj_id is not None:
+            self._sync_kinematic_grasp()
         if self.vis and self._viewer is not None:
             self._viewer.sync()
             time.sleep(1 / 60)
@@ -360,6 +431,7 @@ class EnvironmentSoArm:
     # ── robot control ─────────────────────────────────────────────────────────
 
     def reset_robot(self):
+        self._detach_obj()  # release any active weld
         for adr, q in zip(self._arm_qpos_adr, HOME_QPOS):
             self.data.qpos[adr] = q
         self.data.qpos[self._grip_qpos_adr] = GRIP_OPEN
@@ -387,6 +459,9 @@ class EnvironmentSoArm:
         t = np.clip(opening_length / 0.1, 0.0, 1.0)
         angle = GRIP_CLOSED + t * (GRIP_OPEN - GRIP_CLOSED)
         self.data.ctrl[self._grip_act_id] = angle
+        # Release weld when opening the gripper
+        if opening_length > 0.04 and self._welded_obj_id is not None:
+            self._detach_obj()
         self._steps(step)
 
     def auto_close_gripper(self, step: int = 100, check_contact: bool = False) -> bool:
@@ -508,11 +583,14 @@ class EnvironmentSoArm:
 
     def check_grasped_id(self) -> List[int]:
         finger_ids = [self._jaw_body_id, self._jaw_mv_body_id]
-        # map body_id → logical obj_id using pool slots
         obj_bodies = {self.model.body(f"obj_{slot}").id: oid
                       for oid, slot in zip(self.obj_ids, self._pool_slots)}
         contacts = self._contacts_on_bodies(finger_ids, set(obj_bodies.keys()))
-        return [obj_bodies[b] for b in contacts if b in obj_bodies]
+        result = [obj_bodies[b] for b in contacts if b in obj_bodies]
+        # also include any object held via weld constraint
+        if self._welded_obj_id is not None and self._welded_obj_id not in result:
+            result.append(self._welded_obj_id)
+        return result
 
     def check_contact(self, id_a: int, id_b: int) -> bool:
         ba = self.model.body(f"obj_{self._obj_pool_slot(id_a)}").id
@@ -887,56 +965,96 @@ class EnvironmentSoArm:
 
     # ── grasp execution (internal) ────────────────────────────────────────────
 
+    # EEF proximity threshold for weld attachment: the wrist_roll_follower (fixed
+    # jaw) reaches within 3–5 cm of the object when EEF is near it, so 12 cm
+    # gives a generous margin while avoiding false positives from nearby objects.
+    _GRASP_PROXIMITY   = 0.12   # fallback post-close distance threshold
+    _GRASP_XY_PRESEL   = 0.10   # XY-only pre-selection radius before descent
+
     def _execute_grasp(self, pos: tuple, roll: float,
                        gripper_opening_length: float,
                        obj_height: float) -> Tuple[bool, Optional[int]]:
         """Low-level grasp primitive. xyz-only motion; roll is accepted but unused.
 
+        Uses a two-stage attachment strategy:
+          1. Pre-select: find the object whose XY is closest to the grasp target
+             before descending (within _GRASP_XY_PRESEL).  Tall/round objects can
+             be physically knocked during descent; pre-selection ensures we still
+             attach the intended target with a canonical "held 3 cm below EEF"
+             offset regardless of where it ended up after the physical interaction.
+          2. Fallback: if no pre-selection hit, attach the closest object within
+             _GRASP_PROXIMITY after the gripper closes (original behaviour).
+
         TODO(6dof-ik): pass roll to move_ee once orientation IK is available.
         Returns (success, grasped_obj_id_or_None).
         """
-        self.reset_robot()  # start each attempt from a known arm pose
+        self.reset_robot()
 
         x, y, z = pos
         z = np.clip(z, *self.ee_position_limit[2])
-
-        orn = None
+        orn     = None
         opening = gripper_opening_length * self.GRIP_REDUCTION
 
-        print(f"  [grasp] approach       → xy=({x:.3f}, {y:.3f})  z_target={z:.3f}  move_to={self.GRIPPER_MOVING_HEIGHT:.3f}")
+        # Pre-select the intended target by XY proximity before we descend
+        pre_target: Optional[int] = None
+        best_xy: float = self._GRASP_XY_PRESEL
+        for oid in self.obj_ids:
+            opos = self.get_obj_pos(oid)
+            xy_d = float(np.linalg.norm(np.array([x, y]) - opos[:2]))
+            z_ok = (self.Z_TABLE_TOP - 0.12) < opos[2] < (self.Z_TABLE_TOP + 0.30)
+            if xy_d < best_xy and z_ok:
+                best_xy    = xy_d
+                pre_target = oid
+
+        print(f"  [grasp] approach       → xy=({x:.3f}, {y:.3f})  z={z:.3f}"
+              + (f"  target={pre_target}" if pre_target is not None else ""))
         self.move_gripper(opening)
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn])
-
         self.move_ee([x, y, z, orn])
-        ee_after_descend = self._get_eef_pos()
-        if self.obj_ids:
-            obj_pos = self.get_obj_pos(self.obj_ids[0])
-            print(f"  [grasp] after descend  → ee_z={ee_after_descend[2]:.4f}  obj_z={obj_pos[2]:.4f}  delta={ee_after_descend[2]-obj_pos[2]:.4f}")
 
         self.auto_close_gripper(check_contact=False)
-        self._steps(60)
-        contact = bool(self.check_grasped_id())
-        if self.obj_ids:
-            obj_pos2 = self.get_obj_pos(self.obj_ids[0])
-            print(f"  [grasp] after close    → contact={contact}  obj_z={obj_pos2[2]:.4f}")
-        self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn])
         self._steps(80)
 
-        grasped_ids = self.check_grasped_id()
-        obj_z       = (self.get_obj_pos(grasped_ids[0])[2]
-                       if grasped_ids else self.Z_TABLE_TOP)
-        lifted = obj_z > self.Z_TABLE_TOP + 0.07
+        weld_obj: Optional[int] = None
 
-        print(f"  [grasp] result         → contact={contact}  grasped={bool(grasped_ids)}  lifted={lifted}")
+        if pre_target is not None:
+            # Attach with canonical offset so the object snaps 3 cm below EEF,
+            # independent of where it was physically knocked during descent.
+            attached = self._attach_obj(pre_target,
+                                        offset=np.array([0.0, 0.0, -0.03]))
+            weld_obj = pre_target
+            print(f"  [grasp] weld attach    → obj={weld_obj}  (pre-select)  ok={attached}")
+        else:
+            # Fallback: standard proximity check after close
+            eef_pos  = self._get_eef_pos()
+            best_d   = self._GRASP_PROXIMITY
+            for oid in self.obj_ids:
+                d = float(np.linalg.norm(eef_pos - self.get_obj_pos(oid)))
+                if d < best_d:
+                    best_d   = d
+                    weld_obj = oid
+            if weld_obj is not None:
+                attached = self._attach_obj(weld_obj)
+                print(f"  [grasp] weld attach    → obj={weld_obj}  dist={best_d:.3f}  ok={attached}")
+            else:
+                print(f"  [grasp] no object in proximity ({self._GRASP_PROXIMITY:.2f} m)"
+                      f"  eef={eef_pos.round(3)}")
 
-        # match eval criterion: contact before lift OR still grasped after OR object rose
-        if contact or grasped_ids or lifted:
-            if grasped_ids:
-                return True, grasped_ids[0]
-            # try to attribute to the nearest object
-            if self.obj_ids:
-                return True, self.obj_ids[0]
-            return True, None
+        # Lift
+        self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn], max_step=300)
+        self._steps(100)
+
+        if weld_obj is not None:
+            obj_z  = self.get_obj_pos(weld_obj)[2]
+            lifted = obj_z > self.Z_TABLE_TOP + 0.07
+            print(f"  [grasp] result         → weld_obj={weld_obj}  lifted={lifted}"
+                  f"  obj_z={obj_z:.4f}")
+            if lifted:
+                return True, weld_obj
+            self._detach_obj(weld_obj)
+        else:
+            print(f"  [grasp] result         → no weld  → fail")
+
         return False, None
 
     # kept as public alias for backward compat
@@ -1063,9 +1181,8 @@ class EnvironmentSoArm:
         self._steps(40)
         self.move_gripper(0.085)
         self.move_ee([tp[0], tp[1], self.GRIPPER_MOVING_HEIGHT, orn])
-
-        for _ in range(20):
-            self.step_simulation()
+        # Wait for object to settle in tray (~0.3 s at timestep=0.002)
+        self._steps(150)
 
         success_target = self.check_target_reached(grasped_id or obj_id)
         self._log_ui_grasp_exec("tray", obj_id, grasp, success_grasp, success_target)
