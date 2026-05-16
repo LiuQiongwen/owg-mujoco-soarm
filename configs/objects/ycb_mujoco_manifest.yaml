@@ -73,12 +73,12 @@ objects:
     spawn_z_offset: 0.15
     xml:            owg_robot/assets/ycb/cracker.xml
 
-  MediumClamp:
-    pool_name:      YcbMediumClamp
-    visual_mesh:    textured_reoriented.obj
+  TomatoSoupCan:
+    pool_name:      YcbTomatoSoupCan
+    visual_mesh:    textured_simple_reoriented.obj
     collision_mesh: collision_vhacd.obj
-    mass:           0.259          # kg
-    friction:       [1.5, 0.05, 0.01]
-    scale:          1.75           # matches model.urdf scale="1.75 1.75 1.75"
+    mass:           0.349          # kg
+    friction:       [1.8, 0.05, 0.01]
+    scale:          1.0
     spawn_z_offset: 0.12
-    xml:            owg_robot/assets/ycb/cylinder.xml
+    xml:            owg_robot/assets/ycb/can.xml

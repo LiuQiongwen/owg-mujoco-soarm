@@ -111,6 +111,11 @@ def main():
                         help="Stage2: mesh path for sample_grasps_from_mesh()")
     parser.add_argument("--grasps_out", type=str, default="grasp_6dof/dataset/sample_grasps.json")
     parser.add_argument("--once", action="store_true", help="Run one query then exit (Stage3/4 demo).")
+    parser.add_argument("--grasp-mode", type=str, default=None,
+                        choices=["physics", "demo_attach"],
+                        help="Override grasp_mode from config. "
+                             "Use 'demo_attach' for visual demos (kinematic attach), "
+                             "'physics' for benchmark-accurate results (default from config).")
 
     args = parser.parse_args()
 
@@ -153,6 +158,11 @@ def main():
             if args.object is not None:
                 cfg_set(cfg, "object", args.object)
             print(f"[INFO] Auto-loaded MuJoCo config: {mj_cfg}")
+
+    # ---- grasp_mode override (after all config reloads) ----
+    if args.grasp_mode is not None:
+        cfg_set(cfg, "grasp_mode", args.grasp_mode)
+        print(f"[INFO] grasp_mode overridden → {args.grasp_mode}")
 
     # ---- MuJoCo stage-3 semantic demo: deterministic scene selection ----
     if args.backend == "mujoco" and args.stage == 3:

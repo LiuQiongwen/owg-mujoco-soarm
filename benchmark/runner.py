@@ -50,7 +50,7 @@ OBJECT_REGISTRY: Dict[str, str] = {
     "mustard":  "YcbMustardBottle",
     "cracker":  "YcbCrackerBox",
     "drill":    "YcbPowerDrill",
-    "cylinder": "YcbMediumClamp",
+    "can":      "YcbTomatoSoupCan",
 }
 
 

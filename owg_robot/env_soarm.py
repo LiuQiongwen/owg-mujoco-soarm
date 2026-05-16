@@ -134,6 +134,40 @@ def _so101_fragment() -> Tuple[str, str, str, str]:
 
 
 
+# ── primitive-object registry ────────────────────────────────────────────────
+# Calibration helpers can inject simple geoms (box/cylinder/sphere) without
+# requiring a YCB mesh directory.  Pool names start with "__prim__" so they
+# are distinguished from YCB directory names.
+
+_PRIMITIVE_POOL: Dict[str, str] = {}   # pool_name → geom attribute string
+
+
+def register_primitive_geom(
+    shape: str,
+    size: tuple,
+    mass: float,
+    friction: tuple = (1.5, 0.05, 0.01),
+    rgba: tuple = (0.7, 0.3, 0.2, 1.0),
+) -> str:
+    """Register a primitive geom and return its pool_name.
+
+    The pool_name is stable for a given (shape, size, mass, friction, rgba)
+    tuple, so re-registering the same primitive returns the same name without
+    rebuilding the model.
+    """
+    key = f"{shape}_{size}_{mass}_{friction}_{rgba}"
+    pool_name = f"__prim__{abs(hash(key)) % (10 ** 9):09d}"
+    if pool_name not in _PRIMITIVE_POOL:
+        size_str     = " ".join(str(s) for s in size)
+        friction_str = " ".join(str(f) for f in friction)
+        rgba_str     = " ".join(str(r) for r in rgba)
+        _PRIMITIVE_POOL[pool_name] = (
+            f'type="{shape}" size="{size_str}" mass="{mass}" '
+            f'friction="{friction_str}" rgba="{rgba_str}"'
+        )
+    return pool_name
+
+
 # ── object manifest (Menagerie-style) ─────────────────────────────────────────
 # Lazily loaded from configs/objects/ycb_mujoco_manifest.yaml.
 # Provides per-object mass, friction, scale, and mesh names so these values
@@ -200,7 +234,23 @@ def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
     from configs/objects/ycb_mujoco_manifest.yaml when the object is listed
     there.  Falls back to dynamic mesh discovery and hardcoded defaults for
     objects not in the manifest.
+
+    Primitive objects registered via register_primitive_geom() use inline
+    geoms instead of mesh assets.
     """
+    # ── primitive shortcut ────────────────────────────────────────────────────
+    if obj_name in _PRIMITIVE_POOL:
+        geom_attrs = _PRIMITIVE_POOL[obj_name]
+        park_x     = 2.0 + obj_idx * 0.5
+        asset = ""   # no mesh assets needed for primitives
+        body  = f"""
+    <body name="obj_{obj_idx}" pos="{park_x} 0 0.15">
+      <freejoint name="obj_joint_{obj_idx}"/>
+      <geom {geom_attrs} contype="1" conaffinity="1"/>
+    </body>
+"""
+        return asset, body
+
     obj_dir = os.path.join(YCB_ROOT, obj_name)
     entry   = _manifest_entry(obj_name)
 
@@ -247,8 +297,10 @@ def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
   <mesh name="ycb_col_{obj_idx}" file="{col_mesh}" scale="{scale_str}"/>
 {material_block}"""
 
+    # Initial body pos matches _park_pos(obj_idx): above floor, far from workspace
+    park_x = 2.0 + obj_idx * 0.5
     body = f"""
-    <body name="obj_{obj_idx}" pos="0 0 -100">
+    <body name="obj_{obj_idx}" pos="{park_x} 0 0.15">
       <freejoint name="obj_joint_{obj_idx}"/>
       <geom name="ycb_vis_geom_{obj_idx}" type="mesh" mesh="ycb_vis_{obj_idx}"
             material="ycb_mat_{obj_idx}" contype="0" conaffinity="0" group="2"/>
@@ -258,6 +310,16 @@ def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
     </body>
 """
     return asset, body
+
+
+def _park_pos(slot: int) -> list:
+    """Off-table parking position for an inactive pool slot.
+
+    Placed above the floor (z=0.15) and far from the robot workspace in X, so
+    parked objects settle stably on the floor plane without interfering with the
+    active object on the table.  Each slot gets a unique X to prevent pile-ups.
+    """
+    return [2.0 + slot * 0.5, 0.0, 0.15]
 
 
 def _build_scene_xml(obj_names: List[str]) -> str:
@@ -422,6 +484,17 @@ class EnvironmentSoArm:
             self.data.ctrl[act_id] = q
         self.data.qpos[self._grip_qpos_adr] = GRIP_OPEN
         self.data.ctrl[self._grip_act_id]   = GRIP_OPEN
+        # Park all pool slots at a safe above-floor location far from the workspace.
+        # This prevents inactive freejoints (default z=-100 in raw MjData) from
+        # penetrating the floor plane and generating huge contact impulses that would
+        # fly through the scene and destabilize the active object.
+        for i in range(len(self._pool_names)):
+            jnt  = self.model.joint(f"obj_joint_{i}")
+            adr  = jnt.qposadr[0]
+            vadr = jnt.dofadr[0]
+            self.data.qpos[adr:adr+3]   = _park_pos(i)
+            self.data.qpos[adr+3:adr+7] = [1.0, 0.0, 0.0, 0.0]
+            self.data.qvel[vadr:vadr+6] = 0.0
         mujoco.mj_forward(self.model, self.data)
         # Reattach passive viewer to new model/data when vis is on
         if getattr(self, "vis", False) and getattr(self, "_viewer", None) is not None:
@@ -941,10 +1014,39 @@ class EnvironmentSoArm:
                              mod_orn=mod_orn, mod_stiffness=mod_stiffness,
                              yaw=yaw, **kwargs)
 
+    def load_primitive(
+        self,
+        shape: str = "box",
+        size: tuple = (0.025, 0.025, 0.025),
+        mass: float = 0.200,
+        friction: tuple = (1.5, 0.05, 0.01),
+        rgba: tuple = (0.7, 0.3, 0.2, 1.0),
+        pos=None,
+        name: str = None,
+    ) -> int:
+        """Load a primitive geom (box / cylinder / sphere) for grasp calibration.
+
+        Unlike load_obj(), this injects a simple inline geom into the pool
+        without requiring a YCB mesh directory.  All other env behaviour
+        (IK, contact detection, lift checking) is identical.
+
+        MuJoCo size convention
+        ----------------------
+        box      : size = (half_x, half_y, half_z)  → full dims = 2×size
+        cylinder : size = (radius, half_height)
+        sphere   : size = (radius,)
+
+        Returns the logical obj_id.
+        """
+        pool_name = register_primitive_geom(shape, size, mass, friction, rgba)
+        spawn_z   = TABLE_TOP_Z + max(size) + 0.04   # drop slightly above CoM
+        spawn_pos = pos or [0.0, -0.40, spawn_z]
+        return self.load_obj(pool_name, name=name or shape, pos=spawn_pos)
+
     def remove_obj(self, obj_id: int):
         idx = self._obj_pool_idx(obj_id)
         pool_slot = self._pool_slots[idx]
-        self._set_obj_pose(pool_slot, [0, 0, -100])
+        self._set_obj_pose(pool_slot, _park_pos(pool_slot))
         self.obj_ids.pop(idx)
         self.obj_names.pop(idx)
         self._pool_slots.pop(idx)
@@ -955,11 +1057,11 @@ class EnvironmentSoArm:
 
     def remove_all_obj(self):
         for slot in self._pool_slots:
-            self._set_obj_pose(slot, [0, 0, -100])
+            self._set_obj_pose(slot, _park_pos(slot))
         # also zero out any unreferenced pool slots
         for i in range(len(self._pool_names)):
             if i not in self._pool_slots:
-                self._set_obj_pose(i, [0, 0, -100])
+                self._set_obj_pose(i, _park_pos(i))
         self.obj_ids.clear()
         self.obj_names.clear()
         self._pool_slots.clear()
