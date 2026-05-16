@@ -11,7 +11,9 @@ try:
     from owg_robot.env import *                      # PyBullet Environment (default)
 except ImportError:
     pass                                             # pybullet not available (MuJoCo-only env)
-from owg_robot.env_soarm import EnvironmentSoArm     # MuJoCo backend
+from owg_robot.env_soarm import (EnvironmentSoArm,      # MuJoCo backend
+                                  GRASP_MODE_PHYSICS,
+                                  GRASP_MODE_DEMO_ATTACH)
 try:
     from owg_robot.camera import Camera
 except ImportError:
@@ -56,18 +58,26 @@ class RobotEnvUI:
         if self.backend == "mujoco":
             # ── MuJoCo / SO-ARM101 backend ─────────────────────────────────
             _mj_vis = bool(getattr(self.cfg.policy, "vis", False))
+            # grasp_mode: read from config; fall back to "physics" so all
+            # benchmark runs are honest by default.  Set "demo_attach" in the
+            # mujoco env.yaml (or pass --grasp_mode demo_attach) only for
+            # semantic demo recordings — never for benchmark evaluation.
+            _grasp_mode = getattr(self.cfg, "grasp_mode", GRASP_MODE_PHYSICS)
             self.env = EnvironmentSoArm(
                 vis=_mj_vis,
                 debug=False,
                 finger_length=self.cfg.finger_length,
                 n_grasp_attempts=self.cfg.n_grasp_attempts,
+                grasp_mode=_grasp_mode,
             )
+            print(f"[INFO] MuJoCo grasp_mode: {_grasp_mode}"
+                  + (" (demo only — not for benchmarks)"
+                     if _grasp_mode == GRASP_MODE_DEMO_ATTACH else ""))
             self.camera = self.env.camera   # _MockCamera shim
             self.img_size = (self.env.camera.width, self.env.camera.height)
             print("[INFO] MuJoCo backend: EnvironmentSoArm (SO-ARM101)")
         else:
             # ── PyBullet / UR5 backend (default) ───────────────────────────
-            center_x, center_y, center_z = CAM_X, CAM_Y, CAM_Z
             cam_center = (self.cfg.camera.center_x, self.cfg.camera.center_y,
                           self.cfg.camera.center_z)
             cam_target = (self.cfg.camera.target_x, self.cfg.camera.target_y,
@@ -119,7 +129,8 @@ class RobotEnvUI:
         print(f"[DEBUG] cfg.use_grasp_ranker = {self.cfg.policy.use_grasp_ranker}, "
             f"policy.use_grasp_ranker = {getattr(self.policy, 'use_grasp_ranker', None)}")
          
-        self.grasp_rank_3d = False
+        # MuJoCo backend: grasps are always stored as 3D (get_obj_grasps, not grasp_rects)
+        self.grasp_rank_3d = (self.backend == "mujoco")
         if self.cfg.policy.use_grasp_ranker:
             self.grasp_rank_3d = self.policy.grasp_ranker.use_3d_prompt
 
@@ -161,10 +172,24 @@ class RobotEnvUI:
         if self.backend == "mujoco" and hasattr(self.env, "preload_pool"):
             self.env.preload_pool(obj_list)
 
-        for obj_name in obj_list:
+        # MuJoCo: assign non-overlapping spawn positions so objects don't collide on drop
+        if self.backend == "mujoco":
+            import math as _math
+            _n = len(obj_list)
+            _ys = np.linspace(-0.30, -0.12, max(_n, 1))  # evenly spaced y, within arm reach
+            _xs = [0.05 * (i - _n // 2) for i in range(_n)]  # small x spread
+            _spawn_pos = [[_xs[i], float(_ys[i]), self.env.OBJECT_INIT_HEIGHT]
+                          for i in range(_n)]
+        for i, obj_name in enumerate(obj_list):
             path, mod_orn, mod_stiffness = self.objects.get_obj_info(obj_name)
-            self.env.load_isolated_obj(path, obj_name, mod_orn, mod_stiffness)
-            self.env.dummy_simulation_steps(30)
+            if self.backend == "mujoco":
+                self.env.load_isolated_obj(path, obj_name, mod_orn, mod_stiffness,
+                                           pos=_spawn_pos[i])
+            else:
+                self.env.load_isolated_obj(path, obj_name, mod_orn, mod_stiffness)
+            # Extra settling for MuJoCo: objects need ~150 total steps to fully land
+            settle = 100 if self.backend == "mujoco" else 30
+            self.env.dummy_simulation_steps(settle)
         print(f"[DEBUG] loaded objects: {list(zip(self.env.obj_ids, self.env.obj_names))}")
         self.init_obj_state = self.env.get_obj_states()
         obs = self.env.get_obs()
@@ -214,13 +239,16 @@ class RobotEnvUI:
         the object's 3D position — identical to the collect_mujoco_transitions approach.
         """
         rng = np.random.default_rng(self.seed)
+        # z offset calibrated so the gripper jaw centre (≈ EEF - 0.034m) sits
+        # at the object CoM, giving a firm mid-body grip.
+        GRASP_Z_OFFSET = 0.036
         for obj_id in self.env.obj_ids:
             pos = self.env.get_obj_pos(obj_id)
             grasps = []
             for _ in range(self.n_grasp_attempts):
                 x   = float(pos[0] + rng.uniform(-0.04, 0.04))
                 y   = float(pos[1] + rng.uniform(-0.04, 0.04))
-                z   = float(pos[2] + 0.025)
+                z   = float(pos[2] + GRASP_Z_OFFSET)
                 yaw = float(rng.uniform(-np.pi / 2, np.pi / 2))
                 opening = float(rng.uniform(0.04, 0.09))
                 grasps.append(np.array([x, y, z, yaw, opening, 0.05], dtype=np.float32))

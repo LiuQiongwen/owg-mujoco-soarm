@@ -70,6 +70,24 @@ IK_TOL     = 5e-4
 _LOG_DIR  = "logs"
 _LOG_PATH = os.path.join(_LOG_DIR, "ui_grasp_exec.jsonl")
 
+# Grasp execution modes — choose at EnvironmentSoArm construction time.
+#
+#   GRASP_MODE_PHYSICS:
+#     Uses real MuJoCo contact detection and lift verification.  The SO-ARM
+#     gripper geometry cannot physically contact table-level objects in a
+#     top-down approach (moving-jaw clearance gap), so this mode records
+#     honest 0 % success for the current hardware config.  Use this for ALL
+#     benchmark runs and world-model training label generation.
+#
+#   GRASP_MODE_DEMO_ATTACH:
+#     Kinematic sticky-gripper: pre-selects the nearest object by XY before
+#     descent, then snaps it 3 cm below the EEF after the gripper closes,
+#     zeroing its velocity on release.  Looks correct on video but the
+#     "success" signal is synthetic.  Use ONLY for semantic demo recordings.
+#     DO NOT use for benchmarks or world-model training labels.
+GRASP_MODE_PHYSICS     = "physics"
+GRASP_MODE_DEMO_ATTACH = "demo_attach"
+
 
 # ── compatibility shim ───────────────────────────────────────────────────────
 
@@ -261,11 +279,13 @@ class EnvironmentSoArm:
                  debug: bool = False,
                  finger_length: float = 0.04,
                  n_grasp_attempts: int = 3,
+                 grasp_mode: str = GRASP_MODE_PHYSICS,
                  **kwargs):
-        self.vis   = vis
-        self.debug = debug
+        self.vis        = vis
+        self.debug      = debug
         self.finger_length    = finger_length
         self.N_GRASP_ATTEMPTS = n_grasp_attempts
+        self.grasp_mode = grasp_mode
 
         # mock camera so ui.py can do env.camera.width
         self.camera = _MockCamera(IMG_SIZE)
@@ -965,28 +985,94 @@ class EnvironmentSoArm:
 
     # ── grasp execution (internal) ────────────────────────────────────────────
 
-    # EEF proximity threshold for weld attachment: the wrist_roll_follower (fixed
-    # jaw) reaches within 3–5 cm of the object when EEF is near it, so 12 cm
-    # gives a generous margin while avoiding false positives from nearby objects.
-    _GRASP_PROXIMITY   = 0.12   # fallback post-close distance threshold
-    _GRASP_XY_PRESEL   = 0.10   # XY-only pre-selection radius before descent
+    _GRASP_PROXIMITY   = 0.12   # demo_attach fallback: 3-D post-close threshold
+    _GRASP_XY_PRESEL   = 0.10   # demo_attach: XY pre-selection radius before descent
 
     def _execute_grasp(self, pos: tuple, roll: float,
                        gripper_opening_length: float,
                        obj_height: float) -> Tuple[bool, Optional[int]]:
-        """Low-level grasp primitive. xyz-only motion; roll is accepted but unused.
+        """Dispatch to the active grasp execution mode (self.grasp_mode).
 
-        Uses a two-stage attachment strategy:
-          1. Pre-select: find the object whose XY is closest to the grasp target
-             before descending (within _GRASP_XY_PRESEL).  Tall/round objects can
-             be physically knocked during descent; pre-selection ensures we still
-             attach the intended target with a canonical "held 3 cm below EEF"
-             offset regardless of where it ended up after the physical interaction.
-          2. Fallback: if no pre-selection hit, attach the closest object within
-             _GRASP_PROXIMITY after the gripper closes (original behaviour).
+        Returns (success, grasped_obj_id_or_None).
+        """
+        if self.grasp_mode == GRASP_MODE_DEMO_ATTACH:
+            return self._execute_grasp_demo_attach(pos, roll,
+                                                   gripper_opening_length,
+                                                   obj_height)
+        return self._execute_grasp_physics(pos, roll,
+                                           gripper_opening_length,
+                                           obj_height)
+
+    def _execute_grasp_physics(self, pos: tuple, roll: float,
+                               gripper_opening_length: float,
+                               obj_height: float) -> Tuple[bool, Optional[int]]:
+        """Honest physics-based grasp.  Uses real MuJoCo contact detection and
+        post-lift Z verification.  No kinematic attachment.
+
+        The SO-ARM moving jaw cannot physically contact table-level objects in a
+        top-down approach (geometric clearance gap), so this mode will report 0 %
+        success for the current hardware config.  That is the CORRECT result for
+        benchmark and world-model training label generation.
 
         TODO(6dof-ik): pass roll to move_ee once orientation IK is available.
-        Returns (success, grasped_obj_id_or_None).
+        """
+        self.reset_robot()
+
+        x, y, z = pos
+        z = np.clip(z, *self.ee_position_limit[2])
+        orn     = None
+        opening = gripper_opening_length * self.GRIP_REDUCTION
+
+        print(f"  [grasp/physics] approach → xy=({x:.3f}, {y:.3f})  z={z:.3f}")
+        self.move_gripper(opening)
+        self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn])
+        self.move_ee([x, y, z, orn])
+
+        self.auto_close_gripper(check_contact=False)
+        self._steps(80)
+
+        contact     = bool(self.check_grasped_id())
+        grasped_pre = self.check_grasped_id()
+
+        # Lift — no kinematic attachment; purely physics
+        self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn], max_step=300)
+        self._steps(100)
+
+        grasped_ids = self.check_grasped_id()
+        if grasped_ids:
+            obj_z  = self.get_obj_pos(grasped_ids[0])[2]
+            lifted = obj_z > self.Z_TABLE_TOP + 0.07
+        else:
+            obj_z  = self.Z_TABLE_TOP
+            lifted = False
+
+        print(f"  [grasp/physics] result → contact={contact}"
+              f"  grasped={grasped_ids}  lifted={lifted}  obj_z={obj_z:.4f}")
+
+        if grasped_ids and lifted:
+            return True, grasped_ids[0]
+        return False, None
+
+    def _execute_grasp_demo_attach(self, pos: tuple, roll: float,
+                                   gripper_opening_length: float,
+                                   obj_height: float) -> Tuple[bool, Optional[int]]:
+        """Kinematic sticky-gripper for VISUAL DEMOS ONLY.
+
+        NOT for benchmarks or world-model training label generation.  The
+        "success" signal here is synthetic: the object is kinematically
+        teleported to follow the EEF rather than physically grasped.
+
+        Strategy:
+          1. Pre-select the closest object by XY before descent so that tall/
+             round objects knocked sideways during the arm's downward sweep are
+             still captured.
+          2. After gripper closes, snap the pre-selected object 3 cm below the
+             EEF (canonical held offset) and kinematically track it through lift
+             and tray delivery.
+          3. Fallback: if no XY pre-selection matched, fall back to the closest
+             object within _GRASP_PROXIMITY after close.
+
+        TODO(6dof-ik): pass roll to move_ee once orientation IK is available.
         """
         self.reset_robot()
 
@@ -1006,7 +1092,7 @@ class EnvironmentSoArm:
                 best_xy    = xy_d
                 pre_target = oid
 
-        print(f"  [grasp] approach       → xy=({x:.3f}, {y:.3f})  z={z:.3f}"
+        print(f"  [grasp/demo] approach  → xy=({x:.3f}, {y:.3f})  z={z:.3f}"
               + (f"  target={pre_target}" if pre_target is not None else ""))
         self.move_gripper(opening)
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn])
@@ -1018,16 +1104,15 @@ class EnvironmentSoArm:
         weld_obj: Optional[int] = None
 
         if pre_target is not None:
-            # Attach with canonical offset so the object snaps 3 cm below EEF,
-            # independent of where it was physically knocked during descent.
+            # Snap object 3 cm below EEF regardless of where descent pushed it
             attached = self._attach_obj(pre_target,
                                         offset=np.array([0.0, 0.0, -0.03]))
             weld_obj = pre_target
-            print(f"  [grasp] weld attach    → obj={weld_obj}  (pre-select)  ok={attached}")
+            print(f"  [grasp/demo] attach    → obj={weld_obj}  ok={attached}")
         else:
-            # Fallback: standard proximity check after close
-            eef_pos  = self._get_eef_pos()
-            best_d   = self._GRASP_PROXIMITY
+            # Fallback: standard 3-D proximity check
+            eef_pos = self._get_eef_pos()
+            best_d  = self._GRASP_PROXIMITY
             for oid in self.obj_ids:
                 d = float(np.linalg.norm(eef_pos - self.get_obj_pos(oid)))
                 if d < best_d:
@@ -1035,10 +1120,11 @@ class EnvironmentSoArm:
                     weld_obj = oid
             if weld_obj is not None:
                 attached = self._attach_obj(weld_obj)
-                print(f"  [grasp] weld attach    → obj={weld_obj}  dist={best_d:.3f}  ok={attached}")
+                print(f"  [grasp/demo] attach    → obj={weld_obj}"
+                      f"  dist={best_d:.3f}  ok={attached}")
             else:
-                print(f"  [grasp] no object in proximity ({self._GRASP_PROXIMITY:.2f} m)"
-                      f"  eef={eef_pos.round(3)}")
+                print(f"  [grasp/demo] no object in proximity"
+                      f"  ({self._GRASP_PROXIMITY:.2f} m)  eef={eef_pos.round(3)}")
 
         # Lift
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn], max_step=300)
@@ -1047,13 +1133,13 @@ class EnvironmentSoArm:
         if weld_obj is not None:
             obj_z  = self.get_obj_pos(weld_obj)[2]
             lifted = obj_z > self.Z_TABLE_TOP + 0.07
-            print(f"  [grasp] result         → weld_obj={weld_obj}  lifted={lifted}"
+            print(f"  [grasp/demo] result    → weld_obj={weld_obj}  lifted={lifted}"
                   f"  obj_z={obj_z:.4f}")
             if lifted:
                 return True, weld_obj
             self._detach_obj(weld_obj)
         else:
-            print(f"  [grasp] result         → no weld  → fail")
+            print(f"  [grasp/demo] result    → no attach  → fail")
 
         return False, None
 
@@ -1237,6 +1323,7 @@ class EnvironmentSoArm:
         record = dict(
             time=time.strftime("%Y-%m-%d %H:%M:%S"),
             mode=mode, obj_id=int(obj_id),
+            execution_mode=self.grasp_mode,
             x=x, y=y, z=z, yaw=yaw,
             opening_len=opening, obj_height=height,
             success_grasp=bool(success_grasp),
