@@ -46,7 +46,7 @@ TABLE_TOP_Z    = 0.785
 ROBOT_BASE_POS = "0 0 0.785"
 CAM_POS        = "0.05 -0.52 1.9"
 CAM_EULER      = "0 0 0"   # with angle="radian" compiler, default orientation looks -Z (down)
-TARGET_ZONE_POS = [0.5, 0.0, TABLE_TOP_Z]
+TARGET_ZONE_POS = [0.20, 0.25, TABLE_TOP_Z]   # within arm workspace (x,y ≤ 0.4)
 
 ARM_JOINTS  = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"]
 GRIP_JOINT  = "gripper"
@@ -156,7 +156,7 @@ def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
       <geom name="ycb_vis_geom_{obj_idx}" type="mesh" mesh="ycb_vis_{obj_idx}"
             material="ycb_mat_{obj_idx}" contype="0" conaffinity="0" group="2"/>
       <geom name="ycb_col_geom_{obj_idx}" type="mesh" mesh="ycb_col_{obj_idx}"
-            contype="1" conaffinity="1" friction="0.8 0.01 0.001"/>
+            contype="1" conaffinity="1" friction="2.0 0.05 0.01"/>
     </body>
 """
     return asset, body
@@ -435,42 +435,40 @@ class EnvironmentSoArm:
     def move_ee(self, action, max_step: int = 200, **kwargs):
         """Move EEF to (x, y, z, orn). orn is accepted but currently ignored.
 
-        vis=True  → smooth interpolation: ctrl interpolated from current to target
-                    over max_step physics steps, viewer.sync() each step.
-        vis=False → fast IK teleport + settle (headless eval path, unchanged).
+        IK solves the target joint angles, then ctrl is interpolated from current
+        to target over physics steps so objects held in the gripper are transported
+        correctly. vis=True adds viewer.sync() for smooth visual; vis=False runs
+        the same physics loop without rendering.
         """
         x, y, z = action[0], action[1], action[2]
         x = np.clip(x, *self.ee_position_limit[0])
         y = np.clip(y, *self.ee_position_limit[1])
         z = np.clip(z, *self.ee_position_limit[2])
 
-        if self.vis:
-            # Save current physical state before IK modifies qpos
-            qpos_saved = self.data.qpos[self._arm_qpos_adr].copy()
-            qvel_saved = self.data.qvel.copy()
-            q_start    = np.array([self.data.ctrl[i] for i in self._arm_act_ids])
+        # Save physics state before IK clobbers qpos
+        qpos_saved = self.data.qpos[self._arm_qpos_adr].copy()
+        qvel_saved = self.data.qvel.copy()
+        q_start    = np.array([self.data.ctrl[i] for i in self._arm_act_ids])
 
-            ok = self._solve_ik(np.array([x, y, z]))
-            q_target = np.array([self.data.qpos[adr] for adr in self._arm_qpos_adr])
+        ok = self._solve_ik(np.array([x, y, z]))
+        q_target = np.array([self.data.qpos[adr] for adr in self._arm_qpos_adr])
 
-            # Restore physics state so interpolation starts from actual position
-            for adr, q in zip(self._arm_qpos_adr, qpos_saved):
-                self.data.qpos[adr] = q
-            self.data.qvel[:] = qvel_saved
-            mujoco.mj_forward(self.model, self.data)
+        # Restore physics state so ctrl interpolation starts from actual position
+        for adr, q in zip(self._arm_qpos_adr, qpos_saved):
+            self.data.qpos[adr] = q
+        self.data.qvel[:] = qvel_saved
+        mujoco.mj_forward(self.model, self.data)
 
-            # Drive ctrl from q_start → q_target over max_step steps (smooth motion)
-            for i in range(max_step):
-                t = (i + 1) / max_step
-                for act_id, qs, qt in zip(self._arm_act_ids, q_start, q_target):
-                    self.data.ctrl[act_id] = float(qs + t * (qt - qs))
-                self.step_simulation()
-        else:
-            # Headless: IK teleport + physics settle (original fast path)
-            ok = self._solve_ik(np.array([x, y, z]))
-            for act_id, adr in zip(self._arm_act_ids, self._arm_qpos_adr):
-                self.data.ctrl[act_id] = self.data.qpos[adr]
-            self._steps(max_step // 4)
+        # Drive ctrl from q_start → q_target with physics at each step so that
+        # any held object moves with the gripper (gripper ctrl is untouched).
+        n_steps = max_step if self.vis else max(100, max_step // 2)
+        for i in range(n_steps):
+            t = (i + 1) / n_steps
+            for act_id, qs, qt in zip(self._arm_act_ids, q_start, q_target):
+                self.data.ctrl[act_id] = float(qs + t * (qt - qs))
+            self.step_simulation()
+            if self.vis and self._viewer is not None:
+                self._viewer.sync()
 
         pos = self._get_eef_pos()
         return ok, (pos, np.array([0, 0, 0, 1]))
@@ -560,6 +558,9 @@ class EnvironmentSoArm:
         adr = jnt.qposadr[0]
         self.data.qpos[adr:adr+3]   = pos
         self.data.qpos[adr+3:adr+7] = orn   # MuJoCo: w x y z
+        # zero velocity to prevent phantom motion when teleporting from parked z=-100
+        vadr = jnt.dofadr[0]
+        self.data.qvel[vadr:vadr+6] = 0.0
         mujoco.mj_forward(self.model, self.data)
 
     # ── object pose access ────────────────────────────────────────────────────
@@ -840,17 +841,16 @@ class EnvironmentSoArm:
         return rgb, depth, seg
 
     def _depth_to_pointcloud(self, depth: np.ndarray) -> np.ndarray:
-        """Project depth image to 3D pointcloud in robot-base frame."""
-        h, w = depth.shape
-        fy = (h / 2) / np.tan(np.deg2rad(FOVY / 2))
-        fx = fy
-        ys, xs = np.meshgrid(np.arange(h), np.arange(w), indexing='ij')
-        z = depth
-        xc = (xs - w / 2) / fx * z
-        yc = (ys - h / 2) / fy * z
-        pc = np.stack([xc, -yc, -z], axis=-1).reshape(-1, 3)
-        pc_hom = np.vstack([pc.T, np.ones((1, pc.shape[0]))])
-        return (self.cam_to_robot_base @ pc_hom)[:3].T
+        """Project metric depth image to 3D pointcloud in robot-base frame.
+
+        Delegates to owg_robot.pointcloud.mujoco_depth_to_world_points so
+        the projection logic lives in one place.
+        """
+        from owg_robot.pointcloud import mujoco_depth_to_world_points
+        return mujoco_depth_to_world_points(
+            depth, seg=None,
+            cam_to_world=self.cam_to_robot_base,
+            fov_deg=FOVY)
 
     def get_obs(self, pointcloud: bool = True) -> dict:
         """Return {'image', 'depth', 'seg', 'obj_ids', 'points'} — matches env.py API.
@@ -903,23 +903,22 @@ class EnvironmentSoArm:
         orn = None
         opening = gripper_opening_length * self.GRIP_REDUCTION
 
-        if self.vis:
-            print(f"  [grasp] approach       → xy=({x:.3f}, {y:.3f})  z={self.GRIPPER_MOVING_HEIGHT:.3f}")
+        print(f"  [grasp] approach       → xy=({x:.3f}, {y:.3f})  z_target={z:.3f}  move_to={self.GRIPPER_MOVING_HEIGHT:.3f}")
         self.move_gripper(opening)
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn])
 
-        if self.vis:
-            print(f"  [grasp] descend        → xy=({x:.3f}, {y:.3f})  z={z:.3f}")
         self.move_ee([x, y, z, orn])
+        ee_after_descend = self._get_eef_pos()
+        if self.obj_ids:
+            obj_pos = self.get_obj_pos(self.obj_ids[0])
+            print(f"  [grasp] after descend  → ee_z={ee_after_descend[2]:.4f}  obj_z={obj_pos[2]:.4f}  delta={ee_after_descend[2]-obj_pos[2]:.4f}")
 
-        if self.vis:
-            print(f"  [grasp] close_gripper  (opening={opening:.3f})")
         self.auto_close_gripper(check_contact=False)
         self._steps(60)
         contact = bool(self.check_grasped_id())
-
-        if self.vis:
-            print(f"  [grasp] lift           → z={self.GRIPPER_MOVING_HEIGHT:.3f}")
+        if self.obj_ids:
+            obj_pos2 = self.get_obj_pos(self.obj_ids[0])
+            print(f"  [grasp] after close    → contact={contact}  obj_z={obj_pos2[2]:.4f}")
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn])
         self._steps(80)
 
@@ -928,8 +927,7 @@ class EnvironmentSoArm:
                        if grasped_ids else self.Z_TABLE_TOP)
         lifted = obj_z > self.Z_TABLE_TOP + 0.07
 
-        if self.vis:
-            print(f"  [grasp] result         → contact={contact}  grasped={bool(grasped_ids)}  lifted={lifted}")
+        print(f"  [grasp] result         → contact={contact}  grasped={bool(grasped_ids)}  lifted={lifted}")
 
         # match eval criterion: contact before lift OR still grasped after OR object rose
         if contact or grasped_ids or lifted:
