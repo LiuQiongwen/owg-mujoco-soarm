@@ -22,6 +22,7 @@ Usage
 
 from __future__ import annotations
 
+import json
 import math
 import time
 from dataclasses import dataclass, field
@@ -129,19 +130,24 @@ class BenchmarkConfig:
 @dataclass
 class TrialResult:
     """Outcome of one benchmark trial."""
-    object:          str
-    seed:            int
-    method:          str
-    execution_mode:  str
-    stability_valid: bool
-    skip_reason:     Optional[str]
-    n_candidates:    Optional[int]
+    object:           str
+    seed:             int
+    method:           str
+    execution_mode:   str
+    stability_valid:  bool
+    skip_reason:      Optional[str]
+    n_candidates:     Optional[int]
     grasp_rank_order: Optional[List[int]]
     grasp_used_rank:  Optional[int]
-    success:         Optional[bool]
-    dz:              Optional[float]
-    fell_off:        Optional[bool]
-    failure_reason:  Optional[str]
+    grasp_index:      Optional[int]
+    contact_count:    Optional[int]
+    bilateral_contact: Optional[bool]
+    success:          Optional[bool]
+    dz:               Optional[float]
+    slip:             Optional[float]
+    fell_off:         Optional[bool]
+    failure_reason:   Optional[str]
+    scene_file:       Optional[str]
 
 
 # ── runner ────────────────────────────────────────────────────────────────────
@@ -216,20 +222,25 @@ class BenchmarkRunner:
                             obj_name, ycb_name, spawn_pos, seed, method
                         )
                         self.logger.log(TrialRecord(
-                            trial_id        = self._trial_id,
-                            object          = result.object,
-                            seed            = result.seed,
-                            method          = result.method,
-                            execution_mode  = result.execution_mode,
-                            stability_valid = result.stability_valid,
-                            skip_reason     = result.skip_reason,
-                            n_candidates    = result.n_candidates,
-                            grasp_rank_order= result.grasp_rank_order,
-                            grasp_used_rank = result.grasp_used_rank,
-                            success         = result.success,
-                            dz              = result.dz,
-                            fell_off        = result.fell_off,
-                            failure_reason  = result.failure_reason,
+                            trial_id          = self._trial_id,
+                            object            = result.object,
+                            seed              = result.seed,
+                            method            = result.method,
+                            execution_mode    = result.execution_mode,
+                            stability_valid   = result.stability_valid,
+                            skip_reason       = result.skip_reason,
+                            n_candidates      = result.n_candidates,
+                            grasp_rank_order  = result.grasp_rank_order,
+                            grasp_used_rank   = result.grasp_used_rank,
+                            grasp_index       = result.grasp_index,
+                            contact_count     = result.contact_count,
+                            bilateral_contact = result.bilateral_contact,
+                            success           = result.success,
+                            dz                = result.dz,
+                            slip              = result.slip,
+                            fell_off          = result.fell_off,
+                            failure_reason    = result.failure_reason,
+                            scene_file        = result.scene_file,
                         ))
                         self._trial_id += 1
                         n_done += 1
@@ -277,9 +288,10 @@ class BenchmarkRunner:
                     execution_mode=self.cfg.execution_mode,
                     stability_valid=False, skip_reason=stable.reason,
                     n_candidates=None, grasp_rank_order=None,
-                    grasp_used_rank=None,
-                    success=None, dz=None, fell_off=None,
-                    failure_reason=stable.reason,
+                    grasp_used_rank=None, grasp_index=None,
+                    contact_count=None, bilateral_contact=None,
+                    success=None, dz=None, slip=None, fell_off=None,
+                    failure_reason=stable.reason, scene_file=None,
                 )
 
         # ── observation + state ───────────────────────────────────────────────
@@ -298,16 +310,23 @@ class BenchmarkRunner:
         except Exception as e:
             ranked = np.arange(n_cands)
 
+        # ── save pre-grasp scene state ────────────────────────────────────────
+        scene_file = self._save_scene_state(obj_name, seed, method.name, env, obj_id)
+
         # ── execute top-K attempts ────────────────────────────────────────────
         pos_before     = env.get_obj_pos(obj_id).copy()
         tried_indices  = []
         success        = False
         used_rank      = None
+        grasp_index    = None
+        contact_count  = None
+        bilateral_contact = None
         failure_reason = "all_attempts_failed"
 
         for rank_pos, cand_idx in enumerate(ranked[: self.cfg.n_grasp_attempts]):
             g = candidates[int(cand_idx)]
-            tried_indices.append(int(cand_idx))
+            cand_idx_int = int(cand_idx)
+            tried_indices.append(cand_idx_int)
 
             ok, _grasped = env._execute_grasp(
                 pos   = (float(g[0]), float(g[1]), float(g[2])),
@@ -315,6 +334,14 @@ class BenchmarkRunner:
                 gripper_opening_length = float(g[4]),
                 obj_height             = float(g[5]),
             )
+
+            # capture contact metrics from the post-close snapshot
+            if env.last_grasp_metrics is not None:
+                m = env.last_grasp_metrics
+                contact_count     = m.get("left_contacts", 0) + m.get("right_contacts", 0)
+                bilateral_contact = bool(m.get("bilateral_contacts", 0) > 0)
+
+            grasp_index = cand_idx_int
 
             if ok:
                 success        = True
@@ -328,6 +355,7 @@ class BenchmarkRunner:
         # ── outcome ───────────────────────────────────────────────────────────
         pos_after = env.get_obj_pos(obj_id)
         dz        = float(pos_after[2] - pos_before[2])
+        slip      = float(np.linalg.norm(pos_after[:2] - pos_before[:2]))
         fell_off  = bool(pos_after[2] < TABLE_TOP_Z - 0.10)
 
         return TrialResult(
@@ -337,13 +365,42 @@ class BenchmarkRunner:
             n_candidates=n_cands,
             grasp_rank_order=[int(i) for i in tried_indices],
             grasp_used_rank=used_rank,
+            grasp_index=grasp_index,
+            contact_count=contact_count,
+            bilateral_contact=bilateral_contact,
             success=success,
             dz=dz,
+            slip=slip,
             fell_off=fell_off,
             failure_reason=failure_reason,
+            scene_file=str(scene_file) if scene_file else None,
         )
 
     # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _save_scene_state(
+        self, obj_name: str, seed: int, method: str, env, obj_id: int
+    ) -> Optional[Path]:
+        """Save pre-grasp MuJoCo state to scenes/ for later replay."""
+        try:
+            scenes_dir = self.logger.run_dir / "scenes"
+            scenes_dir.mkdir(exist_ok=True)
+            fname = scenes_dir / f"{obj_name}_seed{seed:04d}_{method}.json"
+            obj_pos = env.get_obj_pos(obj_id).tolist()
+            state = {
+                "version":  1,
+                "object":   obj_name,
+                "seed":     seed,
+                "method":   method,
+                "obj_pos":  obj_pos,
+                "qpos":     env.data.qpos.tolist(),
+                "qvel":     env.data.qvel.tolist(),
+            }
+            with open(fname, "w") as f:
+                json.dump(state, f)
+            return fname
+        except Exception:
+            return None
 
     def _fixed_spawn(self, seed: int) -> List[float]:
         """Deterministic spawn position for a given seed (independent of method)."""

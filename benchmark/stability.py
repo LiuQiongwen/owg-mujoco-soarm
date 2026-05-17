@@ -42,17 +42,19 @@ class StabilityChecker:
 
     def __init__(
         self,
-        max_pos_z:     float = TABLE_TOP_Z + 0.40,
-        min_pos_z:     float = TABLE_TOP_Z - 0.08,
-        max_xy_radius: float = 0.44,
-        max_velocity:  float = 0.05,
-        table_centre:  tuple = (0.0, -0.45),
+        max_pos_z:          float = TABLE_TOP_Z + 0.40,
+        min_pos_z:          float = TABLE_TOP_Z - 0.08,
+        max_xy_radius:      float = 0.44,
+        max_velocity:       float = 0.05,
+        table_centre:       tuple = (0.0, -0.45),
+        check_arm_contacts: bool  = True,
     ):
-        self.max_pos_z     = max_pos_z
-        self.min_pos_z     = min_pos_z
-        self.max_xy_radius = max_xy_radius
-        self.max_velocity  = max_velocity
-        self.table_centre  = np.array(table_centre, dtype=float)
+        self.max_pos_z          = max_pos_z
+        self.min_pos_z          = min_pos_z
+        self.max_xy_radius      = max_xy_radius
+        self.max_velocity       = max_velocity
+        self.table_centre       = np.array(table_centre, dtype=float)
+        self.check_arm_contacts = check_arm_contacts
 
     def check(self, env, obj_id: int) -> StabilityResult:
         """Return StabilityResult after settling is complete."""
@@ -88,6 +90,9 @@ class StabilityChecker:
         if not self._velocity_ok(env, obj_id):
             return StabilityResult(ok=False, reason="still_moving")
 
+        if self.check_arm_contacts and not self._no_pregrasp_arm_contact(env, obj_id):
+            return StabilityResult(ok=False, reason="pregrasp_arm_contact")
+
         return StabilityResult(ok=True)
 
     def _velocity_ok(self, env, obj_id: int) -> bool:
@@ -105,3 +110,33 @@ class StabilityChecker:
             return float(np.abs(vel_lin).sum()) < self.max_velocity
         except Exception:
             return True   # if we can't read velocity, assume OK
+
+    def _no_pregrasp_arm_contact(self, env, obj_id: int) -> bool:
+        """Return True if no arm/gripper geoms are in contact with the object before grasping.
+
+        A pre-grasp arm contact means the robot park position is already touching
+        the object — an invalid scene that should be filtered out.
+        """
+        try:
+            import mujoco
+            slot         = env._obj_pool_slot(obj_id)
+            obj_body_id  = env.model.body(f"obj_body_{slot}").id
+            obj_geoms    = {
+                gi for gi in range(env.model.ngeom)
+                if env.model.geom_bodyid[gi] == obj_body_id
+            }
+            # bodies that are known non-arm (table, world, other objects)
+            safe_prefixes = ("obj_", "table", "floor", "world")
+            for i in range(env.data.ncon):
+                c  = env.data.contact[i]
+                g1, g2 = c.geom1, c.geom2
+                if g1 not in obj_geoms and g2 not in obj_geoms:
+                    continue
+                other_g     = g2 if g1 in obj_geoms else g1
+                other_body  = env.model.geom_bodyid[other_g]
+                other_name  = env.model.body(other_body).name
+                if not any(other_name.startswith(p) for p in safe_prefixes):
+                    return False   # arm touching object pre-grasp → invalid
+        except Exception:
+            pass
+        return True

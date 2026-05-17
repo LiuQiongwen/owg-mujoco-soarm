@@ -77,7 +77,9 @@ class BenchmarkPlotter:
         saved += self.plot_dz_histogram()
         saved += self.plot_per_object_heatmap()
         saved += self.plot_overview()
-        return saved
+        saved += self.plot_calibration_heatmap()
+        saved += [self.write_success_table()]
+        return [p for p in saved if p is not None]
 
     def plot_success_rate(self) -> List[Path]:
         """Grouped bar chart: success rate ± Wilson 95% CI per method."""
@@ -347,9 +349,85 @@ class BenchmarkPlotter:
                 result[m][o] = (rate, lo, hi, d["n"])
         return result
 
+    def plot_calibration_heatmap(self) -> List[Path]:
+        """Bilateral contact rate matrix: methods (rows) × objects (cols)."""
+        import matplotlib.pyplot as plt
+
+        methods = self._methods
+        objects = self._objects
+
+        matrix = np.full((len(methods), len(objects)), np.nan)
+        for mi, m in enumerate(methods):
+            for oi, o in enumerate(objects):
+                vals = [
+                    r for r in self._records
+                    if r.get("method") == m and r.get("object") == o
+                    and r.get("stability_valid") and r.get("bilateral_contact") is not None
+                ]
+                if vals:
+                    matrix[mi, oi] = sum(
+                        1 for r in vals if r["bilateral_contact"]
+                    ) / len(vals)
+
+        if np.all(np.isnan(matrix)):
+            return []
+
+        fig, ax = plt.subplots(figsize=(max(6, len(objects) * 1.2), max(3, len(methods) * 0.9)))
+        cmap = plt.cm.Blues
+        cmap.set_bad("lightgrey")
+        masked = np.ma.masked_invalid(matrix)
+        im = ax.imshow(masked, cmap=cmap, vmin=0, vmax=1, aspect="auto")
+
+        ax.set_xticks(range(len(objects)))
+        ax.set_xticklabels(objects, rotation=25, ha="right", fontsize=10)
+        ax.set_yticks(range(len(methods)))
+        ax.set_yticklabels(methods, fontsize=10)
+
+        for mi in range(len(methods)):
+            for oi in range(len(objects)):
+                v = matrix[mi, oi]
+                if not np.isnan(v):
+                    tc = "white" if v > 0.6 else "black"
+                    ax.text(oi, mi, f"{v:.0%}", ha="center", va="center",
+                            fontsize=9, color=tc, fontweight="bold")
+
+        plt.colorbar(im, ax=ax, fraction=0.03, pad=0.04,
+                     format=plt.FuncFormatter(lambda v, _: f"{v:.0%}"))
+        ax.set_title("Bilateral Contact Rate per Object × Method", fontsize=12)
+        fig.tight_layout()
+        paths = self._save(fig, "calibration_heatmap")
+        plt.close(fig)
+        return paths
+
+    def write_success_table(self) -> Optional[Path]:
+        """Write a markdown success-rate table to plots/success_table.md."""
+        stats = self._aggregate()
+        methods = self._methods
+        objects = self._objects + ["overall"]
+
+        lines = []
+        header = "| object | " + " | ".join(methods) + " |"
+        sep    = "| --- | " + " | ".join(["---"] * len(methods)) + " |"
+        lines += [header, sep]
+
+        for obj in objects:
+            cells = []
+            for m in methods:
+                entry = stats.get(m, {}).get(obj)
+                if entry:
+                    r, lo, hi, n = entry
+                    cells.append(f"{r:.0%} [{lo:.0%}, {hi:.0%}] n={n}")
+                else:
+                    cells.append("—")
+            lines.append(f"| {obj} | " + " | ".join(cells) + " |")
+
+        out_path = self.plots_dir / "success_table.md"
+        out_path.write_text("\n".join(lines) + "\n")
+        return out_path
+
     def _save(self, fig, name: str) -> List[Path]:
         paths = []
-        for ext in ("pdf", "png"):
+        for ext in ("pdf", "png", "svg"):
             p = self.plots_dir / f"{name}.{ext}"
             fig.savefig(p, dpi=self.dpi, bbox_inches="tight")
             paths.append(p)

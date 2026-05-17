@@ -474,6 +474,9 @@ class EnvironmentSoArm:
         self._welded_obj_id:    Optional[int]        = None   # kinematically attached object
         self._kinematic_offset: Optional[np.ndarray] = None   # world-frame EEF→obj offset
 
+        # out-band contact metrics from the most recent grasp attempt
+        self.last_grasp_metrics: Optional[dict] = None
+
         # MuJoCo model
         self.model: Optional[mujoco.MjModel] = None
         self.data:  Optional[mujoco.MjData]  = None
@@ -1338,6 +1341,8 @@ class EnvironmentSoArm:
         self.auto_close_gripper(check_contact=False)
         self._steps(80)
 
+        self.last_grasp_metrics = self.get_grasp_debug_metrics()
+
         contact     = bool(self.check_grasped_id())
         grasped_pre = self.check_grasped_id()
 
@@ -1400,6 +1405,7 @@ class EnvironmentSoArm:
 
         contact      = bool(self.check_grasped_id())
         metrics_post = self.get_grasp_debug_metrics()
+        self.last_grasp_metrics = metrics_post
         print(f"  [grasp/topdown] post-close metrics: {metrics_post}")
 
         # Lift with xyz_only — avoids arm reconfiguration that would push cube into table.

@@ -41,15 +41,22 @@ class TrialRecord:
     # grasp details (None when skipped)
     n_candidates:      Optional[int]
     grasp_rank_order:  Optional[List[int]]   # which candidate indices were tried, in order
-    grasp_used_rank:   Optional[int]          # rank position of successful grasp (0-based)
+    grasp_used_rank:   Optional[int]         # rank position of successful grasp (0-based)
+    grasp_index:       Optional[int]         # raw candidate array index used
+
+    # contact metrics (measured after gripper closes, before lift)
+    contact_count:     Optional[int]         # total jaw-object contact points
+    bilateral_contact: Optional[bool]        # both fixed and moving jaw in contact
 
     # outcome
     success:           Optional[bool]
-    dz:                Optional[float]
+    dz:                Optional[float]       # object Z gain (m) relative to pre-grasp
+    slip:              Optional[float]       # |XY displacement| during lift (0 if lifted clean)
     fell_off:          Optional[bool]
     failure_reason:    Optional[str]
 
     # metadata
+    scene_file:        Optional[str] = None  # path to saved scene JSON for replay
     timestamp:         str = ""
 
     def as_dict(self) -> dict:
@@ -118,8 +125,12 @@ class TrialLogger:
             n_candidates=None,
             grasp_rank_order=None,
             grasp_used_rank=None,
+            grasp_index=None,
+            contact_count=None,
+            bilateral_contact=None,
             success=None,
             dz=None,
+            slip=None,
             fell_off=None,
             failure_reason=reason,
         )
@@ -135,7 +146,7 @@ class TrialLogger:
 
         rows: dict = defaultdict(lambda: {
             "n_total": 0, "n_valid": 0, "n_success": 0,
-            "dz_vals": [],
+            "dz_vals": [], "slip_vals": [],
         })
 
         for rec in self._iter_jsonl():
@@ -147,12 +158,27 @@ class TrialLogger:
                 rows[key]["n_success"] += 1
                 if rec.get("dz") is not None:
                     rows[key]["dz_vals"].append(rec["dz"])
+                if rec.get("slip") is not None:
+                    rows[key]["slip_vals"].append(rec["slip"])
+
+        # aggregate bilateral contact rate
+        bilateral: dict = defaultdict(lambda: {"n": 0, "k": 0})
+        for rec in self._iter_jsonl():
+            if not rec.get("stability_valid"):
+                continue
+            key = (rec["object"], rec["method"])
+            if rec.get("bilateral_contact") is not None:
+                bilateral[key]["n"] += 1
+                if rec["bilateral_contact"]:
+                    bilateral[key]["k"] += 1
 
         fieldnames = [
             "object", "method",
             "n_total", "n_valid", "n_success",
             "success_rate", "ci_lo", "ci_hi",
+            "bilateral_rate",
             "dz_mean", "dz_std",
+            "slip_mean",
         ]
         with open(self._csv_path, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -160,18 +186,23 @@ class TrialLogger:
             for (obj, method), d in sorted(rows.items()):
                 k, n = d["n_success"], d["n_valid"]
                 rate, lo, hi = wilson_ci(k, n)
-                dz_vals = d["dz_vals"]
+                dz_vals   = d["dz_vals"]
+                slip_vals = d.get("slip_vals", [])
+                bi        = bilateral.get((obj, method), {})
+                bi_rate   = bi["k"] / bi["n"] if bi.get("n") else ""
                 writer.writerow({
-                    "object":       obj,
-                    "method":       method,
-                    "n_total":      d["n_total"],
-                    "n_valid":      d["n_valid"],
-                    "n_success":    k,
-                    "success_rate": round(rate, 4),
-                    "ci_lo":        round(lo,   4),
-                    "ci_hi":        round(hi,   4),
-                    "dz_mean":      round(float(sum(dz_vals) / len(dz_vals)), 4) if dz_vals else "",
-                    "dz_std":       round(float(_std(dz_vals)), 4) if dz_vals else "",
+                    "object":          obj,
+                    "method":          method,
+                    "n_total":         d["n_total"],
+                    "n_valid":         d["n_valid"],
+                    "n_success":       k,
+                    "success_rate":    round(rate, 4),
+                    "ci_lo":           round(lo,   4),
+                    "ci_hi":           round(hi,   4),
+                    "bilateral_rate":  round(bi_rate, 4) if bi_rate != "" else "",
+                    "dz_mean":         round(float(sum(dz_vals) / len(dz_vals)), 4) if dz_vals else "",
+                    "dz_std":          round(float(_std(dz_vals)), 4) if dz_vals else "",
+                    "slip_mean":       round(float(sum(slip_vals) / len(slip_vals)), 4) if slip_vals else "",
                 })
 
         return self._csv_path
