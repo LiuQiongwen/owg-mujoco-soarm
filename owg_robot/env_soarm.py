@@ -68,6 +68,25 @@ IK_ITERS   = 200
 IK_DAMPING = 0.05
 IK_TOL     = 5e-4
 
+# IK execution modes
+IK_MODE_XYZ_ONLY    = "xyz_only"       # position-only (legacy default)
+IK_MODE_YAW_TOPDOWN = "yaw_aware_topdown"  # top-down with jaw-yaw orientation
+IK_MODE_FULL_6DOF   = "full_6dof"      # full 6-DoF pose target
+
+
+def make_topdown_rotation(yaw: float = 0.0) -> np.ndarray:
+    """3×3 rotation matrix for a top-down gripper approach at a given jaw yaw.
+
+    Site Z-axis → world -Z (straight down), site X-axis → [cos(yaw), sin(yaw), 0].
+    The SO-ARM101 gripperframe site Z-axis is the approach/closing direction.
+    """
+    cy, sy = np.cos(yaw), np.sin(yaw)
+    return np.array([
+        [ cy,  sy,  0.0],
+        [ sy, -cy,  0.0],
+        [0.0, 0.0, -1.0],
+    ], dtype=float)
+
 # log path (matches PyBullet env)
 _LOG_DIR  = "logs"
 _LOG_PATH = os.path.join(_LOG_DIR, "ui_grasp_exec.jsonl")
@@ -663,13 +682,14 @@ class EnvironmentSoArm:
     def _get_eef_pos(self) -> np.ndarray:
         return self.data.site_xpos[self._eef_site_id].copy()
 
-    def _ik_step(self, target_pos: np.ndarray) -> bool:
-        """Damped least-squares IK — position only (xyz).
+    def _get_eef_rot(self) -> np.ndarray:
+        """Current 3×3 rotation matrix of the EEF site (world frame)."""
+        return self.data.site_xmat[self._eef_site_id].reshape(3, 3).copy()
 
-        TODO(6dof-ik): extend to 6-DoF by stacking rotation Jacobian rows
-        and computing orientation error from quat difference. Replace the
-        3×n Jacobian with 6×n and solve for [Δpos; Δori] jointly.
-        """
+    # ── position-only IK (legacy) ─────────────────────────────────────────────
+
+    def _ik_step(self, target_pos: np.ndarray) -> bool:
+        """Damped least-squares IK — position only (xyz)."""
         jacp = np.zeros((3, self.model.nv))
         mujoco.mj_jacSite(self.model, self.data, jacp, None, self._eef_site_id)
         cols = [self.model.joint(n).dofadr[0] for n in ARM_JOINTS]
@@ -689,35 +709,105 @@ class EnvironmentSoArm:
                 return True
         return np.linalg.norm(target_pos - self._get_eef_pos()) < 5e-3
 
-    def move_ee(self, action, max_step: int = 200, **kwargs):
-        """Move EEF to (x, y, z, orn). orn is accepted but currently ignored.
+    # ── 6-DoF orientation-aware IK ────────────────────────────────────────────
 
-        IK solves the target joint angles, then ctrl is interpolated from current
-        to target over physics steps so objects held in the gripper are transported
-        correctly. vis=True adds viewer.sync() for smooth visual; vis=False runs
-        the same physics loop without rendering.
+    def _ik_step_6dof(self, target_pos: np.ndarray, target_rot: np.ndarray,
+                      w_pos: float = 1.0, w_ori: float = 0.5,
+                      damping: float = IK_DAMPING) -> Tuple[float, float]:
+        """Single DLS IK step targeting both position and orientation.
+
+        Uses the full 6×n Jacobian (translation + rotation rows).  Orientation
+        error is computed as the rotation-vector difference between the target
+        and current site rotation matrices.
+
+        Returns (pos_err_norm, ori_err_norm).
         """
-        x, y, z = action[0], action[1], action[2]
-        x = np.clip(x, *self.ee_position_limit[0])
-        y = np.clip(y, *self.ee_position_limit[1])
-        z = np.clip(z, *self.ee_position_limit[2])
+        nv   = self.model.nv
+        jacp = np.zeros((3, nv))
+        jacr = np.zeros((3, nv))
+        mujoco.mj_jacSite(self.model, self.data, jacp, jacr, self._eef_site_id)
 
-        # Save physics state before IK clobbers qpos
+        cols = [self.model.joint(n).dofadr[0] for n in ARM_JOINTS]
+        Jp   = jacp[:, cols]   # 3×5
+        Jr   = jacr[:, cols]   # 3×5
+
+        pos_err = target_pos - self._get_eef_pos()
+
+        R_cur = self._get_eef_rot()
+        R_err = target_rot @ R_cur.T
+        q_err = np.zeros(4)
+        mujoco.mju_mat2Quat(q_err, R_err.ravel())
+        ori_vec = np.zeros(3)
+        mujoco.mju_quat2Vel(ori_vec, q_err, 1.0)
+
+        # Clamp orientation error to avoid it drowning out position when the
+        # initial orientation is far from target (5-DOF arm can have >π gap).
+        ori_norm = float(np.linalg.norm(ori_vec))
+        if ori_norm > 0.3:
+            ori_vec = ori_vec * (0.3 / ori_norm)
+
+        # Weighted 6-D error and Jacobian
+        err6 = np.concatenate([w_pos * pos_err, w_ori * ori_vec])
+        J6   = np.vstack([w_pos * Jp, w_ori * Jr])   # 6×5
+
+        dq = J6.T @ np.linalg.solve(J6 @ J6.T + damping * np.eye(6), err6)
+        for i, adr in enumerate(self._arm_qpos_adr):
+            lo = self.model.jnt_range[self._arm_jnt_ids[i], 0]
+            hi = self.model.jnt_range[self._arm_jnt_ids[i], 1]
+            self.data.qpos[adr] = np.clip(self.data.qpos[adr] + dq[i], lo, hi)
+        mujoco.mj_forward(self.model, self.data)
+        return float(np.linalg.norm(pos_err)), ori_norm
+
+    def _solve_ik_6dof(self, target_pos: np.ndarray, target_rot: np.ndarray,
+                       iters: int = IK_ITERS,
+                       w_pos: float = 10.0, w_ori: float = 0.3,
+                       pos_tol: float = 5e-3, ori_tol: float = 0.3) -> Tuple[bool, float, float]:
+        """Two-phase DLS IK: position-only warm-start then joint 6-DOF refinement.
+
+        Phase 1 (first half of iters): position-only to anchor XYZ.
+        Phase 2 (second half): 6-DOF with w_pos >> w_ori to nudge orientation
+        while staying near the position solution.
+
+        Returns (converged, final_pos_err, final_ori_err).
+        """
+        half = iters // 2
+        # Phase 1: position-only warm-start
+        for _ in range(half):
+            if self._ik_step(target_pos):
+                break
+
+        # Phase 2: gentle orientation correction from the position solution
+        pe = oe = float("inf")
+        for _ in range(iters - half):
+            pe, oe = self._ik_step_6dof(target_pos, target_rot, w_pos, w_ori)
+            if pe < pos_tol and oe < ori_tol:
+                return True, pe, oe
+        return pe < pos_tol and oe < ori_tol, pe, oe
+
+    # ── EEF motion ────────────────────────────────────────────────────────────
+
+    def _move_ee_internal(self, target_pos: np.ndarray,
+                          target_rot: Optional[np.ndarray],
+                          ik_mode: str, max_step: int) -> Tuple[bool, float, float]:
+        """Solve IK then interpolate ctrl to drive the arm.  Returns (ok, pe, oe)."""
         qpos_saved = self.data.qpos[self._arm_qpos_adr].copy()
         qvel_saved = self.data.qvel.copy()
         q_start    = np.array([self.data.ctrl[i] for i in self._arm_act_ids])
 
-        ok = self._solve_ik(np.array([x, y, z]))
+        if ik_mode == IK_MODE_XYZ_ONLY or target_rot is None:
+            ok = self._solve_ik(target_pos)
+            pe = float(np.linalg.norm(target_pos - self._get_eef_pos()))
+            oe = 0.0
+        else:
+            ok, pe, oe = self._solve_ik_6dof(target_pos, target_rot)
+
         q_target = np.array([self.data.qpos[adr] for adr in self._arm_qpos_adr])
 
-        # Restore physics state so ctrl interpolation starts from actual position
         for adr, q in zip(self._arm_qpos_adr, qpos_saved):
             self.data.qpos[adr] = q
         self.data.qvel[:] = qvel_saved
         mujoco.mj_forward(self.model, self.data)
 
-        # Drive ctrl from q_start → q_target with physics at each step so that
-        # any held object moves with the gripper (gripper ctrl is untouched).
         n_steps = max_step if self.vis else max(100, max_step // 2)
         for i in range(n_steps):
             t = (i + 1) / n_steps
@@ -727,6 +817,32 @@ class EnvironmentSoArm:
             if self.vis and self._viewer is not None:
                 self._viewer.sync()
 
+        return ok, pe, oe
+
+    def move_ee(self, action, max_step: int = 200, ik_mode: str = IK_MODE_XYZ_ONLY,
+                target_rot: Optional[np.ndarray] = None, **kwargs):
+        """Move EEF to (x, y, z, orn).
+
+        Parameters
+        ----------
+        action      : [x, y, z, orn]  — orn unused by legacy callers
+        ik_mode     : IK_MODE_XYZ_ONLY | IK_MODE_YAW_TOPDOWN | IK_MODE_FULL_6DOF
+        target_rot  : 3×3 rotation matrix (world frame) to track; auto-built from
+                      action[3] when ik_mode == IK_MODE_YAW_TOPDOWN and action[3]
+                      is a float yaw angle.
+        """
+        x, y, z = action[0], action[1], action[2]
+        x = np.clip(x, *self.ee_position_limit[0])
+        y = np.clip(y, *self.ee_position_limit[1])
+        z = np.clip(z, *self.ee_position_limit[2])
+
+        rot = target_rot
+        if ik_mode == IK_MODE_YAW_TOPDOWN and rot is None:
+            yaw = float(action[3]) if (action[3] is not None and
+                                       not isinstance(action[3], np.ndarray)) else 0.0
+            rot = make_topdown_rotation(yaw)
+
+        ok, pe, oe = self._move_ee_internal(np.array([x, y, z]), rot, ik_mode, max_step)
         pos = self._get_eef_pos()
         return ok, (pos, np.array([0, 0, 0, 1]))
 
@@ -1205,7 +1321,7 @@ class EnvironmentSoArm:
         success for the current hardware config.  That is the CORRECT result for
         benchmark and world-model training label generation.
 
-        TODO(6dof-ik): pass roll to move_ee once orientation IK is available.
+        For orientation-controlled top-down grasps use _execute_grasp_physics_topdown.
         """
         self.reset_robot()
 
@@ -1244,6 +1360,137 @@ class EnvironmentSoArm:
             return True, grasped_ids[0]
         return False, None
 
+    def _execute_grasp_physics_topdown(self, pos: tuple, yaw: float,
+                                       gripper_opening_length: float,
+                                       obj_height: float) -> Tuple[bool, Optional[int]]:
+        """Physics grasp with orientation-aware top-down approach.
+
+        Uses IK_MODE_YAW_TOPDOWN: the gripperframe site Z-axis is driven to
+        world -Z while the jaw opening axis is aligned to `yaw`.  This avoids
+        the oblique approach geometry that causes 0% success with xyz_only IK.
+
+        The arm descends in three phases:
+          1. Hover above the object at GRIPPER_MOVING_HEIGHT (orientation IK).
+          2. Descend to the grasp Z with orientation maintained.
+          3. Close gripper, wait, lift, verify.
+        """
+        self.reset_robot()
+
+        x, y, z = pos
+        z = np.clip(z, *self.ee_position_limit[2])
+        opening = gripper_opening_length * self.GRIP_REDUCTION
+        R_topdown = make_topdown_rotation(yaw)
+
+        print(f"  [grasp/topdown] approach → xy=({x:.3f}, {y:.3f})"
+              f"  z={z:.3f}  yaw={yaw:.3f}")
+
+        self.move_gripper(opening)
+        # Hover with orientation
+        self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, yaw],
+                     ik_mode=IK_MODE_YAW_TOPDOWN, max_step=200)
+        # Descend with orientation maintained
+        self.move_ee([x, y, z, yaw],
+                     ik_mode=IK_MODE_YAW_TOPDOWN, max_step=200)
+
+        metrics_pre = self.get_grasp_debug_metrics()
+        print(f"  [grasp/topdown] pre-close metrics: {metrics_pre}")
+
+        self.auto_close_gripper(check_contact=False)
+        self._steps(120)   # let gripper settle and contacts stabilize
+
+        contact      = bool(self.check_grasped_id())
+        metrics_post = self.get_grasp_debug_metrics()
+        print(f"  [grasp/topdown] post-close metrics: {metrics_post}")
+
+        # Lift with xyz_only — avoids arm reconfiguration that would push cube into table.
+        # The 6-DOF config transitions back to natural oblique while carrying the object.
+        self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, None],
+                     ik_mode=IK_MODE_XYZ_ONLY, max_step=300)
+        self._steps(100)
+
+        grasped_ids = self.check_grasped_id()
+        if grasped_ids:
+            obj_z  = self.get_obj_pos(grasped_ids[0])[2]
+            lifted = obj_z > self.Z_TABLE_TOP + 0.07
+        else:
+            obj_z  = self.Z_TABLE_TOP
+            lifted = False
+
+        print(f"  [grasp/topdown] result → contact={contact}"
+              f"  grasped={grasped_ids}  lifted={lifted}  obj_z={obj_z:.4f}")
+
+        if grasped_ids and lifted:
+            return True, grasped_ids[0]
+        return False, None
+
+    def get_grasp_debug_metrics(self, obj_id: Optional[int] = None) -> dict:
+        """Return diagnostic metrics about the current gripper-object geometry.
+
+        Keys
+        ----
+        ori_err_norm      : orientation error (rad) between current EEF and ideal
+                            top-down rotation (0 if arm is in perfect top-down pose)
+        jaw_obj_xy_gap    : XY distance (m) between jaw midpoint and nearest object
+                            CoM; None if no object loaded
+        bilateral_contacts: number of contacts involving both fixed AND moving jaw
+        left_contacts     : contacts on fixed jaw body
+        right_contacts    : contacts on moving jaw body
+        symmetry_score    : |left_contacts - right_contacts| / max(1, left+right),
+                            0 = perfectly symmetric
+        eef_z_axis        : current EEF site Z-axis in world frame (3-vector)
+        """
+        R_cur    = self._get_eef_rot()
+        R_target = make_topdown_rotation(0.0)
+        R_err    = R_target @ R_cur.T
+        q_err    = np.zeros(4)
+        mujoco.mju_mat2Quat(q_err, R_err.ravel())
+        ori_vel  = np.zeros(3)
+        mujoco.mju_quat2Vel(ori_vel, q_err, 1.0)
+        ori_err  = float(np.linalg.norm(ori_vel))
+
+        jaw_fixed_pos = self.data.xpos[self._jaw_body_id].copy()
+        jaw_mv_pos    = self.data.xpos[self._jaw_mv_body_id].copy()
+        jaw_mid_xy    = 0.5 * (jaw_fixed_pos[:2] + jaw_mv_pos[:2])
+
+        obj_ids = [obj_id] if obj_id is not None else list(self.obj_ids)
+        jaw_obj_xy_gap = None
+        if obj_ids:
+            gaps = []
+            for oid in obj_ids:
+                try:
+                    op = self.get_obj_pos(oid)
+                    gaps.append(float(np.linalg.norm(jaw_mid_xy - op[:2])))
+                except Exception:
+                    pass
+            if gaps:
+                jaw_obj_xy_gap = float(min(gaps))
+
+        jaw_ids  = {self._jaw_body_id, self._jaw_mv_body_id}
+        left_c   = 0
+        right_c  = 0
+        for i in range(self.data.ncon):
+            c  = self.data.contact[i]
+            b1 = self.model.geom_bodyid[c.geom1]
+            b2 = self.model.geom_bodyid[c.geom2]
+            if b1 == self._jaw_body_id or b2 == self._jaw_body_id:
+                left_c += 1
+            if b1 == self._jaw_mv_body_id or b2 == self._jaw_mv_body_id:
+                right_c += 1
+
+        bilateral = 1 if (left_c > 0 and right_c > 0) else 0
+        total     = left_c + right_c
+        symmetry  = abs(left_c - right_c) / max(1, total)
+
+        return {
+            "ori_err_norm":       round(ori_err, 4),
+            "jaw_obj_xy_gap":     round(jaw_obj_xy_gap, 4) if jaw_obj_xy_gap is not None else None,
+            "bilateral_contacts": bilateral,
+            "left_contacts":      left_c,
+            "right_contacts":     right_c,
+            "symmetry_score":     round(symmetry, 3),
+            "eef_z_axis":         R_cur[:, 2].round(3).tolist(),
+        }
+
     def _execute_grasp_demo_attach(self, pos: tuple, roll: float,
                                    gripper_opening_length: float,
                                    obj_height: float) -> Tuple[bool, Optional[int]]:
@@ -1263,7 +1510,6 @@ class EnvironmentSoArm:
           3. Fallback: if no XY pre-selection matched, fall back to the closest
              object within _GRASP_PROXIMITY after close.
 
-        TODO(6dof-ik): pass roll to move_ee once orientation IK is available.
         """
         self.reset_robot()
 
