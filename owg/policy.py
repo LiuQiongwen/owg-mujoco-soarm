@@ -69,7 +69,8 @@ class OwgPolicy:
     Debug version of OWG policy with detailed logging and robust JSON parsing.
     """
 
-    def __init__(self, config_path: str, verbose: bool = True, vis: bool = False, use_grasp_ranker: bool = True):
+    def __init__(self, config_path: str, verbose: bool = True, vis: bool = False,
+                 use_grasp_ranker: bool = True, lggsn_input_dim: int | None = None):
         self.vis = vis
         self.verbose = verbose
         self.grounder = VisualPrompterGrounding(config_path, debug=verbose)
@@ -84,13 +85,19 @@ class OwgPolicy:
                 self.grasp_ranker = LggsnGraspRanker(
                     model_path=os.environ.get("LGGSN_CKPT", "grasp_6dof/models/lggsn_pairwise_live.pt"),
                     device="cuda",
+                    lggsn_input_dim=lggsn_input_dim,
                 )
                 if verbose:
                     print("🟢 Using LGGSN geometry grasp ranker.")
             except Exception as e:
-                print("⚠️ Failed to init LGGSN ranker, disable grasp ranker:", e)
+                msg = str(e)
+                if "size mismatch" in msg or "shape" in msg or "mismatch" in msg:
+                    print(f"[WARNING] LGGSN disabled due to checkpoint/model mismatch: {e}")
+                else:
+                    print(f"[WARNING] LGGSN disabled: {e}")
+                print("[WARNING] Stage 4 falling back to Stage 3 behavior (no grasp ranking).")
                 self.grasp_ranker = None
-                self.use_grasp_ranker = False   # 关键：直接关掉，不再 fallback
+                self.use_grasp_ranker = False
     def predict(self, obs, user_input, all_grasps, obj_names=None, env_obj_ids=None):
         """
         Robust predict method for OwgPolicy. Replace the original predict with this.

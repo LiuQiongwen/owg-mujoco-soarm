@@ -69,9 +69,11 @@ IK_DAMPING = 0.05
 IK_TOL     = 5e-4
 
 # IK execution modes
-IK_MODE_XYZ_ONLY    = "xyz_only"       # position-only (legacy default)
-IK_MODE_YAW_TOPDOWN = "yaw_aware_topdown"  # top-down with jaw-yaw orientation
-IK_MODE_FULL_6DOF   = "full_6dof"      # full 6-DoF pose target
+IK_MODE_XYZ_ONLY    = "xyz_only"            # position-only (legacy default)
+IK_MODE_YAW_TOPDOWN = "yaw_aware_topdown"   # top-down with jaw-yaw orientation
+IK_MODE_FULL_6DOF   = "full_6dof"           # full 6-DoF pose target
+IK_MODE_JAW_TOPDOWN = "jaw_midpoint_topdown"  # jaw-midpoint + orientation (preferred)
+IK_MODE_JAW_POS     = "jaw_pos_only"        # jaw-midpoint, natural arm orientation
 
 
 def make_topdown_rotation(yaw: float = 0.0) -> np.ndarray:
@@ -491,6 +493,40 @@ class EnvironmentSoArm:
 
     # ── model lifecycle ───────────────────────────────────────────────────────
 
+    def _simplify_jaw_collision(self):
+        """Replace large jaw mesh collision geoms with small spheres.
+
+        The SO-ARM101 scissor jaw mesh geoms (sts3215 motor, wrist_roll_follower,
+        moving_jaw) have convex hulls spanning ~10 cm along the jaw arm.  When the
+        arm is teleported to the grasp configuration and the object is restored, these
+        hulls create 2.8–3.9 cm penetrations that generate explosive contact impulses
+        and send the object flying.
+
+        Fix: disable the sts3215 motor collision geom and replace the jaw tip mesh
+        collision geoms with 6 mm radius spheres at the same local positions.  The IK
+        drives the geom centres to ≈1–2 mm outside the object faces, so the spheres
+        produce small (4–5 mm), controlled penetrations instead of the catastrophic
+        hull overlaps.  This preserves bilateral contact detection while eliminating
+        the explosion.
+        """
+        if self._jaw_body_id < 0:
+            return
+        try:
+            motor_gid = self._find_collision_geom("gripper", "sts3215_03a_v1")
+            self.model.geom_contype[motor_gid] = 0
+            self.model.geom_conaffinity[motor_gid] = 0
+        except Exception:
+            pass
+
+        _SPHERE = int(mujoco.mjtGeom.mjGEOM_SPHERE)
+        _R = 0.006  # 6 mm radius — geom centres are ≈1–2 mm outside object faces
+        for gid in (self._jaw_fixed_geom_id, self._jaw_mv_geom_id):
+            if gid >= 0:
+                self.model.geom_type[gid] = _SPHERE
+                self.model.geom_size[gid, 0] = _R
+                self.model.geom_size[gid, 1] = 0.0
+                self.model.geom_size[gid, 2] = 0.0
+
     def _rebuild_model(self):
         xml = _build_scene_xml(self._pool_names)
         self.model = mujoco.MjModel.from_xml_string(xml)
@@ -499,6 +535,7 @@ class EnvironmentSoArm:
             self._renderer.close()
         self._renderer = mujoco.Renderer(self.model, height=IMG_SIZE, width=IMG_SIZE)
         self._cache_ids()
+        self._simplify_jaw_collision()
         # initialize arm to HOME_QPOS so _steps() after object spawn is stable
         for adr, q in zip(self._arm_qpos_adr, HOME_QPOS):
             self.data.qpos[adr] = q
@@ -538,9 +575,16 @@ class EnvironmentSoArm:
         try:
             self._jaw_body_id    = self.model.body("gripper").id
             self._jaw_mv_body_id = self.model.body("moving_jaw_so101_v1").id
+            # Actual jaw tip geom centers: wrist_roll_follower (fixed finger)
+            # and moving_jaw_so101_v1 (moving finger).  These are offset ~2 cm
+            # from the body centers and give the true gripping midpoint.
+            self._jaw_fixed_geom_id = self._find_collision_geom("gripper", "wrist_roll_follower_so101_v1")
+            self._jaw_mv_geom_id    = self._find_collision_geom("moving_jaw_so101_v1", "moving_jaw_so101_v1")
         except Exception:
-            self._jaw_body_id    = -1
-            self._jaw_mv_body_id = -1
+            self._jaw_body_id       = -1
+            self._jaw_mv_body_id    = -1
+            self._jaw_fixed_geom_id = -1
+            self._jaw_mv_geom_id    = -1
 
         self._grasp_weld_eq_ids: list = []
         for i in range(len(self._pool_names)):
@@ -787,6 +831,140 @@ class EnvironmentSoArm:
                 return True, pe, oe
         return pe < pos_tol and oe < ori_tol, pe, oe
 
+    # ── jaw midpoint IK ───────────────────────────────────────────────────────
+
+    def _find_collision_geom(self, body_name: str, mesh_name: str) -> int:
+        """Return the ID of the collision geom on body_name whose mesh is mesh_name."""
+        bid = self.model.body(body_name).id
+        for gi in range(self.model.ngeom):
+            if self.model.geom_bodyid[gi] != bid:
+                continue
+            if self.model.geom_contype[gi] == 0:
+                continue   # visual-only geom
+            dataid = self.model.geom_dataid[gi]
+            if dataid >= 0 and self.model.mesh(dataid).name == mesh_name:
+                return gi
+        raise ValueError(f"collision geom '{mesh_name}' not found on body '{body_name}'")
+
+    def _get_jaw_midpoint(self) -> np.ndarray:
+        """World-frame midpoint between the fixed and moving jaw body centres."""
+        if self._jaw_body_id < 0:
+            return self._get_eef_pos()
+        return 0.5 * (self.data.xpos[self._jaw_body_id] +
+                      self.data.xpos[self._jaw_mv_body_id])
+
+    def _get_jaw_geom_midpoint(self) -> np.ndarray:
+        """World-frame midpoint of the actual jaw tip GEOM centres.
+
+        Uses wrist_roll_follower (fixed finger) and moving_jaw_so101_v1 geom
+        centres — the true gripping surfaces, offset ~2 cm from body centres.
+        Falls back to body midpoint when geom IDs are unavailable.
+        """
+        if self._jaw_fixed_geom_id < 0:
+            return self._get_jaw_midpoint()
+        return 0.5 * (self.data.geom_xpos[self._jaw_fixed_geom_id] +
+                      self.data.geom_xpos[self._jaw_mv_geom_id])
+
+    def _solve_ik_jaw_topdown(
+        self,
+        target_jaw_mid: np.ndarray,
+        yaw:            float = 0.0,
+        iters:          int   = 600,
+        w_pos:          float = 10.0,
+        w_ori:          float = 0.3,
+        pos_tol:        float = 5e-3,
+        n_outer:        int   = 8,
+    ) -> Tuple[bool, float, float]:
+        """Jaw-midpoint–targeted top-down IK.
+
+        Targets the MIDPOINT of the two jaw bodies at `target_jaw_mid` while
+        driving the site Z-axis toward world -Z (top-down orientation).
+
+        Always resets to HOME_QPOS before solving so the IK starts from a
+        well-conditioned configuration regardless of the current arm posture.
+        This is safe because _move_ee_internal saves and restores qpos around
+        this call.
+
+        Returns (converged, jaw_mid_pos_err, ori_err).
+        """
+        # Reset to HOME_QPOS for a reproducible, well-conditioned IK start
+        for adr, q in zip(self._arm_qpos_adr, HOME_QPOS):
+            self.data.qpos[adr] = q
+        mujoco.mj_forward(self.model, self.data)
+
+        target_rot = make_topdown_rotation(yaw)
+
+        # Phase 1: position-only warm-start (1/3 of budget).
+        # Anchors the arm near the target xyz before the orientation term can
+        # push it away — mirrors the two-phase approach in _solve_ik_6dof.
+        warmup = iters // 3
+        offset = self._get_eef_pos() - self._get_jaw_midpoint()
+        adjusted_site_target = target_jaw_mid + offset
+        for _ in range(warmup):
+            if self._ik_step(adjusted_site_target):
+                break
+
+        # Phase 2: 6-DOF refinement with offset updates
+        iters_6dof      = iters - warmup
+        iters_per_outer = max(50, iters_6dof // n_outer)
+
+        pe = oe = float("inf")
+        for _ in range(n_outer):
+            # Recompute offset from the current (improved) arm state
+            offset = self._get_eef_pos() - self._get_jaw_midpoint()
+            adjusted_site_target = target_jaw_mid + offset
+
+            pe_site, oe = float("inf"), float("inf")
+            for _ in range(iters_per_outer):
+                pe_site, oe = self._ik_step_6dof(
+                    adjusted_site_target, target_rot, w_pos, w_ori)
+                if pe_site < pos_tol:
+                    break
+
+        pe = float(np.linalg.norm(self._get_jaw_midpoint() - target_jaw_mid))
+        return pe < pos_tol, pe, oe
+
+    def _solve_ik_jaw_pos_only(
+        self,
+        target_jaw_mid: np.ndarray,
+        iters:          int   = 800,
+        pos_tol:        float = 5e-3,
+        n_outer:        int   = 8,
+        reset_to_home:  bool  = True,
+    ) -> Tuple[bool, float, float]:
+        """Position-only IK targeting the jaw GEOM midpoint with natural arm orientation.
+
+        Drives the midpoint of the two jaw tip GEOM centres (wrist_roll_follower +
+        moving_jaw) to target_jaw_mid.  Using geom centres (not kinematic body
+        centres) ensures the actual jaw tips straddle the object symmetrically
+        after the IK converges, which is required for bilateral contact on closing.
+
+        reset_to_home : if True (default, used by move_ee/hover), resets to HOME_QPOS
+                        before solving.  Set False when called from
+                        _execute_grasp_physics_topdown so the IK starts from the
+                        hover arm state — this keeps the arm in the same kinematic
+                        workspace and ensures the gripper closing motion is directed
+                        toward the object rather than sweeping 30 cm past it.
+
+        Returns (converged, geom_mid_pos_err, 0.0).
+        """
+        if reset_to_home:
+            for adr, q in zip(self._arm_qpos_adr, HOME_QPOS):
+                self.data.qpos[adr] = q
+        mujoco.mj_forward(self.model, self.data)
+
+        iters_per = max(50, iters // n_outer)
+        for _ in range(n_outer):
+            offset   = self._get_eef_pos() - self._get_jaw_geom_midpoint()
+            adjusted = target_jaw_mid + offset
+            for _ in range(iters_per):
+                if self._ik_step(adjusted):
+                    break
+        geom_pos = self._get_jaw_geom_midpoint()
+        pe = float(np.linalg.norm(geom_pos - target_jaw_mid))
+        print(f"  [ik_jaw_geom] target={target_jaw_mid.round(4)} solved_geom_mid={geom_pos.round(4)} pe={pe*100:.2f}cm")
+        return pe < pos_tol, pe, 0.0
+
     # ── EEF motion ────────────────────────────────────────────────────────────
 
     def _move_ee_internal(self, target_pos: np.ndarray,
@@ -797,7 +975,14 @@ class EnvironmentSoArm:
         qvel_saved = self.data.qvel.copy()
         q_start    = np.array([self.data.ctrl[i] for i in self._arm_act_ids])
 
-        if ik_mode == IK_MODE_XYZ_ONLY or target_rot is None:
+        if ik_mode == IK_MODE_JAW_POS:
+            # Position-only jaw-midpoint IK — must be checked before target_rot is None
+            ok, pe, oe = self._solve_ik_jaw_pos_only(target_pos)
+        elif ik_mode == IK_MODE_JAW_TOPDOWN:
+            yaw = float(np.arctan2(target_rot[0, 1], target_rot[0, 0])) \
+                  if target_rot is not None else 0.0
+            ok, pe, oe = self._solve_ik_jaw_topdown(target_pos, yaw)
+        elif ik_mode == IK_MODE_XYZ_ONLY or target_rot is None:
             ok = self._solve_ik(target_pos)
             pe = float(np.linalg.norm(target_pos - self._get_eef_pos()))
             oe = 0.0
@@ -840,7 +1025,7 @@ class EnvironmentSoArm:
         z = np.clip(z, *self.ee_position_limit[2])
 
         rot = target_rot
-        if ik_mode == IK_MODE_YAW_TOPDOWN and rot is None:
+        if ik_mode in (IK_MODE_YAW_TOPDOWN, IK_MODE_JAW_TOPDOWN) and rot is None:
             yaw = float(action[3]) if (action[3] is not None and
                                        not isinstance(action[3], np.ndarray)) else 0.0
             rot = make_topdown_rotation(yaw)
@@ -1309,9 +1494,13 @@ class EnvironmentSoArm:
             return self._execute_grasp_demo_attach(pos, roll,
                                                    gripper_opening_length,
                                                    obj_height)
-        return self._execute_grasp_physics(pos, roll,
-                                           gripper_opening_length,
-                                           obj_height)
+        # Physics mode: use jaw-midpoint IK (topdown).  The legacy
+        # _execute_grasp_physics uses EEF-site IK which cannot contact
+        # table-level objects with this arm geometry (the jaw sits ~3 cm
+        # below the site and ends up at or below TABLE_TOP_Z).
+        return self._execute_grasp_physics_topdown(pos, roll,
+                                                   gripper_opening_length,
+                                                   obj_height)
 
     def _execute_grasp_physics(self, pos: tuple, roll: float,
                                gripper_opening_length: float,
@@ -1368,15 +1557,18 @@ class EnvironmentSoArm:
     def _execute_grasp_physics_topdown(self, pos: tuple, yaw: float,
                                        gripper_opening_length: float,
                                        obj_height: float) -> Tuple[bool, Optional[int]]:
-        """Physics grasp with orientation-aware top-down approach.
+        """Physics grasp with jaw-midpoint–targeted approach.
 
-        Uses IK_MODE_YAW_TOPDOWN: the gripperframe site Z-axis is driven to
-        world -Z while the jaw opening axis is aligned to `yaw`.  This avoids
-        the oblique approach geometry that causes 0% success with xyz_only IK.
+        Uses IK_MODE_JAW_POS so the JAW MIDPOINT (not the site) is driven to
+        the target position with the arm in its natural configuration.  This
+        avoids the near-joint-limit configs that arise when top-down orientation
+        is forced at table-level reach distances, which caused the site Z-axis
+        to flip to the -X world direction and the jaw midpoint to miss the
+        object entirely.
 
         The arm descends in three phases:
-          1. Hover above the object at GRIPPER_MOVING_HEIGHT (orientation IK).
-          2. Descend to the grasp Z with orientation maintained.
+          1. Hover above the object at GRIPPER_MOVING_HEIGHT (jaw-pos IK).
+          2. Descend to the grasp Z with jaw-midpoint alignment maintained.
           3. Close gripper, wait, lift, verify.
         """
         self.reset_robot()
@@ -1384,32 +1576,113 @@ class EnvironmentSoArm:
         x, y, z = pos
         z = np.clip(z, *self.ee_position_limit[2])
         opening = gripper_opening_length * self.GRIP_REDUCTION
-        R_topdown = make_topdown_rotation(yaw)
 
         print(f"  [grasp/topdown] approach → xy=({x:.3f}, {y:.3f})"
               f"  z={z:.3f}  yaw={yaw:.3f}")
 
         self.move_gripper(opening)
-        # Hover with orientation
-        self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, yaw],
-                     ik_mode=IK_MODE_YAW_TOPDOWN, max_step=200)
-        # Descend with orientation maintained
-        self.move_ee([x, y, z, yaw],
-                     ik_mode=IK_MODE_YAW_TOPDOWN, max_step=200)
+
+        # Phase 1 — Hover: rotate base joint to correct orientation via physics.
+        # max_step=1200 → n_steps=600 headless.  ~101° base rotation from HOME.
+        self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, None],
+                     ik_mode=IK_MODE_JAW_POS, max_step=1200)
+        self._steps(100)
+
+        # Phase 2 — Descend: solve IK for grasp height then directly assign
+        # joint angles (bypassing physics interpolation).  Physics interpolation
+        # from hover to grasp passes through intermediate configs where the open
+        # jaws collide with the box sides (moving jaw sweeps to within 0.6 mm of
+        # the box face), stopping the arm 10+ cm above target.  Direct assignment
+        # places the arm at the collision-free IK solution immediately.
+        #
+        # IK: drive jaw GEOM midpoint (not body midpoint) to object centre.
+        # Using geom positions ensures the actual jaw tips straddle the object
+        # symmetrically in Y with ~5 mm clearance on each side, so that
+        # restoring the object after teleport finds no Y-penetration and closing
+        # sweeps the moving jaw tip into bilateral contact.
+        qpos_saved = self.data.qpos.copy()
+        qvel_saved = self.data.qvel.copy()
+
+        obj_target = np.array([x, y, z])
+        # Start IK from hover state (not HOME) so the arm stays in the same
+        # workspace and the gripper closing motion sweeps toward the object.
+        ok_ik, pe_ik, _ = self._solve_ik_jaw_pos_only(obj_target, reset_to_home=False)
+        q_grasp = np.array([self.data.qpos[adr] for adr in self._arm_qpos_adr])
+
+        if self._jaw_fixed_geom_id >= 0:
+            fg = self.data.geom_xpos[self._jaw_fixed_geom_id]
+            mg = self.data.geom_xpos[self._jaw_mv_geom_id]
+            eef_z = self._get_eef_rot()[:, 2]
+            print(f"  [grasp/topdown] jaw geoms at IK: fixed={fg.round(4)}  moving={mg.round(4)}"
+                  f"  Y-gap={abs(mg[1]-fg[1])*100:.1f}cm  eef_z={eef_z.round(3)}")
+
+        # Restore hover state.  Park all objects to z=-100 so the arm joints
+        # can be teleported to the IK solution without jaw meshes penetrating
+        # the object (which would push it away during the settle steps).
+        self.data.qpos[:] = qpos_saved
+        self.data.qvel[:] = qvel_saved
+        obj_poses: list[tuple] = []
+        for oid in self.obj_ids:
+            slot = self._obj_pool_slot(oid)
+            jnt  = self.model.joint(f"obj_joint_{slot}")
+            adr  = jnt.qposadr[0]
+            obj_poses.append(self.data.qpos[adr : adr + 7].copy())
+            self.data.qpos[adr + 2] = -100.0   # park below floor
+
+        # Teleport arm to IK solution and settle without the object
+        for adr, act_id, q in zip(self._arm_qpos_adr, self._arm_act_ids, q_grasp):
+            self.data.qpos[adr] = q
+            self.data.ctrl[act_id] = q
+        mujoco.mj_forward(self.model, self.data)
+        self._steps(200)
+
+        # Restore object poses and settle — geom IK guarantees ~5 mm Y clearance
+        # on each side so no penetration on restore
+        for oid, pose in zip(self.obj_ids, obj_poses):
+            slot = self._obj_pool_slot(oid)
+            jnt  = self.model.joint(f"obj_joint_{slot}")
+            adr  = jnt.qposadr[0]
+            vadr = jnt.dofadr[0]
+            self.data.qpos[adr : adr + 7] = pose
+            self.data.qvel[vadr : vadr + 6] = 0.0
+        mujoco.mj_forward(self.model, self.data)
+        self._steps(100)   # settle object into jaw gap
 
         metrics_pre = self.get_grasp_debug_metrics()
+        jaw_gap_pre = metrics_pre.get("jaw_obj_xy_gap", 0)
         print(f"  [grasp/topdown] pre-close metrics: {metrics_pre}")
+
+        if self._jaw_fixed_geom_id >= 0:
+            fg0 = self.data.geom_xpos[self._jaw_fixed_geom_id].copy()
+            mg0 = self.data.geom_xpos[self._jaw_mv_geom_id].copy()
+            print(f"  [grasp/topdown] pre-close geoms: fixed_Y={fg0[1]:.4f} moving_Y={mg0[1]:.4f} moving_Z={mg0[2]:.4f}")
 
         self.auto_close_gripper(check_contact=False)
         self._steps(120)   # let gripper settle and contacts stabilize
+
+        if self._jaw_fixed_geom_id >= 0:
+            fg1 = self.data.geom_xpos[self._jaw_fixed_geom_id].copy()
+            mg1 = self.data.geom_xpos[self._jaw_mv_geom_id].copy()
+            print(f"  [grasp/topdown] post-close geoms: fixed_Y={fg1[1]:.4f} moving_Y={mg1[1]:.4f}"
+                  f"  ΔY_moving={( mg1[1]-mg0[1])*1000:.1f}mm  ncon={self.data.ncon}")
+            # debug: print all active contacts with body names
+            _jaw_bid  = self._jaw_body_id
+            _jaw_mbid = self._jaw_mv_body_id
+            for _ci in range(self.data.ncon):
+                _c  = self.data.contact[_ci]
+                _b1 = self.model.geom_bodyid[_c.geom1]
+                _b2 = self.model.geom_bodyid[_c.geom2]
+                _n1 = self.model.body(_b1).name
+                _n2 = self.model.body(_b2).name
+                print(f"  [contact {_ci}] geom1={_c.geom1}(body={_n1}) geom2={_c.geom2}(body={_n2})"
+                      f"  dist={_c.dist:.4f}")
 
         contact      = bool(self.check_grasped_id())
         metrics_post = self.get_grasp_debug_metrics()
         self.last_grasp_metrics = metrics_post
         print(f"  [grasp/topdown] post-close metrics: {metrics_post}")
 
-        # Lift with xyz_only — avoids arm reconfiguration that would push cube into table.
-        # The 6-DOF config transitions back to natural oblique while carrying the object.
+        # Lift: xyz-only to avoid arm reconfiguration pushing cube into table.
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, None],
                      ik_mode=IK_MODE_XYZ_ONLY, max_step=300)
         self._steps(100)

@@ -125,18 +125,20 @@ class RobotEnvUI:
             self.cfg.policy.config_path,
             verbose=self.cfg.policy.verbose,
             vis=self.cfg.policy.vis,
-            use_grasp_ranker=self.cfg.policy.use_grasp_ranker)
+            use_grasp_ranker=self.cfg.policy.use_grasp_ranker,
+            lggsn_input_dim=getattr(self.cfg.policy, "lggsn_input_dim", None))
         print(f"[DEBUG] cfg.use_grasp_ranker = {self.cfg.policy.use_grasp_ranker}, "
             f"policy.use_grasp_ranker = {getattr(self.policy, 'use_grasp_ranker', None)}")
          
         # MuJoCo backend: grasps are always stored as 3D (get_obj_grasps, not grasp_rects)
         self.grasp_rank_3d = (self.backend == "mujoco")
-        if self.cfg.policy.use_grasp_ranker:
+        if self.policy.grasp_ranker is not None:
             self.grasp_rank_3d = self.policy.grasp_ranker.use_3d_prompt
 
-        # derive stage label for per-trial logging
+        # derive stage label for per-trial logging; use runtime flag (may differ
+        # from cfg when LGGSN init fails and use_grasp_ranker was cleared)
         _sem = getattr(self.cfg.policy, "enable_semantic", False)
-        _rank = getattr(self.cfg.policy, "use_grasp_ranker", False)
+        _rank = getattr(self.policy, "use_grasp_ranker", False)
         if _rank and _sem:
             self._stage = 4
         elif _sem:
@@ -239,15 +241,19 @@ class RobotEnvUI:
         the object's 3D position — identical to the collect_mujoco_transitions approach.
         """
         rng = np.random.default_rng(self.seed)
-        # z offset calibrated so the gripper jaw centre (≈ EEF - 0.034m) sits
-        # at the object CoM, giving a firm mid-body grip.
-        GRASP_Z_OFFSET = 0.036
+        # GRASP_Z_OFFSET: added to obj body-origin z to get the jaw-midpoint
+        # target.  YCB "reoriented" meshes have their origin at the base of the
+        # object, so this offset is roughly object_half_height.  The jaw-midpoint
+        # IK (_execute_grasp_physics_topdown) places the jaw GEOM centre directly
+        # at this z, unlike the old EEF-site IK which required a larger offset
+        # to compensate for the ~3.4 cm EEF→jaw distance.
+        GRASP_Z_OFFSET = 0.06
         for obj_id in self.env.obj_ids:
             pos = self.env.get_obj_pos(obj_id)
             grasps = []
             for _ in range(self.n_grasp_attempts):
-                x   = float(pos[0] + rng.uniform(-0.04, 0.04))
-                y   = float(pos[1] + rng.uniform(-0.04, 0.04))
+                x   = float(pos[0])
+                y   = float(pos[1])
                 z   = float(pos[2] + GRASP_Z_OFFSET)
                 yaw = float(rng.uniform(-np.pi / 2, np.pi / 2))
                 opening = float(rng.uniform(0.04, 0.09))

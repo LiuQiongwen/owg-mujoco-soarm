@@ -4,22 +4,27 @@ import torch
 
 from lggsn_model import LGGSN, GC_LGGSN
 
-_USE_DIST = os.environ.get("FEAT_DIST", "1") == "1"   # ablation toggle
-_USE_ZREL = os.environ.get("FEAT_ZREL", "1") == "1"   # ablation toggle
-_FLAT_GATE = float(os.environ.get("FLAT_GATE_H_STD", "0.005"))  # disable reranking if H_std < threshold
-# Object-conditional whitelist: only rerank if query matches one of these labels.
-# Empty string (default) = no restriction (rank all objects).
+_USE_DIST = os.environ.get("FEAT_DIST", "1") == "1"   # module-level default, overridden per instance
+_USE_ZREL = os.environ.get("FEAT_ZREL", "1") == "1"
+_FLAT_GATE = float(os.environ.get("FLAT_GATE_H_STD", "0.005"))
 _RERANK_WHITELIST = set(
     s.strip() for s in os.environ.get("RERANK_WHITELIST", "").split(",") if s.strip()
 )
 
-FEATURE_COLS = [
+# Canonical 14-dim feature list (both dist_to_centroid and z_rel present).
+# Per-instance _feature_cols may be shorter depending on the checkpoint.
+FEATURE_COLS_BASE = [
     "x", "y", "z",
     "roll", "pitch", "yaw",
     "width", "score",
     "dz", "dz_lift", "need_dz", "H",
-] + (["dist_to_centroid"] if _USE_DIST else []) \
-  + (["z_rel"]            if _USE_ZREL else [])
+]
+FEATURE_COLS_FULL = FEATURE_COLS_BASE + ["dist_to_centroid", "z_rel"]
+
+# Module-level alias kept for backward-compat imports
+FEATURE_COLS = FEATURE_COLS_FULL if (_USE_DIST and _USE_ZREL) else (
+    FEATURE_COLS_BASE + (["dist_to_centroid"] if _USE_DIST else []) + (["z_rel"] if _USE_ZREL else [])
+)
 
 
 class LggsnGraspRanker:
@@ -37,17 +42,47 @@ class LggsnGraspRanker:
         self,
         model_path: str = "grasp_6dof/models/lggsn_geom_only_live.pt",
         device: str = "cuda",
+        lggsn_input_dim: int | None = None,
     ):
-        # 设备
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
-
-        # GC-LGGSN mode: activated when checkpoint is the gc model
         self._gc_mode = os.environ.get("LGGSN_GC_MODE", "0") == "1"
 
+        # ── Step 1: probe checkpoint to get actual input dim ──────────────────
+        raw_state = torch.load(model_path, map_location="cpu", weights_only=False)
+        ckpt_dim = raw_state["mlp.0.weight"].shape[1]
+
+        # ── Step 2: validate against explicit config (if given) ───────────────
+        if lggsn_input_dim is not None and lggsn_input_dim != ckpt_dim:
+            raise ValueError(
+                f"lggsn_input_dim={lggsn_input_dim} conflicts with checkpoint "
+                f"mlp.0.weight input dim={ckpt_dim} in {model_path}"
+            )
+
+        # ── Step 3: derive per-instance feature flags from checkpoint dim ─────
+        if ckpt_dim == 12:
+            self._use_dist = False
+            self._use_zrel = False
+            self._feature_cols = FEATURE_COLS_BASE[:]
+            print(f"[LggsnGraspRanker] legacy 12-dim checkpoint — "
+                  f"dist_to_centroid and z_rel disabled for this instance")
+        elif ckpt_dim == 14:
+            self._use_dist = True
+            self._use_zrel = True
+            self._feature_cols = FEATURE_COLS_FULL[:]
+        else:
+            raise ValueError(
+                f"Unsupported checkpoint input dim {ckpt_dim} in {model_path}; "
+                f"expected 12 or 14"
+            )
+
+        print(f"[LggsnGraspRanker] input_dim={ckpt_dim}  "
+              f"features={self._feature_cols}")
+
+        # ── Step 4: build model with the right geom_dim ───────────────────────
         if self._gc_mode:
             self.model = GC_LGGSN(
                 n_queries=1,
-                geom_dim=len(FEATURE_COLS),
+                geom_dim=ckpt_dim,
                 query_dim=0,
                 hidden_dim=40,
                 context_dim=3,
@@ -56,18 +91,16 @@ class LggsnGraspRanker:
         else:
             self.model = LGGSN(
                 n_queries=1,
-                geom_dim=len(FEATURE_COLS),
+                geom_dim=ckpt_dim,
                 query_dim=0,
                 hidden_dim=40,
             )
             print(f"[LggsnGraspRanker] loading checkpoint: {model_path}")
 
-        state = torch.load(model_path, map_location=self.device)
-        self.model.load_state_dict(state)
+        self.model.load_state_dict(raw_state)
         self.model.to(self.device)
         self.model.eval()
 
-        # 告诉上层这是 3D grasp ranker（不用图像）
         self.use_3d_prompt = True
 
     # --------- 输入格式适配 ---------
@@ -187,19 +220,19 @@ class LggsnGraspRanker:
 
     def _featurize(self, grasps):
         feats = [self._featurize_one(g) for g in grasps]
-        arr   = np.asarray(feats, dtype=np.float32)                     # [N, 12]
+        arr   = np.asarray(feats, dtype=np.float32)   # [N, 12]
         extra = []
 
-        if _USE_DIST or _USE_ZREL:
+        if self._use_dist or self._use_zrel:
             xy   = arr[:, :2]
             z    = arr[:, 2]
             cent = xy.mean(axis=0)
-            if _USE_DIST:
-                dists = np.linalg.norm(xy - cent, axis=1, keepdims=True)        # [N,1]
+            if self._use_dist:
+                dists = np.linalg.norm(xy - cent, axis=1, keepdims=True)       # [N,1]
                 extra.append(dists)
-            if _USE_ZREL:
+            if self._use_zrel:
                 z_min, z_max = z.min(), z.max()
-                z_rel = ((z - z_min) / (z_max - z_min + 1e-8)).reshape(-1, 1)  # [N,1]
+                z_rel = ((z - z_min) / (z_max - z_min + 1e-8)).reshape(-1, 1) # [N,1]
                 extra.append(z_rel)
 
         if extra:
@@ -261,7 +294,7 @@ class LggsnGraspRanker:
         if verbose:
             logit_np = logit.cpu().numpy()
             print("[LGGSN diag] per-candidate features + scores:")
-            header = f"  {'idx':>3}  " + "  ".join(f"{c:>8}" for c in FEATURE_COLS) + \
+            header = f"  {'idx':>3}  " + "  ".join(f"{c:>8}" for c in self._feature_cols) + \
                      f"  {'logit':>7}  {'score':>6}  {'spread_from_c0':>14}"
             print(header)
             for i in range(len(grasps)):
@@ -269,7 +302,7 @@ class LggsnGraspRanker:
                 delta = score[i] - score[0]
                 print(f"  {i:>3}  {feat_str}  {logit_np[i]:>7.4f}  {score[i]:>6.4f}  {delta:>+14.4f}")
             print(f"  score spread (max-min): {score.max() - score.min():.6f}")
-            zero_cols = [FEATURE_COLS[j] for j in range(len(FEATURE_COLS))
+            zero_cols = [self._feature_cols[j] for j in range(len(self._feature_cols))
                          if np.all(X[:, j] == X[0, j])]
             print(f"  constant features (no within-episode variance): {zero_cols}")
 

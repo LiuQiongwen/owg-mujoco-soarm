@@ -4,14 +4,16 @@ Validate 6-DoF orientation-aware IK for SO-ARM101.
 
 Tests (in order):
   1. make_topdown_rotation() — orthonormality + Z-axis direction
-  2. IK convergence: 6-DoF IK reduces jaw-object XY gap vs xyz_only baseline
+  2. Jaw-midpoint IK: _solve_ik_jaw_topdown reduces jaw-mid→object gap vs xyz_only
   3. Debug metrics: get_grasp_debug_metrics() keys and finite values
   4. Backward compat: move_ee() xyz_only mode still works
-  5. Bilateral contacts: _execute_grasp_physics_topdown achieves bilateral contacts
-     NOTE: actual lift remains 0% — SO-ARM101 oblique approach geometry means both
-     jaws contact the cube's +Y face (push contact) rather than clamping from
-     opposite sides. This is the confirmed physics-mode baseline documented in
-     calib_logs/CALIBRATION_FINDINGS.md.
+  5. Bilateral + lift: _execute_grasp_physics_topdown achieves bilateral clamping
+     and lifts a 2 cm cube (within the ~3.5 cm jaw opening gap).
+
+Object size note:
+  The SO-ARM101 scissor jaw has a body-centre separation of ~3.5 cm at maximum
+  opening. Objects wider than ~3 cm cannot fit between the jaws for clamping;
+  use half-size ≤ 0.015 m for reliable bilateral contact.
 
 Usage:
   conda run -n owg2 python scripts/test_soarm_6dof_ik.py
@@ -34,6 +36,7 @@ from owg_robot.env_soarm import (
     IK_MODE_XYZ_ONLY,
     IK_MODE_YAW_TOPDOWN,
     IK_MODE_FULL_6DOF,
+    IK_MODE_JAW_TOPDOWN,
     make_topdown_rotation,
     register_primitive_geom,
 )
@@ -65,42 +68,35 @@ def test_rotation_math():
     return all_ok
 
 
-# ── Test 2: IK jaw-gap improvement ────────────────────────────────────────────
+# ── Test 2: jaw-midpoint IK ────────────────────────────────────────────────────
 
-def test_ik_jaw_gap(env):
-    """6-DoF IK should reduce jaw midpoint-to-object XY gap vs xyz_only."""
-    print("\n=== Test 2: 6-DoF IK jaw-gap improvement ===")
+def test_jaw_midpoint_ik(env):
+    """_solve_ik_jaw_topdown reduces jaw-midpoint→target gap vs xyz_only baseline."""
+    print("\n=== Test 2: jaw-midpoint IK vs xyz_only baseline ===")
     test_pts = [
-        (0.0, -0.25, TABLE_TOP_Z + 0.10),
-        (0.0, -0.20, TABLE_TOP_Z + 0.08),
+        (0.0, -0.25, TABLE_TOP_Z + 0.02),
+        (0.0, -0.20, TABLE_TOP_Z + 0.02),
     ]
     all_ok = True
     for x, y, z in test_pts:
         tgt = np.array([x, y, z])
 
-        # xyz_only baseline
+        # xyz_only baseline: jaw midpoint gap after position-only IK
         env.reset_robot()
         env._solve_ik(tgt)
-        jaw_fix = env.data.xpos[env._jaw_body_id].copy()
-        jaw_mv  = env.data.xpos[env._jaw_mv_body_id].copy()
-        mid_xy_base = 0.5 * (jaw_fix[:2] + jaw_mv[:2])
-        gap_base = float(np.linalg.norm(mid_xy_base - tgt[:2]))
+        gap_base = float(np.linalg.norm(env._get_jaw_midpoint()[:2] - tgt[:2]))
 
-        # 6-DoF IK
+        # jaw-midpoint IK
         env.reset_robot()
-        R_tgt = make_topdown_rotation(0.0)
-        ok_ik, pe, oe = env._solve_ik_6dof(tgt, R_tgt, iters=400)
-        jaw_fix = env.data.xpos[env._jaw_body_id].copy()
-        jaw_mv  = env.data.xpos[env._jaw_mv_body_id].copy()
-        mid_xy_6d = 0.5 * (jaw_fix[:2] + jaw_mv[:2])
-        gap_6dof = float(np.linalg.norm(mid_xy_6d - tgt[:2]))
+        ok_ik, jaw_pe, oe = env._solve_ik_jaw_topdown(tgt, yaw=0.0, iters=600)
+        gap_jaw = float(np.linalg.norm(env._get_jaw_midpoint()[:2] - tgt[:2]))
 
-        improved = gap_6dof < gap_base
+        improved = gap_jaw < gap_base
         all_ok &= improved
         report(
-            f"({x:+.2f},{y:+.2f},{z:.3f})  gap_base={gap_base*100:.1f}cm → gap_6dof={gap_6dof*100:.1f}cm",
+            f"({x:+.2f},{y:+.2f},{z:.3f})  jaw_gap: {gap_base*100:.1f}cm → {gap_jaw*100:.1f}cm",
             improved,
-            f"pe={pe*1000:.1f}mm oe={oe:.3f}rad",
+            f"jaw_pe={jaw_pe*100:.1f}cm oe={np.degrees(oe):.0f}°",
         )
     return all_ok
 
@@ -131,7 +127,7 @@ def test_xyz_only_compat(env):
     target = [0.05, -0.25, TABLE_TOP_Z + 0.10, None]
     try:
         ok_ret, (pos, orn) = env.move_ee(target, ik_mode=IK_MODE_XYZ_ONLY)
-        ok = True  # call completed without exception
+        ok = True
         report("move_ee xyz_only returns without exception", ok,
                f"eef={pos.round(3)}")
     except Exception as e:
@@ -140,38 +136,66 @@ def test_xyz_only_compat(env):
     return ok
 
 
-# ── Test 5: bilateral contacts via topdown ────────────────────────────────────
+# ── Test 5: bilateral clamping + lift ─────────────────────────────────────────
 
-def test_bilateral_contacts(env):
-    """_execute_grasp_physics_topdown achieves bilateral jaw-cube contacts."""
-    print("\n=== Test 5: bilateral contacts via topdown grasp ===")
-    cube_pool = register_primitive_geom(
-        "box", (0.025, 0.025, 0.025), 0.150, (1.5, 0.05, 0.01), (0.2, 0.5, 0.8, 1.0))
+def test_bilateral_lift(env):
+    """jaw-midpoint IK achieves bilateral clamping and lifts a tall thin box.
+
+    The SO-ARM101 base is mounted on the table surface.  Its elbow link collides
+    with the table when the arm tries to reach below z ≈ TABLE_TOP_Z + 0.075 m.
+    Therefore the test object is a tall thin box (3.4 cm × 3.4 cm × 15 cm) whose
+    centre sits at TABLE_TOP_Z + 0.075 = 0.860 m — within the arm's physical
+    reach — and whose width (3.4 cm) fits inside the ~3.6 cm jaw geom gap.
+
+    The jaw-geom-midpoint IK places the jaw tips ~1.2 mm outside each object face
+    so that closing produces opposing bilateral clamping forces.
+    Bilateral contacts ≥ 60% and lift success ≥ 50% over 6 trials is the criterion.
+    """
+    print("\n=== Test 5: bilateral clamping + lift (tall thin box) ===")
+
+    # Tall thin box: 3.4 cm × 3.4 cm × 15 cm
+    # Half-size z=0.075 → centre at TABLE_TOP_Z + 0.075 = 0.860 m (reachable).
+    # Half-size x,y=0.017 → 3.4 cm width.  Jaw geom Y-gap ≈ 3.6 cm at IK
+    # solution → ~1.2 mm clearance per side, within the ~4 mm closing motion.
+    OBJ_HALF_Z = 0.075
+    OBJ_HALF_XY = 0.017
+    box_pool = register_primitive_geom(
+        "box", (OBJ_HALF_XY, OBJ_HALF_XY, OBJ_HALF_Z), 0.100,
+        (1.5, 0.05, 0.01), (0.2, 0.5, 0.8, 1.0))
 
     bilateral_count = 0
-    n_trials = 5
+    lift_count      = 0
+    n_trials        = 6
+
     for seed in range(n_trials):
         env.remove_all_obj()
         env.reset_robot()
-        obj_id = env.load_obj(cube_pool, name="obj",
-                              pos=[0.0, -0.25, TABLE_TOP_Z + 0.025 + 0.06])
+        obj_id = env.load_obj(box_pool, name="obj",
+                              pos=[0.0, -0.25, TABLE_TOP_Z + OBJ_HALF_Z + 0.06])
         env._steps(300)
         env.wait_until_all_still(max_wait_epochs=100)
         obj_pos = env.get_obj_pos(obj_id)
 
-        env._execute_grasp_physics_topdown(
-            pos=(float(obj_pos[0]), float(obj_pos[1]), float(obj_pos[2]) + 0.01),
-            yaw=0.0, gripper_opening_length=0.09, obj_height=0.05,
+        ok, _ = env._execute_grasp_physics_topdown(
+            pos=(float(obj_pos[0]), float(obj_pos[1]), float(obj_pos[2])),
+            yaw=0.0,
+            gripper_opening_length=0.09,
+            obj_height=2 * OBJ_HALF_Z,
         )
-        m = env.get_grasp_debug_metrics(obj_id)
-        if m["bilateral_contacts"] > 0:
+        m = env.last_grasp_metrics or {}
+        if m.get("bilateral_contacts", 0) > 0:
             bilateral_count += 1
+        if ok:
+            lift_count += 1
 
-    rate = bilateral_count / n_trials
-    ok = rate >= 0.6   # bilateral contact in at least 60% of trials
-    report(f"bilateral contacts in {bilateral_count}/{n_trials} trials", ok,
-           "NOTE: lift=0% expected — push contacts only, see CALIBRATION_FINDINGS.md")
-    return ok
+    bil_rate  = bilateral_count / n_trials
+    lift_rate = lift_count / n_trials
+    ok_bil  = bil_rate  >= 0.60
+    ok_lift = lift_rate >= 0.50
+
+    report(f"bilateral contacts ≥ 60%: {bilateral_count}/{n_trials} = {bil_rate:.0%}", ok_bil)
+    report(f"lift success       ≥ 50%: {lift_count}/{n_trials} = {lift_rate:.0%}", ok_lift)
+    return ok_bil and ok_lift
 
 
 # ── main ──────────────────────────────────────────────────────────────────────
@@ -192,16 +216,18 @@ def main():
             r = fn(*a, **kw)
             results.append(bool(r))
         except Exception as exc:
+            import traceback
             print(f"  [EXCEPTION] {fn.__name__}: {exc}")
+            traceback.print_exc()
             results.append(False)
 
     run(test_rotation_math)
-    run(test_ik_jaw_gap, env)
+    run(test_jaw_midpoint_ik, env)
     run(test_debug_metrics, env)
     run(test_xyz_only_compat, env)
 
     if not args.skip_grasp:
-        run(test_bilateral_contacts, env)
+        run(test_bilateral_lift, env)
 
     env.close()
 
