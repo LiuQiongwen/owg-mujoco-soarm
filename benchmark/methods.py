@@ -99,9 +99,11 @@ class LggsnMethod(MethodBase):
         If True, silently fall back to geometry when the model fails.
     """
 
+    _DEFAULT_CKPT = "grasp_6dof/models/lggsn_pairwise_live_v2.pt"
+
     def __init__(self, ckpt_path: Optional[str] = None,
                  fallback_on_error: bool = True):
-        self._ckpt_path      = ckpt_path
+        self._ckpt_path      = ckpt_path or self._DEFAULT_CKPT
         self._fallback       = fallback_on_error
         self._ranker         = None
         self._geometry       = GeometryMethod()
@@ -111,7 +113,7 @@ class LggsnMethod(MethodBase):
     def _init_ranker(self):
         try:
             from owg_robot.grasp_ranker_lggsn import LggsnGraspRanker
-            self._ranker = LggsnGraspRanker(ckpt_path=self._ckpt_path)
+            self._ranker = LggsnGraspRanker(model_path=self._ckpt_path)
         except Exception as e:
             self._load_error = str(e)
             if not self._fallback:
