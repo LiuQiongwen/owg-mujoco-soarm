@@ -160,10 +160,12 @@ class WorldModelMethod(MethodBase):
 
     def __init__(self, ckpt_path: str = "data/world_model_ckpt.pt",
                  fallback_on_error: bool = True):
-        self._ckpt_path = ckpt_path
-        self._fallback  = fallback_on_error
-        self._model     = None
-        self._geometry  = GeometryMethod()
+        self._ckpt_path  = ckpt_path
+        self._fallback   = fallback_on_error
+        self._model      = None
+        self._norm_mean  = None
+        self._norm_std   = None
+        self._geometry   = GeometryMethod()
         self._load_error: Optional[str] = None
         self._init_model()
 
@@ -180,11 +182,17 @@ class WorldModelMethod(MethodBase):
         try:
             import torch
             from benchmark._wm_mlp import WorldModelMLP
-            ck = torch.load(self._ckpt_path, map_location="cpu", weights_only=True)
+            ck = torch.load(self._ckpt_path, map_location="cpu", weights_only=False)
             dim = ck.get("input_dim", 22)
-            self._model = WorldModelMLP(input_dim=dim)
+            self._model = WorldModelMLP(input_dim=dim, hidden=ck.get("hidden", 128))
             self._model.load_state_dict(ck["model_state"])
             self._model.eval()
+            # load per-feature normalisation if present
+            if "norm_mean" in ck and "norm_std" in ck:
+                self._norm_mean = torch.tensor(ck["norm_mean"], dtype=torch.float32)
+                self._norm_std  = torch.tensor(ck["norm_std"],  dtype=torch.float32)
+            else:
+                self._norm_mean = self._norm_std = None
         except Exception as e:
             self._load_error = str(e)
             if not self._fallback:
@@ -206,23 +214,24 @@ class WorldModelMethod(MethodBase):
 
     def _rank_with_model(self, candidates, obs, obj_id) -> np.ndarray:
         import torch
-        from data.transition_logger import build_feature, compute_pc_stats
 
-        obj_pos  = obs.get("object_pose", {})
-        obj_info = obj_pos.get(obj_id, {}) if isinstance(obj_pos, dict) else {}
-        pos      = np.zeros(3, dtype=np.float32)
-        quat     = np.array([1, 0, 0, 0], dtype=np.float32)
-        pc_stats = compute_pc_stats(obs, obj_id)
+        # resolve obj_pos from obs
+        obj_pose_dict = obs.get("object_pose", {}) if isinstance(obs, dict) else {}
+        obj_info      = obj_pose_dict.get(obj_id, {}) if isinstance(obj_pose_dict, dict) else {}
+        obj_pos       = np.asarray(
+            obj_info.get("pos", [0.0, 0.0, 0.0]), dtype=np.float32
+        )
 
+        # 9-dim features: grasp(6) + obj_pos(3)
         feats = []
         for g in candidates:
-            feat = build_feature(
-                np.asarray(g[:6], dtype=np.float32),
-                pos, quat, pc_stats,
-            )
+            feat = np.concatenate([np.asarray(g[:6], dtype=np.float32), obj_pos])
             feats.append(feat)
 
         X = torch.tensor(np.array(feats), dtype=torch.float32)
+        if self._norm_mean is not None:
+            X = (X - self._norm_mean) / self._norm_std
+
         with torch.no_grad():
             scores = self._model(X).squeeze(-1).numpy()
 

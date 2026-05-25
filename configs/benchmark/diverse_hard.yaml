@@ -28,6 +28,7 @@ methods:
   - geometry
   - random
   - lggsn
+  - world_model
 
 execution_mode: physics_weld_after_bilateral
 
