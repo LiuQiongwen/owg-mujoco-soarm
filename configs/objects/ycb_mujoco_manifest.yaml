@@ -82,3 +82,13 @@ objects:
     scale:          1.0
     spawn_z_offset: 0.12
     xml:            owg_robot/assets/ycb/can.xml
+
+  Cylinder:
+    pool_name:      YcbMediumClamp
+    visual_mesh:    textured_reoriented.obj
+    collision_mesh: collision_vhacd.obj
+    mass:           0.259          # kg  (YCB 051_large_clamp, scaled 1.75×)
+    friction:       [1.5, 0.05, 0.01]
+    scale:          1.75
+    spawn_z_offset: 0.12
+    xml:            owg_robot/assets/ycb/cylinder.xml

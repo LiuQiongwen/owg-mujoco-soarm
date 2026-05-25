@@ -55,6 +55,20 @@ class TrialRecord:
     fell_off:          Optional[bool]
     failure_reason:    Optional[str]
 
+    # weld / contact detail (physics_weld_after_bilateral mode)
+    weld_triggered:    Optional[bool]  = None  # kinematic weld was activated
+    table_contact:     Optional[bool]  = None  # fixed jaw sphere touched table
+    final_z:           Optional[float] = None  # object z after lift attempt (m)
+    lifted:            Optional[bool]  = None  # obj_z > TABLE_TOP_Z + 0.07
+
+    # diversity fields (set by DiverseBenchmarkRunner)
+    difficulty:        Optional[str]   = None  # "easy" | "medium" | "hard"
+    spawn_x:           Optional[float] = None  # m
+    spawn_y:           Optional[float] = None  # m
+    spawn_yaw:         Optional[float] = None  # rad — initial object yaw at spawn
+    clutter_count:     Optional[int]   = None  # number of distractor objects
+    grasp_yaw:         Optional[float] = None  # rad — yaw of the attempted grasp
+
     # metadata
     scene_file:        Optional[str] = None  # path to saved scene JSON for replay
     timestamp:         str = ""
@@ -142,7 +156,6 @@ class TrialLogger:
     def write_summary(self) -> Path:
         """Aggregate all trials and write summary.csv.  Safe to call repeatedly."""
         from collections import defaultdict
-        import math
 
         rows: dict = defaultdict(lambda: {
             "n_total": 0, "n_valid": 0, "n_success": 0,
@@ -161,7 +174,6 @@ class TrialLogger:
                 if rec.get("slip") is not None:
                     rows[key]["slip_vals"].append(rec["slip"])
 
-        # aggregate bilateral contact rate
         bilateral: dict = defaultdict(lambda: {"n": 0, "k": 0})
         for rec in self._iter_jsonl():
             if not rec.get("stability_valid"):
@@ -191,21 +203,64 @@ class TrialLogger:
                 bi        = bilateral.get((obj, method), {})
                 bi_rate   = bi["k"] / bi["n"] if bi.get("n") else ""
                 writer.writerow({
-                    "object":          obj,
-                    "method":          method,
-                    "n_total":         d["n_total"],
-                    "n_valid":         d["n_valid"],
-                    "n_success":       k,
-                    "success_rate":    round(rate, 4),
-                    "ci_lo":           round(lo,   4),
-                    "ci_hi":           round(hi,   4),
-                    "bilateral_rate":  round(bi_rate, 4) if bi_rate != "" else "",
-                    "dz_mean":         round(float(sum(dz_vals) / len(dz_vals)), 4) if dz_vals else "",
-                    "dz_std":          round(float(_std(dz_vals)), 4) if dz_vals else "",
-                    "slip_mean":       round(float(sum(slip_vals) / len(slip_vals)), 4) if slip_vals else "",
+                    "object":         obj,
+                    "method":         method,
+                    "n_total":        d["n_total"],
+                    "n_valid":        d["n_valid"],
+                    "n_success":      k,
+                    "success_rate":   round(rate, 4),
+                    "ci_lo":          round(lo,   4),
+                    "ci_hi":          round(hi,   4),
+                    "bilateral_rate": round(bi_rate, 4) if bi_rate != "" else "",
+                    "dz_mean":        round(float(sum(dz_vals) / len(dz_vals)), 4) if dz_vals else "",
+                    "dz_std":         round(float(_std(dz_vals)), 4) if dz_vals else "",
+                    "slip_mean":      round(float(sum(slip_vals) / len(slip_vals)), 4) if slip_vals else "",
                 })
 
+        # optional per-difficulty summary when diversity fields are present
+        self._write_difficulty_summary()
+
         return self._csv_path
+
+    def _write_difficulty_summary(self) -> None:
+        """Write difficulty_summary.csv when trials include difficulty labels."""
+        from collections import defaultdict
+
+        has_difficulty = any(
+            rec.get("difficulty") for rec in self._iter_jsonl()
+        )
+        if not has_difficulty:
+            return
+
+        rows: dict = defaultdict(lambda: {"n_total": 0, "n_valid": 0, "n_success": 0})
+        for rec in self._iter_jsonl():
+            diff = rec.get("difficulty") or "unknown"
+            key  = (diff, rec["method"])
+            rows[key]["n_total"] += 1
+            if rec.get("stability_valid"):
+                rows[key]["n_valid"] += 1
+            if rec.get("success"):
+                rows[key]["n_success"] += 1
+
+        diff_csv = self.run_dir / "difficulty_summary.csv"
+        fieldnames = ["difficulty", "method", "n_total", "n_valid", "n_success",
+                      "success_rate", "ci_lo", "ci_hi"]
+        with open(diff_csv, "w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for (diff, method), d in sorted(rows.items()):
+                k, n = d["n_success"], d["n_valid"]
+                rate, lo, hi = wilson_ci(k, n)
+                writer.writerow({
+                    "difficulty":   diff,
+                    "method":       method,
+                    "n_total":      d["n_total"],
+                    "n_valid":      d["n_valid"],
+                    "n_success":    k,
+                    "success_rate": round(rate, 4),
+                    "ci_lo":        round(lo,   4),
+                    "ci_hi":        round(hi,   4),
+                })
 
     # ── read-back ─────────────────────────────────────────────────────────────
 

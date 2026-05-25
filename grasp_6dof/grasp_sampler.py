@@ -13,9 +13,10 @@ import open3d as o3d
 # -------------------------
 @dataclass
 class GraspPose:
-    position: np.ndarray    # (3,)
-    rpy: np.ndarray         # (3,) in radians
-    score: float
+    position:  np.ndarray    # (3,)
+    rpy:       np.ndarray    # (3,) in radians — ZYX euler from full rotation matrix
+    score:     float
+    world_yaw: float = 0.0   # gripper X-axis projected onto world XY → true Z-yaw
 
 # -------------------------
 # 工具函数
@@ -54,6 +55,33 @@ def orthonormal_basis_from_z(z_dir: np.ndarray) -> np.ndarray:
     y = np.cross(z, x);      y /= (np.linalg.norm(y)+1e-12)
     R = np.stack([x,y,z], axis=1)  # 列向量为基
     return R
+
+# -------------------------
+# PCA 轴分析
+# -------------------------
+def compute_pca_axes(pts: np.ndarray):
+    """
+    返回 (major_axis, minor_axis, elongation_ratio).
+    major_axis: 3-D单位向量，点云最长方向（投影到XY平面后用于计算 world yaw）
+    elongation_ratio: 最大/次大特征值之比；>3 视为长条物体
+    """
+    centered = pts - pts.mean(axis=0)
+    cov = centered.T @ centered / max(1, len(pts))
+    eigvals, eigvecs = np.linalg.eigh(cov)
+    order = np.argsort(eigvals)[::-1]
+    major = eigvecs[:, order[0]]
+    minor = eigvecs[:, order[1]]
+    elongation = float(eigvals[order[0]]) / (float(eigvals[order[1]]) + 1e-8)
+    return major, minor, elongation
+
+def lateral_score(R: np.ndarray, major_axis: np.ndarray) -> float:
+    """
+    侧向抓取分数：gripper X轴与物体长轴垂直时为1，平行时为0。
+    用于长条物体的横向抓取优化。
+    """
+    gripper_x = R[:, 0]
+    dot = float(abs(np.dot(gripper_x[:2], major_axis[:2])))
+    return 1.0 - dot
 
 # -------------------------
 # 打分（几何启发式）
@@ -161,43 +189,70 @@ def sample_grasps_from_mesh(
     if pts.shape[0] == 0:
         raise RuntimeError("点云为空，检查 mesh 路径或采样参数。")
 
+    # PCA 分析：检测是否为长条物体（香蕉/钻等）
+    major_axis, minor_axis, elongation = compute_pca_axes(pts)
+    is_elongated = elongation > 3.0
+    if is_elongated:
+        major_yaw_2d = float(np.arctan2(major_axis[1], major_axis[0]))
+        print(f"[INFO] elongation={elongation:.1f} → 长条物体，启用横向抓取 prior "
+              f"(major_yaw={np.degrees(major_yaw_2d):.1f}°)")
+    else:
+        major_yaw_2d = 0.0
+
     # 随机选 n_samples 个点
     sel_idx = np.random.choice(pts.shape[0], size=min(n_samples, pts.shape[0]), replace=False)
 
     grasps: List[GraspPose] = []
     for idx in sel_idx:
-        p = pts[idx]
-        n = nrm[idx]
-        n = n / (np.linalg.norm(n) + 1e-12)
+        pt = pts[idx]
+        n  = nrm[idx]
+        n  = n / (np.linalg.norm(n) + 1e-12)
 
         # 基础朝向：让手爪 -z 与 n 对齐（即 z = -n）
         z_dir = -n
         R0 = orthonormal_basis_from_z(z_dir)
 
-        # 沿着 z 轴离散多个 yaw，且在 roll/pitch 上加小扰动
-        for b in range(yaw_bins):
-            yaw = (2*np.pi) * (b / yaw_bins)
-            R_yaw = rodrigues(z_dir, yaw)
+        # 长条物体：优先从垂直于长轴的方向采样 yaw（横向抓取 prior）
+        if is_elongated:
+            perp_yaw = major_yaw_2d + np.pi / 2
+            sampled_yaws = np.concatenate([
+                np.random.normal(perp_yaw,       np.pi / 8, size=max(1, yaw_bins // 2)),
+                np.random.normal(perp_yaw + np.pi, np.pi / 8, size=max(1, yaw_bins // 2)),
+            ])
+        else:
+            sampled_yaws = [(2 * np.pi) * (b / yaw_bins) for b in range(yaw_bins)]
+
+        for yaw_angle in sampled_yaws:
+            R_yaw = rodrigues(z_dir, float(yaw_angle))
 
             # 小扰动
             pj = np.deg2rad(np.random.uniform(-pitch_jitter_deg, pitch_jitter_deg))
             rj = np.deg2rad(np.random.uniform(-roll_jitter_deg,  roll_jitter_deg))
-            # 扰动轴：在 x、y 上做小旋转
-            R_pitch = rodrigues(R0[:,0], pj)
-            R_roll  = rodrigues(R0[:,1], rj)
+            R_pitch = rodrigues(R0[:, 0], pj)
+            R_roll  = rodrigues(R0[:, 1], rj)
 
             R = R0 @ R_yaw @ R_pitch @ R_roll
 
-            # 末端位置：在法向反方向（朝外）退一点作为 approach
-            pos = p + (-n) * approach_offset
+            # 末端位置：在法向反方向退一点作为 approach
+            pos = pt + (-n) * approach_offset
 
-            # 评分并记录
-            s = score_grasp(pos, n, R, workspace=workspace, table_z=table_z)
-            if s <= 0.0:
+            # 评分
+            s_geom = score_grasp(pos, n, R, workspace=workspace, table_z=table_z)
+            if s_geom <= 0.0:
                 continue
 
-            rpy = np.array(euler_from_R(R))  # roll,pitch,yaw
-            grasps.append(GraspPose(position=pos, rpy=rpy, score=s))
+            # 长条物体：加权横向优先分
+            if is_elongated:
+                s_lat = lateral_score(R, major_axis)
+                s = 0.9 * s_lat + 0.1 * s_geom
+            else:
+                s = s_geom
+
+            rpy = np.array(euler_from_R(R))
+            # world_yaw: gripper X轴投影到XY平面的角度（真实世界Z轴yaw）
+            world_yaw = float(np.arctan2(R[1, 0], R[0, 0]))
+            grasps.append(GraspPose(position=pos, rpy=rpy, score=s,
+                                     world_yaw=world_yaw))
 
     # 排序（score 从高到低）
     grasps.sort(key=lambda g: g.score, reverse=True)
@@ -209,9 +264,10 @@ def pack_for_json(grasps: List[GraspPose], topk: Optional[int] = None):
     for i in range(K):
         g = grasps[i]
         out.append({
-            "position": [float(g.position[0]), float(g.position[1]), float(g.position[2])],
-            "rpy":      [float(g.rpy[0]), float(g.rpy[1]), float(g.rpy[2])],
-            "score":    float(g.score),
+            "position":  [float(g.position[0]), float(g.position[1]), float(g.position[2])],
+            "rpy":       [float(g.rpy[0]), float(g.rpy[1]), float(g.rpy[2])],
+            "world_yaw": float(g.world_yaw),   # true world-Z yaw for gripper orientation
+            "score":     float(g.score),
         })
     return out
 # ---------- compatibility wrapper for demo.py ----------

@@ -78,6 +78,8 @@ class BenchmarkPlotter:
         saved += self.plot_per_object_heatmap()
         saved += self.plot_overview()
         saved += self.plot_calibration_heatmap()
+        saved += self.plot_difficulty_breakdown()
+        saved += self.plot_spawn_scatter()
         saved += [self.write_success_table()]
         return [p for p in saved if p is not None]
 
@@ -396,6 +398,124 @@ class BenchmarkPlotter:
         ax.set_title("Bilateral Contact Rate per Object × Method", fontsize=12)
         fig.tight_layout()
         paths = self._save(fig, "calibration_heatmap")
+        plt.close(fig)
+        return paths
+
+    def plot_difficulty_breakdown(self) -> List[Path]:
+        """Grouped bar chart: success rate by difficulty level, one bar per method.
+
+        Only generated when at least two difficulty levels are present in the data.
+        """
+        import matplotlib.pyplot as plt
+
+        diffs = sorted({r.get("difficulty") for r in self._records
+                        if r.get("difficulty")})
+        if len(diffs) < 2:
+            return []
+
+        methods = self._methods
+        counts: dict = defaultdict(lambda: defaultdict(lambda: {"k": 0, "n": 0}))
+        for rec in self._records:
+            if not rec.get("stability_valid"):
+                continue
+            d = rec.get("difficulty") or "unknown"
+            m = rec["method"]
+            counts[d][m]["n"] += 1
+            if rec.get("success"):
+                counts[d][m]["k"] += 1
+
+        n_diffs   = len(diffs)
+        n_methods = len(methods)
+        x         = np.arange(n_diffs)
+        bar_w     = 0.8 / max(n_methods, 1)
+
+        fig, ax = plt.subplots(figsize=(max(6, n_diffs * 2), 4))
+        for mi, m in enumerate(methods):
+            offset    = (mi - n_methods / 2 + 0.5) * bar_w
+            rates, lo_errs, hi_errs = [], [], []
+            for d in diffs:
+                cnt  = counts[d][m]
+                rate, lo, hi = wilson_ci(cnt["k"], cnt["n"])
+                rates.append(rate)
+                lo_errs.append(rate - lo)
+                hi_errs.append(hi - rate)
+            color = _METHOD_COLORS.get(m, _DEFAULT_COLOR)
+            ax.bar(x + offset, rates, bar_w * 0.9,
+                   label=m, color=color, alpha=0.85, zorder=3)
+            ax.errorbar(x + offset, rates,
+                        yerr=[lo_errs, hi_errs],
+                        fmt="none", color="black", capsize=3, linewidth=1, zorder=4)
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(diffs, fontsize=11)
+        ax.set_ylabel("Success rate", fontsize=11)
+        ax.set_ylim(0, 1.05)
+        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:.0%}"))
+        ax.axhline(0, color="black", linewidth=0.5)
+        ax.grid(axis="y", linestyle="--", alpha=0.4, zorder=0)
+        ax.legend(loc="upper right", fontsize=9, framealpha=0.9)
+        ax.set_title("Success Rate by Difficulty Level (95% Wilson CI)", fontsize=12)
+        fig.tight_layout()
+        paths = self._save(fig, "difficulty_breakdown")
+        plt.close(fig)
+        return paths
+
+    def plot_spawn_scatter(self) -> List[Path]:
+        """Scatter plot of spawn (x, y) positions coloured by success / failure.
+
+        One subplot per method.  Only generated when spawn_x / spawn_y fields exist.
+        """
+        import matplotlib.pyplot as plt
+
+        recs_with_pos = [
+            r for r in self._records
+            if r.get("stability_valid")
+            and r.get("spawn_x") is not None
+            and r.get("spawn_y") is not None
+        ]
+        if not recs_with_pos:
+            return []
+
+        methods   = [m for m in self._methods if any(r["method"] == m for r in recs_with_pos)]
+        n_methods = len(methods)
+        if n_methods == 0:
+            return []
+
+        fig, axes = plt.subplots(
+            1, n_methods,
+            figsize=(max(4, 4 * n_methods), 4),
+            squeeze=False,
+        )
+        axes = axes[0]
+
+        for ax, m in zip(axes, methods):
+            subset = [r for r in recs_with_pos if r["method"] == m]
+            xs = np.array([r["spawn_x"] for r in subset])
+            ys = np.array([r["spawn_y"] for r in subset])
+            cs = np.array([1 if r.get("success") else 0 for r in subset])
+
+            ax.scatter(xs[cs == 1], ys[cs == 1],
+                       c="limegreen", alpha=0.6, s=18, label="success", zorder=3)
+            ax.scatter(xs[cs == 0], ys[cs == 0],
+                       c="tomato",    alpha=0.6, s=18, label="failure", zorder=3)
+
+            # workspace boundary
+            theta = np.linspace(0, 2 * np.pi, 200)
+            ax.plot(0.44 * np.cos(theta), -0.45 + 0.44 * np.sin(theta),
+                    "k--", linewidth=0.7, alpha=0.4)
+
+            ax.set_xlim(-0.50, 0.50)
+            ax.set_ylim(-0.65, -0.15)
+            ax.set_xlabel("spawn x (m)", fontsize=9)
+            ax.set_ylabel("spawn y (m)", fontsize=9)
+            ax.set_title(m, fontsize=10)
+            ax.set_aspect("equal")
+            if ax == axes[0]:
+                ax.legend(fontsize=8, loc="upper right")
+
+        fig.suptitle("Spawn Position vs Grasp Outcome", fontsize=12, y=1.02)
+        fig.tight_layout()
+        paths = self._save(fig, "spawn_scatter")
         plt.close(fig)
         return paths
 

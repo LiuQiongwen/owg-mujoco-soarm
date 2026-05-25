@@ -34,11 +34,9 @@ from owg_robot.env_soarm import (
     EnvironmentSoArm, TABLE_TOP_Z,
     GRIP_OPEN, GRIP_CLOSED,
     IK_MODE_JAW_POS, IK_MODE_XYZ_ONLY,
-    GRASP_MODE_PHYSICS,
+    GRASP_MODE_PHYSICS, GRASP_Z_TABLE_MARGIN,
 )
 from owg_robot.viewer_utils import MujocoViewer, Overlay
-
-GRASP_Z_OFFSET = 0.06   # jaw-midpoint IK: target jaw this far above table top
 
 
 def _resolve(name: str) -> str:
@@ -73,21 +71,24 @@ def main():
     env.reset()
 
     print(f"[watch] Loading '{obj_name}' …")
-    obj_id = env.load_obj(obj_name)
+    # Spawn on the table (y < 0) so the object rests at TABLE_TOP_Z
+    obj_id = env.load_obj(obj_name, pos=[0.0, -0.20, TABLE_TOP_Z + 0.15])
     env.wait_until_still(obj_id)
+    env._steps(300)
 
+    obj_com = env.get_obj_com_pos(obj_id)   # body CoM in world frame
     obj_pos = env.get_obj_pos(obj_id)
-    x, y    = float(obj_pos[0]), float(obj_pos[1])
-    grasp_z = TABLE_TOP_Z + GRASP_Z_OFFSET
+    x, y    = float(obj_com[0]), float(obj_com[1])
+    grasp_z = float(obj_com[2]) + GRASP_Z_TABLE_MARGIN  # offset keeps fixed jaw off table
     hover_z = env.GRIPPER_MOVING_HEIGHT
-    print(f"[watch] {obj_name} at ({x:.3f}, {y:.3f}, {obj_pos[2]:.3f})")
+    print(f"[watch] {obj_name} at ({x:.3f}, {y:.3f}, {obj_pos[2]:.3f})  CoM z={obj_com[2]:.3f}  grasp_z={grasp_z:.3f}")
 
     # ── Overlay ──────────────────────────────────────────────────────────────
     ov = Overlay()
     ov.set_phase("idle")
     ov.add_info("object",   obj_name)
     ov.add_info("slowdown", f"{args.slowdown}×")
-    ov.add_marker(obj_pos,        rgba=(0.0, 1.0, 0.0, 0.7), size=0.025, label=obj_name)
+    ov.add_marker(obj_com,         rgba=(0.0, 1.0, 0.0, 0.7), size=0.025, label=obj_name)
     ov.add_marker([x, y, grasp_z], rgba=(1.0, 0.5, 0.0, 0.6), size=0.018, label="grasp_z")
 
     # ── Step hook: sync viewer during env.move_ee / _steps ───────────────────
@@ -183,16 +184,24 @@ def main():
         v.sync()
         v.sleep(0.5)
 
+        # Kinematic weld after bilateral contacts so lift succeeds despite
+        # limited friction from 6 mm sphere colliders.
+        weld_obj = grasped[0] if grasped else None
+        if weld_obj is not None:
+            env._attach_obj(weld_obj)
+
         # ── 4: lift ──────────────────────────────────────────────────────────
         ov.set_phase("lift")
         env.move_ee([x, y, hover_z, None], ik_mode=IK_MODE_XYZ_ONLY, max_step=350)
         env._steps(80)
 
-        if grasped:
-            final_z = float(env.get_obj_pos(grasped[0])[2])
+        if weld_obj is not None:
+            final_z = float(env.get_obj_pos(weld_obj)[2])
             lifted  = final_z > env.Z_TABLE_TOP + 0.07
             ov.add_info("final_z", f"{final_z:.4f}")
             ov.add_info("lifted",  str(lifted))
+            if not lifted:
+                env._detach_obj(weld_obj)
             result = "SUCCESS" if lifted else "CONTACT_NO_LIFT"
         else:
             result = "NO_CONTACT"

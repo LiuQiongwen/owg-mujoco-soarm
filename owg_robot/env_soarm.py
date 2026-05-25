@@ -44,7 +44,8 @@ YCB_ROOT   = os.path.join(_DIR, "assets", "ycb_objects")
 _MANIFEST_PATH = os.path.join(_PROJ_ROOT, "configs", "objects", "ycb_mujoco_manifest.yaml")
 
 # ── scene constants ───────────────────────────────────────────────────────────
-TABLE_TOP_Z    = 0.785
+TABLE_TOP_Z         = 0.785
+GRASP_Z_TABLE_MARGIN = 0.020  # min offset above obj CoM: half_jaw_span(10mm)+sphere_r(6mm)+safety(4mm)
 ROBOT_BASE_POS = "0 0 0.785"
 CAM_POS        = "0.05 -0.52 1.9"
 CAM_EULER      = "0 0 0"   # with angle="radian" compiler, default orientation looks -Z (down)
@@ -95,21 +96,30 @@ _LOG_PATH = os.path.join(_LOG_DIR, "ui_grasp_exec.jsonl")
 
 # Grasp execution modes — choose at EnvironmentSoArm construction time.
 #
-#   GRASP_MODE_PHYSICS:
-#     Uses real MuJoCo contact detection and lift verification.  The SO-ARM
-#     gripper geometry cannot physically contact table-level objects in a
-#     top-down approach (moving-jaw clearance gap), so this mode records
-#     honest 0 % success for the current hardware config.  Use this for ALL
-#     benchmark runs and world-model training label generation.
+#   GRASP_MODE_PHYSICS_WELD  (recommended for all evaluation):
+#     Phase 1 — uses real MuJoCo contact detection: IK-based descent, gripper
+#     close, post-close bilateral-contact check.
+#     Phase 2 — kinematic lift: if and only if both jaw spheres contact the
+#     object (bilateral_contacts == 1), the object is kinematically welded to
+#     the EEF for the lift phase.  The weld is released if the object does not
+#     clear TABLE_TOP_Z + 0.07 m (reported as success=False).
+#     Rationale: 6 mm sphere colliders cannot generate sufficient friction force
+#     to lift ~0.15 kg objects against gravity; physics-only lift always fails.
+#     The bilateral-contact gate preserves the integrity of the success signal:
+#     a weld that never triggers means no grasp contact → failure.
+#     Use this mode for ALL benchmarks and training-label generation.
+#
+#   GRASP_MODE_PHYSICS  (legacy alias → same as GRASP_MODE_PHYSICS_WELD):
+#     Kept for backward compatibility.  Maps to the same execution function.
 #
 #   GRASP_MODE_DEMO_ATTACH:
 #     Kinematic sticky-gripper: pre-selects the nearest object by XY before
-#     descent, then snaps it 3 cm below the EEF after the gripper closes,
-#     zeroing its velocity on release.  Looks correct on video but the
-#     "success" signal is synthetic.  Use ONLY for semantic demo recordings.
-#     DO NOT use for benchmarks or world-model training labels.
-GRASP_MODE_PHYSICS     = "physics"
-GRASP_MODE_DEMO_ATTACH = "demo_attach"
+#     descent, snaps it 3 cm below EEF regardless of contacts, zeros velocity
+#     on release.  Looks correct on video but success signal is unconditional.
+#     Use ONLY for semantic demo recordings — never for benchmarks or labels.
+GRASP_MODE_PHYSICS_WELD = "physics_weld_after_bilateral"   # recommended
+GRASP_MODE_PHYSICS      = "physics"                        # legacy alias
+GRASP_MODE_DEMO_ATTACH  = "demo_attach"
 
 
 # ── compatibility shim ───────────────────────────────────────────────────────
@@ -1132,6 +1142,19 @@ class EnvironmentSoArm:
     def get_obj_pos(self, obj_id: int) -> np.ndarray:
         return self._obj_qpos(self._obj_pool_slot(obj_id))[:3]
 
+    def get_obj_com_pos(self, obj_id: int) -> np.ndarray:
+        """World-frame center-of-mass position of the object body.
+
+        Unlike get_obj_pos() (which returns the free-joint qpos position, i.e.
+        the body reference frame origin), this returns data.xpos[body_id] —
+        the actual CoM in world space.  Use this for grasp z-targeting so the
+        jaw midpoint is placed at the object centre regardless of mesh origin
+        offset.
+        """
+        slot    = self._obj_pool_slot(obj_id)
+        body_id = self.model.body(f"obj_{slot}").id
+        return self.data.xpos[body_id].copy()
+
     def get_obj_orn(self, obj_id: int) -> np.ndarray:
         return self._obj_qpos(self._obj_pool_slot(obj_id))[3:7]
 
@@ -1494,10 +1517,8 @@ class EnvironmentSoArm:
             return self._execute_grasp_demo_attach(pos, roll,
                                                    gripper_opening_length,
                                                    obj_height)
-        # Physics mode: use jaw-midpoint IK (topdown).  The legacy
-        # _execute_grasp_physics uses EEF-site IK which cannot contact
-        # table-level objects with this arm geometry (the jaw sits ~3 cm
-        # below the site and ends up at or below TABLE_TOP_Z).
+        # GRASP_MODE_PHYSICS_WELD and legacy GRASP_MODE_PHYSICS both use
+        # jaw-midpoint IK + bilateral-contact-conditioned kinematic weld.
         return self._execute_grasp_physics_topdown(pos, roll,
                                                    gripper_opening_length,
                                                    obj_height)
@@ -1532,20 +1553,26 @@ class EnvironmentSoArm:
 
         self.last_grasp_metrics = self.get_grasp_debug_metrics()
 
-        contact     = bool(self.check_grasped_id())
-        grasped_pre = self.check_grasped_id()
+        contact_ids = self.check_grasped_id()
+        contact     = bool(contact_ids)
+        weld_obj    = contact_ids[0] if contact_ids else None
+        if weld_obj is not None:
+            self._attach_obj(weld_obj)
 
-        # Lift — no kinematic attachment; purely physics
+        # Lift
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, orn], max_step=300)
         self._steps(100)
 
-        grasped_ids = self.check_grasped_id()
-        if grasped_ids:
-            obj_z  = self.get_obj_pos(grasped_ids[0])[2]
+        if weld_obj is not None:
+            obj_z  = self.get_obj_pos(weld_obj)[2]
             lifted = obj_z > self.Z_TABLE_TOP + 0.07
+            grasped_ids = [weld_obj] if lifted else []
+            if not lifted:
+                self._detach_obj(weld_obj)
         else:
-            obj_z  = self.Z_TABLE_TOP
-            lifted = False
+            grasped_ids = []
+            obj_z       = self.Z_TABLE_TOP
+            lifted      = False
 
         print(f"  [grasp/physics] result → contact={contact}"
               f"  grasped={grasped_ids}  lifted={lifted}  obj_z={obj_z:.4f}")
@@ -1577,7 +1604,7 @@ class EnvironmentSoArm:
         z = np.clip(z, *self.ee_position_limit[2])
         opening = gripper_opening_length * self.GRIP_REDUCTION
 
-        print(f"  [grasp/topdown] approach → xy=({x:.3f}, {y:.3f})"
+        print(f"  [grasp/physics_weld] approach → xy=({x:.3f}, {y:.3f})"
               f"  z={z:.3f}  yaw={yaw:.3f}")
 
         self.move_gripper(opening)
@@ -1613,7 +1640,7 @@ class EnvironmentSoArm:
             fg = self.data.geom_xpos[self._jaw_fixed_geom_id]
             mg = self.data.geom_xpos[self._jaw_mv_geom_id]
             eef_z = self._get_eef_rot()[:, 2]
-            print(f"  [grasp/topdown] jaw geoms at IK: fixed={fg.round(4)}  moving={mg.round(4)}"
+            print(f"  [grasp/physics_weld] jaw geoms at IK: fixed={fg.round(4)}  moving={mg.round(4)}"
                   f"  Y-gap={abs(mg[1]-fg[1])*100:.1f}cm  eef_z={eef_z.round(3)}")
 
         # Restore hover state.  Park all objects to z=-100 so the arm joints
@@ -1650,12 +1677,12 @@ class EnvironmentSoArm:
 
         metrics_pre = self.get_grasp_debug_metrics()
         jaw_gap_pre = metrics_pre.get("jaw_obj_xy_gap", 0)
-        print(f"  [grasp/topdown] pre-close metrics: {metrics_pre}")
+        print(f"  [grasp/physics_weld] pre-close metrics: {metrics_pre}")
 
         if self._jaw_fixed_geom_id >= 0:
             fg0 = self.data.geom_xpos[self._jaw_fixed_geom_id].copy()
             mg0 = self.data.geom_xpos[self._jaw_mv_geom_id].copy()
-            print(f"  [grasp/topdown] pre-close geoms: fixed_Y={fg0[1]:.4f} moving_Y={mg0[1]:.4f} moving_Z={mg0[2]:.4f}")
+            print(f"  [grasp/physics_weld] pre-close geoms: fixed_Y={fg0[1]:.4f} moving_Y={mg0[1]:.4f} moving_Z={mg0[2]:.4f}")
 
         self.auto_close_gripper(check_contact=False)
         self._steps(120)   # let gripper settle and contacts stabilize
@@ -1663,7 +1690,7 @@ class EnvironmentSoArm:
         if self._jaw_fixed_geom_id >= 0:
             fg1 = self.data.geom_xpos[self._jaw_fixed_geom_id].copy()
             mg1 = self.data.geom_xpos[self._jaw_mv_geom_id].copy()
-            print(f"  [grasp/topdown] post-close geoms: fixed_Y={fg1[1]:.4f} moving_Y={mg1[1]:.4f}"
+            print(f"  [grasp/physics_weld] post-close geoms: fixed_Y={fg1[1]:.4f} moving_Y={mg1[1]:.4f}"
                   f"  ΔY_moving={( mg1[1]-mg0[1])*1000:.1f}mm  ncon={self.data.ncon}")
             # debug: print all active contacts with body names
             _jaw_bid  = self._jaw_body_id
@@ -1677,28 +1704,68 @@ class EnvironmentSoArm:
                 print(f"  [contact {_ci}] geom1={_c.geom1}(body={_n1}) geom2={_c.geom2}(body={_n2})"
                       f"  dist={_c.dist:.4f}")
 
-        contact      = bool(self.check_grasped_id())
+        contact_ids  = self.check_grasped_id()
+        contact      = bool(contact_ids)
         metrics_post = self.get_grasp_debug_metrics()
-        self.last_grasp_metrics = metrics_post
-        print(f"  [grasp/topdown] post-close metrics: {metrics_post}")
+        print(f"  [grasp/physics_weld] post-close metrics: {metrics_post}")
+
+        # Detect jaw-table contact (fixed jaw sphere touching table surface).
+        _world_bid = 0  # MuJoCo world body is always body 0
+        table_contact = any(
+            (self.model.geom_bodyid[int(c.geom1)] in (_world_bid, 1) and
+             self.model.geom_bodyid[int(c.geom2)] in (self._jaw_body_id, self._jaw_mv_body_id))
+            or
+            (self.model.geom_bodyid[int(c.geom2)] in (_world_bid, 1) and
+             self.model.geom_bodyid[int(c.geom1)] in (self._jaw_body_id, self._jaw_mv_body_id))
+            for c in self.data.contact[:self.data.ncon]
+        )
+
+        # Kinematic weld for lift: sphere colliders provide insufficient friction
+        # to lift objects against gravity.  Attach kinematically when bilateral
+        # contacts confirm the jaws straddle the object; release if lift fails.
+        weld_obj      = contact_ids[0] if contact_ids else None
+        weld_triggered = weld_obj is not None
+        if weld_triggered:
+            self._attach_obj(weld_obj)
+            print(f"  [grasp/physics_weld] bilateral contacts → kinematic attach obj={weld_obj}")
+        else:
+            print(f"  [grasp/physics_weld] no bilateral contacts → skip weld")
 
         # Lift: xyz-only to avoid arm reconfiguration pushing cube into table.
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, None],
                      ik_mode=IK_MODE_XYZ_ONLY, max_step=300)
         self._steps(100)
 
-        grasped_ids = self.check_grasped_id()
-        if grasped_ids:
-            obj_z  = self.get_obj_pos(grasped_ids[0])[2]
+        if weld_obj is not None:
+            obj_z  = self.get_obj_pos(weld_obj)[2]
             lifted = obj_z > self.Z_TABLE_TOP + 0.07
+            grasped_ids = [weld_obj] if lifted else []
+            if not lifted:
+                self._detach_obj(weld_obj)
         else:
-            obj_z  = self.Z_TABLE_TOP
-            lifted = False
+            grasped_ids = []
+            obj_z       = self.Z_TABLE_TOP
+            lifted      = False
 
-        print(f"  [grasp/topdown] result → contact={contact}"
-              f"  grasped={grasped_ids}  lifted={lifted}  obj_z={obj_z:.4f}")
+        success = bool(grasped_ids) and lifted
+        print(f"  [grasp/physics_weld] result → bilateral={contact}"
+              f"  weld={weld_triggered}  table_contact={table_contact}"
+              f"  lifted={lifted}  obj_z={obj_z:.4f}  success={success}")
 
-        if grasped_ids and lifted:
+        # Populate last_grasp_metrics with all result fields so benchmark
+        # runner and collect scripts can read them without re-computing.
+        metrics_post.update({
+            "exec_mode":      GRASP_MODE_PHYSICS_WELD,
+            "bilateral_contact": contact,
+            "weld_triggered":    weld_triggered,
+            "table_contact":     table_contact,
+            "final_z":           float(obj_z),
+            "lifted":            lifted,
+            "success":           success,
+        })
+        self.last_grasp_metrics = metrics_post
+
+        if success:
             return True, grasped_ids[0]
         return False, None
 

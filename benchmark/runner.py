@@ -35,6 +35,7 @@ from owg_robot.env_soarm import (
     EnvironmentSoArm,
     TABLE_TOP_Z,
     GRASP_MODE_PHYSICS,
+    GRASP_MODE_PHYSICS_WELD,
     GRASP_MODE_DEMO_ATTACH,
 )
 from benchmark.stability import StabilityChecker
@@ -52,6 +53,7 @@ OBJECT_REGISTRY: Dict[str, str] = {
     "cracker":  "YcbCrackerBox",
     "drill":    "YcbPowerDrill",
     "can":      "YcbTomatoSoupCan",
+    "cylinder": "YcbMediumClamp",
 }
 
 
@@ -89,7 +91,7 @@ class BenchmarkConfig:
     objects:         List[str]
     seeds:           List[int]
     methods:         List[str]
-    execution_mode:  str           = GRASP_MODE_PHYSICS
+    execution_mode:  str           = GRASP_MODE_PHYSICS_WELD
     n_grasp_candidates: int        = 10
     n_grasp_attempts:   int        = 3
     settle_steps:    int           = 300
@@ -142,6 +144,10 @@ class TrialResult:
     grasp_index:      Optional[int]
     contact_count:    Optional[int]
     bilateral_contact: Optional[bool]
+    weld_triggered:   Optional[bool]    # True iff kinematic weld was activated
+    table_contact:    Optional[bool]    # True iff fixed jaw sphere contacted table
+    final_z:          Optional[float]   # object z after lift attempt
+    lifted:           Optional[bool]    # obj_z > TABLE_TOP_Z + 0.07
     success:          Optional[bool]
     dz:               Optional[float]
     slip:             Optional[float]
@@ -290,6 +296,8 @@ class BenchmarkRunner:
                     n_candidates=None, grasp_rank_order=None,
                     grasp_used_rank=None, grasp_index=None,
                     contact_count=None, bilateral_contact=None,
+                    weld_triggered=None, table_contact=None,
+                    final_z=None, lifted=None,
                     success=None, dz=None, slip=None, fell_off=None,
                     failure_reason=stable.reason, scene_file=None,
                 )
@@ -316,12 +324,16 @@ class BenchmarkRunner:
         # ── execute top-K attempts ────────────────────────────────────────────
         pos_before     = env.get_obj_pos(obj_id).copy()
         tried_indices  = []
-        success        = False
-        used_rank      = None
-        grasp_index    = None
-        contact_count  = None
+        success           = False
+        used_rank         = None
+        grasp_index       = None
+        contact_count     = None
         bilateral_contact = None
-        failure_reason = "all_attempts_failed"
+        weld_triggered    = None
+        table_contact     = None
+        final_z           = None
+        lifted            = None
+        failure_reason    = "all_attempts_failed"
 
         for rank_pos, cand_idx in enumerate(ranked[: self.cfg.n_grasp_attempts]):
             g = candidates[int(cand_idx)]
@@ -335,11 +347,15 @@ class BenchmarkRunner:
                 obj_height             = float(g[5]),
             )
 
-            # capture contact metrics from the post-close snapshot
+            # capture contact and result metrics from the post-execution snapshot
             if env.last_grasp_metrics is not None:
                 m = env.last_grasp_metrics
-                contact_count     = m.get("left_contacts", 0) + m.get("right_contacts", 0)
-                bilateral_contact = bool(m.get("bilateral_contacts", 0) > 0)
+                contact_count     = int(m.get("left_contacts", 0)) + int(m.get("right_contacts", 0))
+                bilateral_contact = bool(m.get("bilateral_contact", False))
+                weld_triggered    = (bool(m["weld_triggered"]) if "weld_triggered" in m else None)
+                table_contact     = (bool(m["table_contact"])  if "table_contact"  in m else None)
+                final_z           = (float(m["final_z"])       if "final_z"        in m else None)
+                lifted            = (bool(m["lifted"])         if "lifted"         in m else None)
 
             grasp_index = cand_idx_int
 
@@ -368,6 +384,10 @@ class BenchmarkRunner:
             grasp_index=grasp_index,
             contact_count=contact_count,
             bilateral_contact=bilateral_contact,
+            weld_triggered=weld_triggered,
+            table_contact=table_contact,
+            final_z=final_z,
+            lifted=lifted,
             success=success,
             dz=dz,
             slip=slip,

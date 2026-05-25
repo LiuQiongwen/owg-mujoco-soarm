@@ -13,7 +13,8 @@ except ImportError:
     pass                                             # pybullet not available (MuJoCo-only env)
 from owg_robot.env_soarm import (EnvironmentSoArm,      # MuJoCo backend
                                   GRASP_MODE_PHYSICS,
-                                  GRASP_MODE_DEMO_ATTACH)
+                                  GRASP_MODE_DEMO_ATTACH,
+                                  GRASP_Z_TABLE_MARGIN)
 try:
     from owg_robot.camera import Camera
 except ImportError:
@@ -238,23 +239,26 @@ class RobotEnvUI:
 
         GR-ConvNet's camera→robot coordinate transform is calibrated for PyBullet
         and produces wrong x/y in MuJoCo. Instead, sample grasps directly from
-        the object's 3D position — identical to the collect_mujoco_transitions approach.
+        the object's 3D CoM position — identical to the collect_mujoco_transitions
+        approach.
+
+        Uses get_obj_com_pos() (body world-frame CoM) rather than get_obj_pos()
+        (free-joint qpos) so the jaw-midpoint IK target z equals the object CoM
+        height.  YCB meshes have varying origin offsets relative to the CoM; a
+        fixed GRASP_Z_OFFSET over qpos_z caused the jaw to sit above short objects
+        (e.g. Banana: 4 cm tall, offset was 6 cm) with no contact on close.
         """
         rng = np.random.default_rng(self.seed)
-        # GRASP_Z_OFFSET: added to obj body-origin z to get the jaw-midpoint
-        # target.  YCB "reoriented" meshes have their origin at the base of the
-        # object, so this offset is roughly object_half_height.  The jaw-midpoint
-        # IK (_execute_grasp_physics_topdown) places the jaw GEOM centre directly
-        # at this z, unlike the old EEF-site IK which required a larger offset
-        # to compensate for the ~3.4 cm EEF→jaw distance.
-        GRASP_Z_OFFSET = 0.06
         for obj_id in self.env.obj_ids:
-            pos = self.env.get_obj_pos(obj_id)
+            try:
+                com = self.env.get_obj_com_pos(obj_id)
+            except Exception:
+                com = self.env.get_obj_pos(obj_id)
             grasps = []
             for _ in range(self.n_grasp_attempts):
-                x   = float(pos[0])
-                y   = float(pos[1])
-                z   = float(pos[2] + GRASP_Z_OFFSET)
+                x   = float(com[0])
+                y   = float(com[1])
+                z   = float(com[2]) + GRASP_Z_TABLE_MARGIN
                 yaw = float(rng.uniform(-np.pi / 2, np.pi / 2))
                 opening = float(rng.uniform(0.04, 0.09))
                 grasps.append(np.array([x, y, z, yaw, opening, 0.05], dtype=np.float32))
