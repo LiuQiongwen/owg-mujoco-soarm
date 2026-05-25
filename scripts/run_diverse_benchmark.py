@@ -39,6 +39,56 @@ from benchmark.methods import build_method
 from benchmark.plotter import BenchmarkPlotter
 
 
+# ── config discovery ──────────────────────────────────────────────────────────
+
+_SEARCH_DIRS = [
+    ROOT / "configs" / "benchmark",
+    ROOT / "benchmark" / "configs",
+    ROOT / "benchmark",
+]
+
+
+def _find_configs() -> list:
+    seen, found = set(), []
+    for d in _SEARCH_DIRS:
+        if d.is_dir():
+            for p in sorted(d.glob("*.yaml")):
+                if p not in seen:
+                    seen.add(p)
+                    found.append(p)
+    return found
+
+
+def _resolve_config(path_str: str) -> Path:
+    candidates = [
+        Path(path_str),        # absolute or CWD-relative as given
+        ROOT / path_str,       # relative to project root
+    ]
+    stem = Path(path_str).name
+    for d in _SEARCH_DIRS:
+        candidates.append(d / stem)
+
+    for c in candidates:
+        if c.is_file():
+            return c.resolve()
+
+    abs_tried = Path(path_str).resolve()
+    lines = [
+        f"Config not found: {path_str!r}",
+        f"  Absolute path tried: {abs_tried}",
+    ]
+    available = _find_configs()
+    if available:
+        lines.append("  Available configs:")
+        for p in available:
+            lines.append(f"    {p.relative_to(ROOT)}")
+    else:
+        lines.append("  No configs found in search dirs:")
+        for d in _SEARCH_DIRS:
+            lines.append(f"    {d}")
+    raise FileNotFoundError("\n".join(lines))
+
+
 # ── argument parsing ──────────────────────────────────────────────────────────
 
 def _parse_args() -> argparse.Namespace:
@@ -47,7 +97,10 @@ def _parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     ap.add_argument("--config", default=None,
-                    help="Path to YAML config  (default: diverse_medium.yaml)")
+                    help="Path to YAML config (name, relative, or absolute; "
+                         "default: diverse_medium.yaml)")
+    ap.add_argument("--list-configs", action="store_true",
+                    help="List all discoverable benchmark configs and exit")
     ap.add_argument("--all", action="store_true",
                     help="Run easy + medium + hard in sequence")
     ap.add_argument("--difficulty",
@@ -133,6 +186,19 @@ def _plot(run_dir: Path, plots_dir: Path) -> None:
 def main() -> None:
     args = _parse_args()
 
+    # ── list-configs mode ─────────────────────────────────────────────────────
+    if args.list_configs:
+        found = _find_configs()
+        if found:
+            print("Available benchmark configs:")
+            for p in found:
+                print(f"  {p.relative_to(ROOT)}")
+        else:
+            print("No configs found in:")
+            for d in _SEARCH_DIRS:
+                print(f"  {d}")
+        return
+
     # ── plot-only mode ────────────────────────────────────────────────────────
     if args.plot_only:
         run_dir = Path(args.run_dir) if args.run_dir else Path("results/diverse_medium")
@@ -141,11 +207,7 @@ def main() -> None:
 
     # ── run all three difficulties ────────────────────────────────────────────
     if args.all:
-        configs = [
-            ROOT / "configs" / "benchmark" / "diverse_easy.yaml",
-            ROOT / "configs" / "benchmark" / "diverse_medium.yaml",
-            ROOT / "configs" / "benchmark" / "diverse_hard.yaml",
-        ]
+        configs = [_resolve_config(f"diverse_{d}.yaml") for d in ("easy", "medium", "hard")]
         run_dirs = []
         for c in configs:
             rd = _run_one(str(c), args)
@@ -157,9 +219,7 @@ def main() -> None:
         return
 
     # ── single config ─────────────────────────────────────────────────────────
-    config_path = args.config or str(
-        ROOT / "configs" / "benchmark" / "diverse_medium.yaml"
-    )
+    config_path = str(_resolve_config(args.config or "diverse_medium.yaml"))
     run_dir = _run_one(config_path, args)
 
     if not args.no_plots:
