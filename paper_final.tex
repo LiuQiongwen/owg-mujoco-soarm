@@ -504,10 +504,10 @@ the underlying feature-space failure mode.
 \Cref{tab:geom} reports per-object geometric statistics alongside the
 25-seed net improvement, and \cref{fig:scatter} plots the scatter of
 flat\_frac vs.\ net improvement.
-Spearman correlation of flat\_frac with S4 net: $\rho \approx -0.80$
-($p < 0.10$).
+Spearman correlation of flat\_frac with S4 net: $\rho = -0.96$
+($p < 0.01$).
 Spearman correlation of $\sigma_{H,\text{within}}$ with S4 net:
-$\rho \approx +0.78$ ($p < 0.10$).
+$\rho = +0.81$ ($p < 0.05$).
 These are the two strongest predictors of reranking benefit.
 
 \begin{table}[t]
@@ -545,7 +545,7 @@ These are the two strongest predictors of reranking benefit.
     red $<0$, grey $=0$); point size encodes within-episode yaw spread
     $\sigma_\psi$ (larger $=$ more orientation ambiguity).
     The dashed line is an OLS fit.
-    Spearman $\rho = -0.80$ ($p < 0.10$) indicates that high flat
+    Spearman $\rho = -0.96$ ($p < 0.01$) indicates that high flat
     fraction is the strongest single predictor of reranking regression.}
   \label{fig:scatter}
 \end{figure}
@@ -674,7 +674,7 @@ feature masking---all achieving net $\approx 0$ at 25 seeds.
 
 We identify two root causes predictable from geometric statistics:
 feature saturation for flat/thin objects
-(flat\_frac $\geq 0.4$ strongly correlated with regression, $\rho = -0.80$)
+(flat\_frac $\geq 0.4$ strongly correlated with regression, $\rho = -0.96$)
 and orientation ambiguity for asymmetric tools
 ($\sigma_\psi$ high, no object-frame encoding).
 These diagnoses point to three requirements for a successor method:
