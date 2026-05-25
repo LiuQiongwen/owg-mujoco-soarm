@@ -215,7 +215,7 @@ def plot_difficulty_comparison(run_dirs_by_diff: dict, plots_dir: Path) -> list:
     ax.legend(loc="upper right", fontsize=10, framealpha=0.9,
               title="Difficulty", title_fontsize=9)
     ax.set_title("Grasp Success Rate vs. Difficulty — 50 seeds × 5 objects\n"
-                 "(bars averaged across geometry + random methods; 95% Wilson CI)",
+                 "(bars averaged across geometry + random + LGGSN methods; 95% Wilson CI)",
                  fontsize=11)
 
     fig.tight_layout()
