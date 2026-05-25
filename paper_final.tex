@@ -626,13 +626,16 @@ complementary benchmark on a physical SO-ARM101 robot arm simulated in
 MuJoCo, varying spawn-pose difficulty across three conditions:
 \emph{easy} (centred spawn, no yaw), \emph{medium} (random yaw, moderate
 XY jitter), and \emph{hard} (large yaw + XY variation + clutter).
-\Cref{fig:difficulty} reports success rates for the geometry-selection
-baseline averaged across 50 seeds $\times$ 5 objects.
+\Cref{fig:difficulty} reports success rates for three methods---geometry,
+random, and LGGSN---averaged across 50 seeds $\times$ 5 objects.
+All three methods perform within noise of one another (geometry 65--71\%,
+random 67--72\%, LGGSN 61--69\% across difficulties), confirming that in
+the position-only candidate setting the pairwise reranker provides no
+additional signal beyond centroid proximity.
 Structured objects (Can, Drill) degrade monotonically with difficulty
 ($95\% \to 71\% \to 51\%$ for Can), while Banana \emph{improves} from
-easy to medium because centred top-down approach consistently lands on the
-curved tip---a failure mode exposed by the fixed spawn but partially
-resolved by pose variation.
+easy to medium because a centred top-down approach consistently lands on
+the curved tip---a failure mode partially resolved by pose variation.
 These results confirm that pose variation is a primary driver of
 difficulty and that per-object geometry determines sensitivity.
 
@@ -641,9 +644,11 @@ difficulty and that per-object geometry determines sensitivity.
   \includegraphics[width=\columnwidth]{fig4_difficulty_comparison.pdf}
   \caption{Grasp success rate on SO-ARM101 (MuJoCo) across three
     difficulty levels (50 seeds $\times$ 5 objects; bars averaged over
-    geometry and random methods; 95\,\% Wilson CI).
+    geometry, random, and LGGSN methods; 95\,\% Wilson CI).
     Can and Drill degrade monotonically; Banana inverts because a centred
-    top-down approach always contacts the curved tip in easy mode.}
+    top-down approach always contacts the curved tip in easy mode.
+    All three methods perform within noise, confirming geometry as the
+    dominant factor over method choice.}
   \label{fig:difficulty}
 \end{figure}
 
