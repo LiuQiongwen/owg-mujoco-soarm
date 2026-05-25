@@ -222,11 +222,21 @@ class WorldModelMethod(MethodBase):
             obj_info.get("pos", [0.0, 0.0, 0.0]), dtype=np.float32
         )
 
-        # 9-dim features: grasp(6) + obj_pos(3)
+        # pc_stats (9-dim) — zeros if not available
+        try:
+            from data.transition_logger import compute_pc_stats as _cps
+            pc_stats = _cps(obs, obj_id)
+        except Exception:
+            pc_stats = np.zeros(9, dtype=np.float32)
+
+        # features: grasp(6) + obj_pos(3) [+ pc_stats(9) if model expects 18-dim]
+        input_dim = self._model.net[0].in_features
         feats = []
         for g in candidates:
-            feat = np.concatenate([np.asarray(g[:6], dtype=np.float32), obj_pos])
-            feats.append(feat)
+            base = np.concatenate([np.asarray(g[:6], dtype=np.float32), obj_pos])
+            if input_dim >= 18:
+                base = np.concatenate([base, pc_stats])
+            feats.append(base[:input_dim])
 
         X = torch.tensor(np.array(feats), dtype=torch.float32)
         if self._norm_mean is not None:

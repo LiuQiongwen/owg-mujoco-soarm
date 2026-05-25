@@ -87,8 +87,9 @@ def _load_dataset(results_dirs: list[Path]) -> tuple[np.ndarray, np.ndarray]:
                 skipped += 1
                 continue
 
-            g = candidates[int(gi)]           # (6,): x,y,z,yaw,opening,H
-            feat = np.concatenate([g, obj_pos])  # (9,)
+            g        = candidates[int(gi)]          # (6,): x,y,z,yaw,opening,H
+            pc_stats = np.array(scene.get("pc_stats") or [0.0]*9, dtype=np.float32)
+            feat     = np.concatenate([g, obj_pos, pc_stats])  # (18,)
             Xs.append(feat)
             ys.append(float(bool(r["success"])))
 
@@ -145,8 +146,9 @@ def train(args):
     train_dl = DataLoader(train_ds, batch_size=args.batch, shuffle=True)
     val_dl   = DataLoader(val_ds,   batch_size=256)
 
+    input_dim = X.shape[1]
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model  = WorldModelMLP(input_dim=9, hidden=args.hidden).to(device)
+    model  = WorldModelMLP(input_dim=input_dim, hidden=args.hidden).to(device)
     opt    = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
     sched  = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=args.epochs)
 
@@ -154,7 +156,7 @@ def train(args):
     pos_weight = torch.tensor([(1 - y.mean()) / y.mean()]).to(device)
     criterion  = nn.BCELoss(reduction="none")
 
-    print(f"\nTraining {model.__class__.__name__}  input=9  hidden={args.hidden}  "
+    print(f"\nTraining {model.__class__.__name__}  input={input_dim}  hidden={args.hidden}  "
           f"device={device}  epochs={args.epochs}")
     print(f"{'Epoch':>6}  {'loss':>8}  {'val_acc':>8}  {'val_auc':>8}")
 
@@ -201,12 +203,14 @@ def train(args):
     out = ROOT / "data" / "world_model_ckpt.pt"
     torch.save({
         "model_state": best_state,
-        "input_dim":   9,
+        "input_dim":   input_dim,
         "hidden":      args.hidden,
         "norm_mean":   mu.squeeze().tolist(),
         "norm_std":    sd.squeeze().tolist(),
         "feature_names": ["x","y","z","yaw","opening","obj_height",
-                          "obj_x","obj_y","obj_z"],
+                          "obj_x","obj_y","obj_z",
+                          "pc_cx","pc_cy","pc_cz","pc_sx","pc_sy","pc_sz",
+                          "pc_minz","pc_maxz","pc_npts"],
         "val_acc":     best_val_acc,
     }, out)
     print(f"\nSaved → {out}  (val_acc={best_val_acc:.3f})")

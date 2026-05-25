@@ -136,6 +136,7 @@ class DiverseBenchmarkRunner:
         ) if config.stability_check else None
         self._env: Optional[EnvironmentSoArm] = None
         self._trial_id = 0
+        self._last_pc_stats: list = [0.0] * 9
 
     # ── public entry point ────────────────────────────────────────────────────
 
@@ -280,6 +281,13 @@ class DiverseBenchmarkRunner:
         obs     = env.get_obs(pointcloud=True)
         obj_pos = env.get_obj_pos(obj_id)
 
+        # compute pc_stats for world-model features
+        try:
+            from data.transition_logger import compute_pc_stats as _compute_pc_stats
+            self._last_pc_stats = _compute_pc_stats(obs, obj_id).tolist()
+        except Exception:
+            self._last_pc_stats = [0.0] * 9
+
         grasp_rng  = np.random.default_rng(scene.seed + 9999)
         candidates = _sample_candidates(obj_pos, grasp_rng, self.cfg)
         n_cands    = len(candidates)
@@ -398,6 +406,7 @@ class DiverseBenchmarkRunner:
                 "obj_pos":    env.get_obj_pos(obj_id).tolist(),
                 "qpos":       env.data.qpos.tolist(),
                 "qvel":       env.data.qvel.tolist(),
+                "pc_stats":   self._last_pc_stats,
             }
             with open(fname, "w") as f:
                 _json.dump(state, f)

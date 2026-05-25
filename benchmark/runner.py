@@ -463,9 +463,12 @@ def _sample_candidates(
 
     xs   = obj_pos[0] + rng.uniform(-sc.spread_xy, sc.spread_xy, N)
     ys   = obj_pos[1] + rng.uniform(-sc.spread_xy, sc.spread_xy, N)
-    zs   = np.full(N, obj_pos[2] + sc.z_offset)
     yaws = rng.uniform(sc.yaw_lo, sc.yaw_hi, N)
     ops  = rng.uniform(sc.opening_lo, sc.opening_hi, N)
-    Hs   = np.full(N, max(0.05, obj_pos[2] - TABLE_TOP_Z))
+    H_val = max(0.05, obj_pos[2] - TABLE_TOP_Z)
+    # Ensure grasp_z stays >= TABLE_TOP_Z + H + 3cm after descent
+    z_val = max(obj_pos[2] + sc.z_offset, TABLE_TOP_Z + H_val + 0.03)
+    zs   = np.full(N, z_val)
+    Hs   = np.full(N, H_val)
 
     return np.column_stack([xs, ys, zs, yaws, ops, Hs]).astype(np.float32)

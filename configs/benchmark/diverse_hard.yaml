@@ -33,7 +33,7 @@ methods:
 execution_mode: physics_weld_after_bilateral
 
 n_grasp_candidates: 10
-n_grasp_attempts: 3
+n_grasp_attempts: 5
 settle_steps: 400     # extra settle time for clutter interactions
 stability_check: true
 verbose: true
@@ -44,7 +44,7 @@ spawn:
   drop_z_off:  0.15
 
 sampling:
-  spread_xy:  0.04
+  spread_xy:  0.02
   z_offset:   0.025
   yaw_lo:    -1.5708
   yaw_hi:     1.5708
