@@ -618,6 +618,34 @@ below a threshold~$\delta$.
 This approach is agnostic to failure mode (saturation vs.\ orientation
 ambiguity) and does not require object-class labels at inference time.
 
+\subsection{Difficulty Generalization on SO-ARM101}
+
+To situate the PyBullet evaluation in a broader context, we ran a
+complementary benchmark on a physical SO-ARM101 robot arm simulated in
+MuJoCo, varying spawn-pose difficulty across three conditions:
+\emph{easy} (centred spawn, no yaw), \emph{medium} (random yaw, moderate
+XY jitter), and \emph{hard} (large yaw + XY variation + clutter).
+\Cref{fig:difficulty} reports success rates for the geometry-selection
+baseline averaged across 50 seeds $\times$ 5 objects.
+Structured objects (Can, Drill) degrade monotonically with difficulty
+($95\% \to 71\% \to 51\%$ for Can), while Banana \emph{improves} from
+easy to medium because centred top-down approach consistently lands on the
+curved tip---a failure mode exposed by the fixed spawn but partially
+resolved by pose variation.
+These results confirm that pose variation is a primary driver of
+difficulty and that per-object geometry determines sensitivity.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{fig4_difficulty_comparison.pdf}
+  \caption{Grasp success rate on SO-ARM101 (MuJoCo) across three
+    difficulty levels (50 seeds $\times$ 5 objects; bars averaged over
+    geometry and random methods; 95\,\% Wilson CI).
+    Can and Drill degrade monotonically; Banana inverts because a centred
+    top-down approach always contacts the curved tip in easy mode.}
+  \label{fig:difficulty}
+\end{figure}
+
 \subsection{Statistical Power}
 
 At $N = 25$ seeds, the bootstrap 80\,\% confidence interval for per-object
