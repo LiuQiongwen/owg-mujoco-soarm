@@ -81,6 +81,7 @@ class SceneConfig:
     spawn_y:     float  # m
     spawn_z:     float  # m  (drop height, always TABLE_TOP_Z + offset)
     spawn_yaw:   float  # rad — initial object rotation around world Z
+    spawn_tilt:  float = 0.0  # rad — X-axis tilt applied before yaw (π/2 = lying on side)
 
     clutter_ycb_names: List[str]          = field(default_factory=list)
     clutter_positions:  List[List[float]] = field(default_factory=list)  # [[x,y,z], ...]
@@ -138,7 +139,9 @@ def generate_scene(
         cx = float(rng.uniform(x_lo, x_hi))
         cy = float(rng.uniform(y_lo, y_hi))
 
-    cz = TABLE_TOP_Z + _DROP_Z_OFFSET
+    # cylinders lie on their side — spawn close to table to avoid bouncing
+    drop_offset = 0.04 if obj_name == "cylinder" else _DROP_Z_OFFSET
+    cz = TABLE_TOP_Z + drop_offset
 
     yaw_lo, yaw_hi = difficulty.spawn_yaw_range
     yaw = float(rng.uniform(yaw_lo, yaw_hi)) if yaw_lo != yaw_hi else 0.0
@@ -176,6 +179,9 @@ def generate_scene(
         if not placed:
             break  # couldn't fit another object — stop early
 
+    # cylinders are unstable standing upright — spawn lying on their side
+    spawn_tilt = math.pi / 2 if obj_name == "cylinder" else 0.0
+
     return SceneConfig(
         difficulty         = difficulty.name,
         obj_name           = obj_name,
@@ -185,6 +191,7 @@ def generate_scene(
         spawn_y            = cy,
         spawn_z            = cz,
         spawn_yaw          = yaw,
+        spawn_tilt         = spawn_tilt,
         clutter_ycb_names  = clutter_ycb,
         clutter_positions  = clutter_pos,
     )

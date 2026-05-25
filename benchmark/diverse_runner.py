@@ -24,12 +24,25 @@ Usage
 
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+
+
+def _make_spawn_quat(yaw: float, tilt: float) -> List[float]:
+    """Return spawn quaternion [w,x,y,z] = q_yaw(Z) ⊗ q_tilt(X).
+
+    tilt=0   → upright;  tilt=π/2 → lying on side (used for cylinder).
+    Hamilton product of q_yaw=[cy,0,0,sy] and q_tilt=[ct,st,0,0]:
+      w=cy·ct,  x=cy·st,  y=sy·st,  z=sy·ct
+    """
+    ct, st = math.cos(tilt / 2), math.sin(tilt / 2)
+    cy, sy = math.cos(yaw  / 2), math.sin(yaw  / 2)
+    return [cy * ct, cy * st, sy * st, sy * ct]
 
 from owg_robot.env_soarm import (
     EnvironmentSoArm,
@@ -222,7 +235,7 @@ class DiverseBenchmarkRunner:
             scene.ycb_name,
             name = scene.obj_name,
             pos  = [scene.spawn_x, scene.spawn_y, scene.spawn_z],
-            yaw  = scene.spawn_yaw,   # applied as Z-axis quaternion in load_obj
+            orn  = _make_spawn_quat(scene.spawn_yaw, scene.spawn_tilt),
         )
 
         # ── spawn clutter objects ─────────────────────────────────────────────
