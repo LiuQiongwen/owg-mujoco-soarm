@@ -671,6 +671,8 @@ class EnvironmentSoArm:
         mujoco.mj_step(self.model, self.data)
         if self._welded_obj_id is not None:
             self._sync_kinematic_grasp()
+        if getattr(self, '_step_hook', None) is not None:
+            self._step_hook()
         if self.vis and self._viewer is not None:
             self._viewer.sync()
             time.sleep(1 / 60)
@@ -884,31 +886,36 @@ class EnvironmentSoArm:
         w_ori:          float = 0.3,
         pos_tol:        float = 5e-3,
         n_outer:        int   = 8,
+        reset_to_home:  bool  = True,
     ) -> Tuple[bool, float, float]:
         """Jaw-midpoint–targeted top-down IK.
 
         Targets the MIDPOINT of the two jaw bodies at `target_jaw_mid` while
         driving the site Z-axis toward world -Z (top-down orientation).
 
-        Always resets to HOME_QPOS before solving so the IK starts from a
-        well-conditioned configuration regardless of the current arm posture.
-        This is safe because _move_ee_internal saves and restores qpos around
-        this call.
+        reset_to_home: if True (default), resets to HOME_QPOS for a
+        reproducible start — safe when called via _move_ee_internal which
+        saves/restores qpos around the call.  Set False when called from
+        _execute_grasp_physics_topdown so the IK starts from the hover arm
+        state, keeping the arm in the same workspace.
 
         Returns (converged, jaw_mid_pos_err, ori_err).
         """
-        # Reset to HOME_QPOS for a reproducible, well-conditioned IK start
-        for adr, q in zip(self._arm_qpos_adr, HOME_QPOS):
-            self.data.qpos[adr] = q
-        mujoco.mj_forward(self.model, self.data)
+        if reset_to_home:
+            for adr, q in zip(self._arm_qpos_adr, HOME_QPOS):
+                self.data.qpos[adr] = q
+            mujoco.mj_forward(self.model, self.data)
 
         target_rot = make_topdown_rotation(yaw)
 
         # Phase 1: position-only warm-start (1/3 of budget).
         # Anchors the arm near the target xyz before the orientation term can
         # push it away — mirrors the two-phase approach in _solve_ik_6dof.
+        # Use geom midpoint (actual jaw tips) not body midpoint so the IK
+        # targets the same physical point as _solve_ik_jaw_pos_only — critical
+        # for tall objects where body/geom offset is amplified by orientation.
         warmup = iters // 3
-        offset = self._get_eef_pos() - self._get_jaw_midpoint()
+        offset = self._get_eef_pos() - self._get_jaw_geom_midpoint()
         adjusted_site_target = target_jaw_mid + offset
         for _ in range(warmup):
             if self._ik_step(adjusted_site_target):
@@ -921,7 +928,7 @@ class EnvironmentSoArm:
         pe = oe = float("inf")
         for _ in range(n_outer):
             # Recompute offset from the current (improved) arm state
-            offset = self._get_eef_pos() - self._get_jaw_midpoint()
+            offset = self._get_eef_pos() - self._get_jaw_geom_midpoint()
             adjusted_site_target = target_jaw_mid + offset
 
             pe_site, oe = float("inf"), float("inf")
@@ -931,7 +938,7 @@ class EnvironmentSoArm:
                 if pe_site < pos_tol:
                     break
 
-        pe = float(np.linalg.norm(self._get_jaw_midpoint() - target_jaw_mid))
+        pe = float(np.linalg.norm(self._get_jaw_geom_midpoint() - target_jaw_mid))
         return pe < pos_tol, pe, oe
 
     def _solve_ik_jaw_pos_only(
@@ -941,6 +948,7 @@ class EnvironmentSoArm:
         pos_tol:        float = 5e-3,
         n_outer:        int   = 8,
         reset_to_home:  bool  = True,
+        silent:         bool  = False,
     ) -> Tuple[bool, float, float]:
         """Position-only IK targeting the jaw GEOM midpoint with natural arm orientation.
 
@@ -972,8 +980,33 @@ class EnvironmentSoArm:
                     break
         geom_pos = self._get_jaw_geom_midpoint()
         pe = float(np.linalg.norm(geom_pos - target_jaw_mid))
-        print(f"  [ik_jaw_geom] target={target_jaw_mid.round(4)} solved_geom_mid={geom_pos.round(4)} pe={pe*100:.2f}cm")
+        if not silent:
+            print(f"  [ik_jaw_geom] target={target_jaw_mid.round(4)} solved_geom_mid={geom_pos.round(4)} pe={pe*100:.2f}cm")
         return pe < pos_tol, pe, 0.0
+
+    def compute_ik_reachability(self, positions: list) -> list:
+        """IK position error for each (x,y,z) target, probed from HOME_QPOS.
+
+        Saves and restores full arm state — no side effects on current arm pose.
+        pe_ik is constant within episode (all candidates share the same CoM target)
+        but discriminative across episodes (different object spawn positions).
+        """
+        saved_qpos = self.data.qpos.copy()
+        saved_qvel = self.data.qvel.copy()
+        saved_ctrl = self.data.ctrl.copy()
+        pe_iks = []
+        for pos in positions:
+            for adr, q in zip(self._arm_qpos_adr, HOME_QPOS):
+                self.data.qpos[adr] = q
+            mujoco.mj_forward(self.model, self.data)
+            _, pe, _ = self._solve_ik_jaw_pos_only(
+                np.asarray(pos, dtype=float), reset_to_home=False, silent=True)
+            pe_iks.append(float(pe))
+        self.data.qpos[:] = saved_qpos
+        self.data.qvel[:] = saved_qvel
+        self.data.ctrl[:] = saved_ctrl
+        mujoco.mj_forward(self.model, self.data)
+        return pe_iks
 
     # ── EEF motion ────────────────────────────────────────────────────────────
 
@@ -1627,6 +1660,11 @@ class EnvironmentSoArm:
         # symmetrically in Y with ~5 mm clearance on each side, so that
         # restoring the object after teleport finds no Y-penetration and closing
         # sweeps the moving jaw tip into bilateral contact.
+        # Position-only IK (jaw_pos_only) is used here — jaw_topdown was tested
+        # and reverted twice (Tier-1 and again post-v5d): the orientation
+        # constraint corrupts jaw centering at SO-ARM101 reach limits, causing
+        # symmetric objects (Pear) to regress catastrophically while only
+        # marginally helping asymmetric ones (MustardBottle, PowerDrill).
         qpos_saved = self.data.qpos.copy()
         qvel_saved = self.data.qvel.copy()
 
@@ -1972,11 +2010,19 @@ class EnvironmentSoArm:
                 print(f"Exceeded {self.N_GRASP_ATTEMPTS} grasping attempts.")
                 return False, obj_id, None
 
-            # grasp tuple: (x, y, z, yaw, opening_len, obj_height, ...)
-            x, y, z   = float(g[0]), float(g[1]), float(g[2])
-            yaw        = float(g[3]) if len(g) > 3 else 0.0
-            opening    = float(g[4]) if len(g) > 4 else 0.05
-            obj_height = float(g[5]) if len(g) > 5 else 0.05
+            # grasp: dict (from IK prefilter) or legacy tuple (x,y,z,yaw,opening,obj_height)
+            if isinstance(g, dict):
+                _pos = g.get("position", [0., 0., 0.])
+                _rpy = g.get("rpy", [np.pi, 0., 0.])
+                x, y, z    = float(_pos[0]), float(_pos[1]), float(_pos[2])
+                yaw        = float(_rpy[2]) if len(_rpy) > 2 else 0.0
+                opening    = float(g.get("width", 0.05))
+                obj_height = float((g.get("_metrics") or {}).get("H", 0.05))
+            else:
+                x, y, z   = float(g[0]), float(g[1]), float(g[2])
+                yaw        = float(g[3]) if len(g) > 3 else 0.0
+                opening    = float(g[4]) if len(g) > 4 else 0.05
+                obj_height = float(g[5]) if len(g) > 5 else 0.05
 
             success, grasped_id = self._execute_grasp((x, y, z), yaw, opening, obj_height)
             if success:
@@ -2098,6 +2144,13 @@ class EnvironmentSoArm:
         os.makedirs(_LOG_DIR, exist_ok=True)
         if grasp is None:
             x = y = z = yaw = opening = height = None
+        elif isinstance(grasp, dict):
+            _pos = grasp.get("position", [0., 0., 0.])
+            _rpy = grasp.get("rpy", [np.pi, 0., 0.])
+            x, y, z = float(_pos[0]), float(_pos[1]), float(_pos[2])
+            yaw     = float(_rpy[2]) if len(_rpy) > 2 else None
+            opening = float(grasp.get("width", 0.05))
+            height  = float((grasp.get("_metrics") or {}).get("H", 0.05))
         else:
             x, y, z = float(grasp[0]), float(grasp[1]), float(grasp[2])
             yaw     = float(grasp[3]) if len(grasp) > 3 else None

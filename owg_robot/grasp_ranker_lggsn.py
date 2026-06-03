@@ -26,6 +26,7 @@ FEATURE_COLS_FULL = FEATURE_COLS_BASE + ["dist_to_centroid", "z_rel"]
 FEATURE_COLS_EXT  = FEATURE_COLS_FULL + [
     "local_point_density", "normal_consistency", "contact_width_ratio",
 ]
+FEATURE_COLS_EXT2 = FEATURE_COLS_EXT + ["pe_ik"]
 
 # Module-level alias kept for backward-compat imports
 FEATURE_COLS = FEATURE_COLS_FULL if (_USE_DIST and _USE_ZREL) else (
@@ -100,6 +101,7 @@ class LggsnGraspRanker:
             self._use_dist = False
             self._use_zrel = False
             self._use_pc_feats = False
+            self._use_pe_ik = False
             self._feature_cols = FEATURE_COLS_BASE[:]
             print(f"[LggsnGraspRanker] legacy 12-dim checkpoint — "
                   f"dist_to_centroid and z_rel disabled for this instance")
@@ -107,16 +109,24 @@ class LggsnGraspRanker:
             self._use_dist = True
             self._use_zrel = True
             self._use_pc_feats = False
+            self._use_pe_ik = False
             self._feature_cols = FEATURE_COLS_FULL[:]
         elif ckpt_dim == 17:
             self._use_dist = True
             self._use_zrel = True
             self._use_pc_feats = True
+            self._use_pe_ik = False
             self._feature_cols = FEATURE_COLS_EXT[:]
+        elif ckpt_dim == 18:
+            self._use_dist = True
+            self._use_zrel = True
+            self._use_pc_feats = True
+            self._use_pe_ik = True
+            self._feature_cols = FEATURE_COLS_EXT2[:]
         else:
             raise ValueError(
                 f"Unsupported checkpoint geom_dim={ckpt_dim} (mlp_in={mlp_in_dim}) "
-                f"in {model_path}; expected 12, 14, or 17"
+                f"in {model_path}; expected 12, 14, 17, or 18"
             )
 
         q_tag = f" + query_emb({_n_queries}×{_query_dim})" if _has_query_emb else ""
@@ -294,6 +304,13 @@ class LggsnGraspRanker:
                     contact_width_ratio(pos, R, width, episode_pc),
                 ])
             extra.append(np.array(pc_rows, dtype=np.float32))
+
+        if self._use_pe_ik:
+            pe_vals = []
+            for g_raw in grasps:
+                g_ = self._unwrap_grasp(g_raw)
+                pe_vals.append(float((g_.get("_metrics") or {}).get("pe_ik", 0.0)))
+            extra.append(np.array(pe_vals, dtype=np.float32).reshape(-1, 1))
 
         if extra:
             return np.concatenate([arr] + extra, axis=1)

@@ -78,21 +78,19 @@ class RobotEnvUI:
             self.img_size = (self.env.camera.width, self.env.camera.height)
             print("[INFO] MuJoCo backend: EnvironmentSoArm (SO-ARM101)")
         else:
-            # ── PyBullet / UR5 backend (default) ───────────────────────────
-            cam_center = (self.cfg.camera.center_x, self.cfg.camera.center_y,
-                          self.cfg.camera.center_z)
-            cam_target = (self.cfg.camera.target_x, self.cfg.camera.target_y,
-                          self.cfg.camera.target_z)
-            self.img_size = (self.cfg.camera.img_size, self.cfg.camera.img_size)
-            self.camera = Camera(cam_center, cam_target, self.cfg.camera.znear,
-                                 self.cfg.camera.zfar, self.img_size,
-                                 self.cfg.camera.fov)
-            self.env = Environment(self.camera,
-                                   vis=True,
-                                   asset_root='./owg_robot/assets',
-                                   debug=False,
-                                   finger_length=self.cfg.finger_length,
-                                   n_grasp_attempts=self.cfg.n_grasp_attempts)
+            # ── Fallback: any non-mujoco backend string uses EnvironmentSoArm
+            _mj_vis = bool(getattr(self.cfg.policy, "vis", False))
+            _grasp_mode = getattr(self.cfg, "grasp_mode", GRASP_MODE_PHYSICS)
+            self.env = EnvironmentSoArm(
+                vis=_mj_vis,
+                debug=False,
+                finger_length=self.cfg.finger_length,
+                n_grasp_attempts=self.cfg.n_grasp_attempts,
+                grasp_mode=_grasp_mode,
+            )
+            self.camera = self.env.camera
+            self.img_size = (self.env.camera.width, self.env.camera.height)
+            print("[INFO] Fallback to EnvironmentSoArm (SO-ARM101)")
 
         # 自然语言级执行日志（query -> action -> success）
         os.makedirs("logs", exist_ok=True)
@@ -170,6 +168,20 @@ class RobotEnvUI:
             obj_list = scene_objects[:n_objects]
         else:
             obj_list = self.objects.obj_names[:n_objects]
+            # Guarantee the prompted object is in the scene.
+            # Skip when --object already pins the pool to one name.
+            _prompt = getattr(self.cfg, "prompt", None)
+            _pin    = getattr(self.cfg, "object", None)
+            if _prompt and n_objects > 0 and _pin is None:
+                _pl = _prompt.strip().lower()
+                _target = next(
+                    (n for n in self.objects.obj_names
+                     if n.lower() in _pl or _pl in n.lower()),
+                    None,
+                )
+                if _target is not None and _target not in obj_list:
+                    _others = [n for n in self.objects.obj_names if n != _target]
+                    obj_list = [_target] + _others[:n_objects - 1]
 
         # Pre-register all object types → single model rebuild before spawn loop
         if self.backend == "mujoco" and hasattr(self.env, "preload_pool"):
@@ -248,20 +260,50 @@ class RobotEnvUI:
         fixed GRASP_Z_OFFSET over qpos_z caused the jaw to sit above short objects
         (e.g. Banana: 4 cm tall, offset was 6 cm) with no contact on close.
         """
+        IK_PE_THRESHOLD = float(os.environ.get("IK_PE_THRESH", "0.005"))
         rng = np.random.default_rng(self.seed)
         for obj_id in self.env.obj_ids:
             try:
                 com = self.env.get_obj_com_pos(obj_id)
             except Exception:
                 com = self.env.get_obj_pos(obj_id)
+
+            gx, gy = float(com[0]), float(com[1])
+            gz     = float(com[2]) + GRASP_Z_TABLE_MARGIN
+
+            candidates = [
+                (float(rng.uniform(-np.pi / 2, np.pi / 2)),
+                 float(rng.uniform(0.04, 0.09)))
+                for _ in range(self.n_grasp_attempts)
+            ]
+
+            target = np.array([gx, gy, gz])
+            pe_iks = self.env.compute_ik_reachability([target] * len(candidates))
+            pe = pe_iks[0]  # same target for all candidates within episode
+
+            reachable = [i for i, e in enumerate(pe_iks) if e <= IK_PE_THRESHOLD]
+            if reachable:
+                use_idx = reachable
+                if len(reachable) < len(candidates):
+                    print(f"  [IK prefilter] pe_ik={pe*1000:.1f}mm OK "
+                          f"({len(use_idx)}/{len(candidates)} retained)")
+            else:
+                use_idx = list(range(min(3, len(candidates))))
+                print(f"  [IK prefilter] pe_ik={pe*1000:.1f}mm "
+                      f"> {IK_PE_THRESHOLD*1000:.0f}mm threshold; "
+                      f"fallback to first {len(use_idx)}")
+
             grasps = []
-            for _ in range(self.n_grasp_attempts):
-                x   = float(com[0])
-                y   = float(com[1])
-                z   = float(com[2]) + GRASP_Z_TABLE_MARGIN
-                yaw = float(rng.uniform(-np.pi / 2, np.pi / 2))
-                opening = float(rng.uniform(0.04, 0.09))
-                grasps.append(np.array([x, y, z, yaw, opening, 0.05], dtype=np.float32))
+            for i in use_idx:
+                yaw, opening = candidates[i]
+                grasps.append({
+                    "position": [gx, gy, gz],
+                    "rpy":      [np.pi, 0.0, yaw],
+                    "width":    opening,
+                    "score":    0.0,
+                    "_metrics": {"H": 0.05, "pe_ik": pe},
+                })
+
             self.env.set_obj_grasps(obj_id, grasps, grasp_rects=[])
 
     def setup_grasps(self,
@@ -354,19 +396,13 @@ class RobotEnvUI:
         for _ in range(30):
             self.env.step_simulation()
 
-        if not success_grasp or not success_target:
+        if not success_grasp:
             print(f'Action failed...')
             success, done = False, False
-
-        elif action['input'] != action['target_id']:
-            # successfull action, but not terminal
-            print(f'Done {action["action"]} {action["input"]}')
-            success, done = True, False
-
         else:
-            # successfull terminal action
             print(f'Done {action["action"]} {action["input"]}')
-            success, done = True, True
+            success = True
+            done = bool(success_target) and (action['input'] == action['target_id'])
 
         return success, done
 
@@ -506,7 +542,10 @@ class RobotEnvUI:
 
                 # 日志保持不变（你原来的 log 代码可以继续留着）
 
-                if success and done:
+                if once:
+                    break
+
+                if success:
                     break
 
                 if not success:
