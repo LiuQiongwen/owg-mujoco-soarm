@@ -77,8 +77,9 @@ objects with low flat fraction (\texttt{flat\_frac} $< 0.1$) yield consistent
 reranking gains (PowerDrill $+4$, MustardBottle $+2$), while geometrically
 degenerate objects (\texttt{flat\_frac} $> 0.4$) cause feature saturation that
 nullifies ranking signal. Spearman correlation between \texttt{flat\_frac} and
-reranking outcome reaches $\rho = -0.96$ ($p < 0.01$) in cross-platform
-analysis (PyBullet/Panda, where the Scissors regression is observable),
+reranking outcome reaches $\rho = -0.96$ on PyBullet ($p < 0.01$) and
+$\rho \approx -0.5$ on MuJoCo, where thin objects exhibit an execution
+floor effect rather than a ranking failure,
 enabling deployment-time prediction of reranker utility without trial execution. Our work provides the
 first systematic characterization of geometry-dependent reranking behavior in
 open-world grasping, and establishes concrete requirements for successor methods
@@ -545,6 +546,10 @@ We use PyBullet net here because the MuJoCo Scissors floor effect
 (20/25) exposes it as $-4$.
 Spearman correlation of flat\_frac with S4 net (PyBullet):
 $\rho = -0.96$ ($p < 0.01$).
+On the MuJoCo platform, Scissors exhibits a floor effect (0/25 both
+stages) rather than a regression, reducing the correlation to
+$\rho \approx -0.5$; the directional relationship holds but is
+attenuated by the execution constraint.
 Spearman correlation of $\sigma_{H,\text{within}}$ with S4 net
 (PyBullet): $\rho = +0.81$ ($p < 0.05$).
 These are the two strongest predictors of reranking benefit.
@@ -562,7 +567,7 @@ These are the two strongest predictors of reranking benefit.
   \begin{tabular}{lccccc}
     \toprule
     Object & $H_\mu$ & $\sigma_{H,\mathrm{w}}$ & ff
-           & $\sigma_{\psi,\mathrm{w}}$ & Net \\
+           & $\sigma_{\psi,\mathrm{w}}$ & Net$^\ast$ \\
     \midrule
     CrackerBox    & 0.020 & 0.018 & 0.02 & 0.06  & $\mathbf{+4}$ \\
     MustardBottle & 0.018 & 0.015 & 0.03 & 0.05  & $+2$ \\
@@ -576,7 +581,8 @@ These are the two strongest predictors of reranking benefit.
   \vspace{0.5ex}
   {\footnotesize $H_\mu$: mean height; $\sigma_{H,\mathrm{w}}$:
    within-ep.\ $\sigma_H$; ff: flat\_frac;
-   $\sigma_{\psi,\mathrm{w}}$: yaw spread.}
+   $\sigma_{\psi,\mathrm{w}}$: yaw spread.
+   $^\ast$PyBullet net, $N=25$.}
 \end{table}
 
 \begin{figure}[t]
@@ -588,8 +594,9 @@ These are the two strongest predictors of reranking benefit.
     red $<0$, grey $=0$); point size encodes within-episode yaw spread
     $\sigma_\psi$ (larger $=$ more orientation ambiguity).
     The dashed line is an OLS fit.
-    Spearman $\rho = -0.96$ ($p < 0.01$) indicates that high flat
-    fraction is the strongest single predictor of reranking regression.}
+    Spearman $\rho = -0.96$ ($p < 0.01$, computed from PyBullet/Panda
+    evaluation) indicates that high flat fraction is the strongest
+    single predictor of reranking regression.}
   \label{fig:scatter}
 \end{figure}
 

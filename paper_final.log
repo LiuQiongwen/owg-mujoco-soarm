@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  4 JUN 2026 02:48
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  4 JUN 2026 02:55
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -693,29 +693,26 @@ Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             `lmtt' (encoding: T1).
 (microtype)             For optimal results, create family-specific settings.
 (microtype)             See the microtype manual for details.
-
-Underfull \hbox (badness 2189) in paragraph at lines 128--131
-\T1/lmr/m/n/10 (+20) object ge-o-met-ric prop-er-ties (flat frac-tion,
- []
-
-[1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}
+ [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}
 
 
 ]
-Underfull \vbox (badness 10000) has occurred while \output is active []
+Underfull \hbox (badness 2189) in paragraph at lines 129--132
+\T1/lmr/m/n/10 (+20) object ge-o-met-ric prop-er-ties (flat frac-tion,
+ []
 
 
-Underfull \hbox (badness 2326) in paragraph at lines 187--187
+Underfull \hbox (badness 2326) in paragraph at lines 188--188
 |[]\T1/lmr/bx/n/11 (+20) Language-Conditioned and Open-
  []
 
 LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 2
-15.
+16.
 (/usr/share/texmf/tex/latex/lm/ts1lmr.fd
 File: ts1lmr.fd 2009/10/30 v1.6 Font defs for Latin Modern
 ) [2]
 LaTeX Font Info:    Trying to load font information for OT1+lmtt on input line 
-248.
+249.
 
 (/usr/share/texmf/tex/latex/lm/ot1lmtt.fd
 File: ot1lmtt.fd 2009/10/30 v1.6 Font defs for Latin Modern
@@ -725,12 +722,12 @@ Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             For optimal results, create family-specific settings.
 (microtype)             See the microtype manual for details.
 
-Underfull \hbox (badness 2828) in paragraph at lines 246--256
+Underfull \hbox (badness 2828) in paragraph at lines 247--257
 \T1/lmr/bx/n/10 (+20) Object query em-bed-ding (4-dim, v5d):
  []
 
 
-Underfull \hbox (badness 3058) in paragraph at lines 246--256
+Underfull \hbox (badness 3058) in paragraph at lines 247--257
 \T1/lmr/m/n/10 (+20) A learned em-bed-ding $\OT1/lmr/bx/n/10 (+20) e[] \OMS/lms
 y/m/n/10 2 \U/msb/m/n/10 R[]$\T1/lmr/m/n/10 (+20) , im-ple-mented
  []
@@ -739,7 +736,7 @@ y/m/n/10 2 \U/msb/m/n/10 R[]$\T1/lmr/m/n/10 (+20) , im-ple-mented
 Underfull \vbox (badness 1939) has occurred while \output is active []
 
 
-Underfull \hbox (badness 1019) in paragraph at lines 306--309
+Underfull \hbox (badness 1019) in paragraph at lines 307--310
 \T1/lmr/m/n/10 (+20) batch size 32, 30 epochs, 80/20 episode-level
  []
 
@@ -747,23 +744,23 @@ Underfull \hbox (badness 1019) in paragraph at lines 306--309
 Underfull \vbox (badness 6808) has occurred while \output is active []
 
  [3]
-Underfull \hbox (badness 10000) in paragraph at lines 349--360
+Underfull \hbox (badness 10000) in paragraph at lines 350--361
 []\T1/lmr/m/n/10 (+20) The can-di-date log
  []
 
 
-Underfull \hbox (badness 6364) in paragraph at lines 349--360
+Underfull \hbox (badness 6364) in paragraph at lines 350--361
 \T1/lmtt/m/n/10 lggsn_live_candidates.jsonl \T1/lmr/m/n/10 (+20) con-tains 3,02
 6
  []
 
 
-Underfull \hbox (badness 1210) in paragraph at lines 349--360
+Underfull \hbox (badness 1210) in paragraph at lines 350--361
 \T1/lmr/m/n/10 (+20) can-di-date records from live episode col-lec-tion
  []
 
 LaTeX Font Info:    Trying to load font information for T1+lmss on input line 3
-85.
+86.
 (/usr/share/texmf/tex/latex/lm/t1lmss.fd
 File: t1lmss.fd 2009/10/30 v1.6 Font defs for Latin Modern
 )
@@ -772,52 +769,47 @@ Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             For optimal results, create family-specific settings.
 (microtype)             See the microtype manual for details.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <8> on input line 389.
+(Font)              <8> on input line 390.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <5> on input line 389.
+(Font)              <5> on input line 390.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <8> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 389.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 390.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <5> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 389.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 390.
 <figures//fig2_success_rate_bar.pdf, id=194, 403.38423pt x 219.72853pt>
 File: figures//fig2_success_rate_bar.pdf Graphic file (type pdf)
 <use figures//fig2_success_rate_bar.pdf>
 Package pdftex.def Info: figures//fig2_success_rate_bar.pdf  used on input line
- 439.
+ 440.
 (pdftex.def)             Requested size: 221.32687pt x 120.55936pt.
 
-Overfull \hbox (44.66113pt too wide) in paragraph at lines 463--475
+Overfull \hbox (44.66113pt too wide) in paragraph at lines 464--476
  [][] 
  []
 
 <figures//fig3_ablation.pdf, id=197, 401.22548pt x 211.51146pt>
 File: figures//fig3_ablation.pdf Graphic file (type pdf)
 <use figures//fig3_ablation.pdf>
-Package pdftex.def Info: figures//fig3_ablation.pdf  used on input line 482.
+Package pdftex.def Info: figures//fig3_ablation.pdf  used on input line 483.
 (pdftex.def)             Requested size: 221.32687pt x 116.67697pt.
-[4]
-<figures//fig1_flat_frac_vs_net.pdf, id=220, 281.19899pt x 219.82677pt>
+[4] [5 <./figures//fig2_success_rate_bar.pdf> <./figures//fig3_ablation.pdf>]
+<figures//fig1_flat_frac_vs_net.pdf, id=284, 281.19899pt x 219.82677pt>
 File: figures//fig1_flat_frac_vs_net.pdf Graphic file (type pdf)
 <use figures//fig1_flat_frac_vs_net.pdf>
 Package pdftex.def Info: figures//fig1_flat_frac_vs_net.pdf  used on input line
- 584.
+ 590.
 (pdftex.def)             Requested size: 221.32687pt x 173.02727pt.
- [5 <./figures//fig2_success_rate_bar.pdf> <./figures//fig3_ablation.pdf>]
+
 [6 <./figures//fig1_flat_frac_vs_net.pdf>]
-Underfull \hbox (badness 3503) in paragraph at lines 686--686
+Underfull \hbox (badness 3503) in paragraph at lines 693--693
 |[]\T1/lmr/bx/n/11 (+20) Difficulty Gen-er-al-iza-tion on SO-
  []
 
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
-
-
-Package balance Warning: You have called \balance in second column
-(balance)                Columns might not be balanced.
-
 [7]
-Underfull \vbox (badness 10000) has occurred while \output is active []
+Underfull \vbox (badness 3260) has occurred while \output is active []
+
+
+Overfull \vbox (2.125pt too high) has occurred while \output is active []
 
  [8]
 (./paper_final.aux)
@@ -828,16 +820,16 @@ Package rerunfilecheck Info: File `paper_final.out' has not changed.
 (rerunfilecheck)             Checksum: 677391E6E603B7C4D7E968D4A7C87AED;4765.
  ) 
 Here is how much of TeX's memory you used:
- 15859 strings out of 478287
- 261405 string characters out of 5849289
+ 15865 strings out of 478287
+ 261477 string characters out of 5849289
  609579 words of memory out of 5000000
  33412 multiletter control sequences out of 15000+600000
- 596306 words of font info for 272 fonts, out of 8000000 for 9000
+ 596667 words of font info for 275 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 70i,13n,76p,1008b,444s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 70i,13n,76p,1008b,442s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texmf/fonts/enc/dvips/lm/lm-ec.enc}{/usr/share/texmf/fonts/enc/dv
-ips/lm/lm-rm.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/share
-/texmf/fonts/enc/dvips/lm/lm-mathsy.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm
+ips/lm/lm-mathsy.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm-rm.enc}{/usr/share
+/texmf/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm
 -mathex.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm-rmtt.enc}{/usr/share/texmf/
 fonts/enc/dvips/lm/lm-ts1.enc}</usr/share/texmf/fonts/type1/public/lm/lmbx10.pf
 b></usr/share/texmf/fonts/type1/public/lm/lmbx12.pfb></usr/share/texmf/fonts/ty
@@ -850,14 +842,15 @@ nts/type1/public/lm/lmr7.pfb></usr/share/texmf/fonts/type1/public/lm/lmr8.pfb><
 /usr/share/texmf/fonts/type1/public/lm/lmr9.pfb></usr/share/texmf/fonts/type1/p
 ublic/lm/lmri10.pfb></usr/share/texmf/fonts/type1/public/lm/lmri9.pfb></usr/sha
 re/texmf/fonts/type1/public/lm/lmssbx10.pfb></usr/share/texmf/fonts/type1/publi
-c/lm/lmsy10.pfb></usr/share/texmf/fonts/type1/public/lm/lmsy7.pfb></usr/share/t
-exmf/fonts/type1/public/lm/lmsy8.pfb></usr/share/texmf/fonts/type1/public/lm/lm
-tt10.pfb></usr/share/texmf/fonts/type1/public/lm/lmtti10.pfb></usr/share/texliv
-e/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
-Output written on paper_final.pdf (8 pages, 514176 bytes).
+c/lm/lmsy10.pfb></usr/share/texmf/fonts/type1/public/lm/lmsy6.pfb></usr/share/t
+exmf/fonts/type1/public/lm/lmsy7.pfb></usr/share/texmf/fonts/type1/public/lm/lm
+sy8.pfb></usr/share/texmf/fonts/type1/public/lm/lmtt10.pfb></usr/share/texmf/fo
+nts/type1/public/lm/lmtti10.pfb></usr/share/texlive/texmf-dist/fonts/type1/publ
+ic/amsfonts/symbols/msbm10.pfb>
+Output written on paper_final.pdf (8 pages, 519002 bytes).
 PDF statistics:
- 460 PDF objects out of 1000 (max. 8388607)
- 358 compressed objects within 4 object streams
+ 465 PDF objects out of 1000 (max. 8388607)
+ 361 compressed objects within 4 object streams
  67 named destinations out of 1000 (max. 500000)
  75496 words of extra memory for PDF output out of 89155 (max. 10000000)
 
