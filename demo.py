@@ -8,7 +8,6 @@ from owg.utils.config import load_config
 
 # ---- FIX 1: grasp sampler real API ----
 from grasp_6dof.grasp_sampler import sample_grasps_from_mesh, pack_for_json
-from grasp_6dof.grasp_validator_panda import validate_grasps
 
 
 def cfg_set(cfg, path, value):
@@ -61,7 +60,7 @@ def apply_stage_overrides(cfg, stage: int):
         cfg_set(cfg, "policy.use_grasp_ranker", True)
         # 你自己的 ckpt 路径（没有也没关系，后面 ranker 自己会报“找不到ckpt”）
         if not hasattr(cfg.policy, "lggsn_ckpt"):
-            cfg_set(cfg, "policy.lggsn_ckpt", "grasp_6dof/models/lggsn_pairwise_live.pt")
+            cfg_set(cfg, "policy.lggsn_ckpt", "grasp_6dof/models/lggsn_pairwise_live_v5d.pt")
 
     else:
         raise ValueError(f"Unknown stage: {stage}")
@@ -91,14 +90,14 @@ def main():
     # ---- Parse args (ALL add_argument BEFORE parse_args) ----
     parser = argparse.ArgumentParser(description="OWG demo with staged pipeline.")
     parser.add_argument("--stage", type=int, default=1, choices=[1, 2, 3, 4])
-    parser.add_argument("--config", type=str, default="./config/pyb/env.yaml")
-    parser.add_argument("--backend", type=str, default="pybullet",
+    parser.add_argument("--config", type=str, default="./config/mujoco/env.yaml")
+    parser.add_argument("--backend", type=str, default="mujoco",
                         choices=["pybullet", "mujoco"],
                         help="Simulation backend. Use 'mujoco' for SO-ARM101.")
     parser.add_argument("--robot_type", type=str, default=None, choices=["ur5", "panda"])
     parser.add_argument("--prompt", type=str, default="grasp the red cup")
 
-    parser.add_argument("--n_objects", type=int, default=None)
+    parser.add_argument("--n_objects", "--n-objects", type=int, default=None)
     parser.add_argument("--object", type=str, default=None,
                         help="Pin a specific YCB object in the scene (e.g. 'Banana'). "
                              "Case-insensitive. Overrides random shuffle.")
@@ -116,8 +115,13 @@ def main():
                         help="Override grasp_mode from config. "
                              "Use 'demo_attach' for visual demos (kinematic attach), "
                              "'physics' for benchmark-accurate results (default from config).")
+    parser.add_argument("--gate-delta", type=float, default=0.15, dest="gate_delta",
+                        help="Uncertainty gate threshold: if max(scores)-min(scores) < gate_delta, "
+                             "skip LGGSN reranking and use GR-ConvNet top-1. 0.0 = disabled.")
 
     args = parser.parse_args()
+
+    os.environ["OWG_GATE_DELTA"] = str(args.gate_delta)
 
     # ---- Load config FIRST ----
     cfg = load_config(args.config)
@@ -143,21 +147,6 @@ def main():
 
     # ---- Backend override ----
     cfg_set(cfg, "backend", args.backend)
-    if args.backend == "mujoco" and args.config == "./config/pyb/env.yaml":
-        # auto-select MuJoCo config if user didn't specify one
-        mj_cfg = "./config/mujoco/env.yaml"
-        if os.path.exists(mj_cfg):
-            cfg = load_config(mj_cfg)
-            cfg = apply_stage_overrides(cfg, args.stage)
-            cfg_set(cfg, "backend", "mujoco")
-            cfg_set(cfg, "prompt", args.prompt)
-            if args.n_objects is not None:
-                cfg_set(cfg, "n_objects", args.n_objects)
-            if args.seed is not None:
-                cfg_set(cfg, "seed", args.seed)
-            if args.object is not None:
-                cfg_set(cfg, "object", args.object)
-            print(f"[INFO] Auto-loaded MuJoCo config: {mj_cfg}")
 
     # ---- grasp_mode override (after all config reloads) ----
     if args.grasp_mode is not None:
@@ -198,8 +187,9 @@ def main():
             out_json=args.grasps_out,
         )
 
-        # validate (uses panda routine)
-        validate_grasps(cfg, sample_file)
+        # MuJoCo validation runs separately — use benchmark/replay_soarm_grasp.py:
+        #   conda run -n owg-mujoco python benchmark/replay_soarm_grasp.py \
+        #       --grasps <output_json>
         print("\n✅ Stage2 complete.")
         return
 

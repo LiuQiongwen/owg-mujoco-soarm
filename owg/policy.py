@@ -13,6 +13,37 @@ from owg.gpt_utils import parse_llm_payload
 GROUND_LOG_DIR = "logs/grounding_examples"
 os.makedirs(GROUND_LOG_DIR, exist_ok=True)
 
+# ── YCB → natural-language label normalisation ────────────────────────────────
+_YCB_LABEL_MAP: dict = {
+    "YcbBanana":        "banana",
+    "YcbPear":          "pear",
+    "YcbMustardBottle": "mustard bottle",
+    "YcbCrackerBox":    "cracker box",
+    "YcbPowerDrill":    "power drill",
+    "YcbTomatoSoupCan": "tomato soup can",
+    "YcbMediumClamp":   "medium clamp",
+    "YcbScissors":      "scissors",
+    "Banana":           "banana",
+    "Pear":             "pear",
+    "MustardBottle":    "mustard bottle",
+    "CrackerBox":       "cracker box",
+    "PowerDrill":       "power drill",
+    "TomatoSoupCan":    "tomato soup can",
+    "MediumClamp":      "medium clamp",
+    "Scissors":         "scissors",
+}
+
+def _norm_label(name: str) -> str:
+    """Convert a YCB object name to natural-language for VLM consumption."""
+    s = str(name)
+    if s in _YCB_LABEL_MAP:
+        return _YCB_LABEL_MAP[s]
+    s = re.sub(r'^Ycb', '', s)
+    s = re.sub(r'(?<=[a-z])(?=[A-Z])', ' ', s)
+    return s.lower().strip()
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 def _safe_get_from_raw(resp: dict, *keys):
     """
     Safely return the first present, non-None value for keys from resp dict.
@@ -83,7 +114,7 @@ class OwgPolicy:
             # ✅ 优先尝试用 LG-GSN 几何 ranker
             try:
                 self.grasp_ranker = LggsnGraspRanker(
-                    model_path=os.environ.get("LGGSN_CKPT", "grasp_6dof/models/lggsn_pairwise_live.pt"),
+                    model_path=os.environ.get("LGGSN_CKPT", "grasp_6dof/models/lggsn_pairwise_live_v5d.pt"),
                     device="cuda",
                     lggsn_input_dim=lggsn_input_dim,
                 )
@@ -127,7 +158,7 @@ class OwgPolicy:
         if env_obj_ids is not None and obj_names is not None:
             id_to_name = {int(i): str(n) for i, n in zip(env_obj_ids, obj_names)}
 
-        labels = [id_to_name.get(int(obj_id), str(int(obj_id))) for obj_id in obj_ids]
+        labels = [_norm_label(id_to_name.get(int(obj_id), str(int(obj_id)))) for obj_id in obj_ids]
 
         marker_data = {'masks': all_masks, 'labels': labels}
 
@@ -182,8 +213,9 @@ class OwgPolicy:
             # 下面继续沿用你原来的 grasp_ranker / top-k 逻辑（不要 return）
             # （也就是让它走到你现在已有的 “LGGSN grasp scores/top5 + action['grasps']=...” 那段）
 
+        norm_query = _norm_label(user_input) if isinstance(user_input, str) else user_input
         raw_resp = self.grounder.request(
-            text_query=user_input,
+            text_query=norm_query,
             image=image.copy(),
             data=marker_data
         )
@@ -372,7 +404,12 @@ class OwgPolicy:
                     query_text=user_input,
                     obj_type=None,
                 )
-                action['grasps'] = order.tolist()
+                score_spread = float(scores.max() - scores.min()) if len(scores) > 1 else 0.0
+                gate_delta = float(os.environ.get("OWG_GATE_DELTA", "0.0"))
+                if gate_delta > 0.0 and score_spread < gate_delta:
+                    print(f"[GATE] score_spread={score_spread:.4f}, skipping reranking")
+                else:
+                    action['grasps'] = order.tolist()
                 if getattr(self, "verbose", False) and len(order) > 0:
                     print("🟢 LGGSN grasp scores (top 5):", scores[order[:5]])
 

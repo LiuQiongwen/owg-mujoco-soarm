@@ -24,6 +24,7 @@ class LGGSN(nn.Module):
         geom_dim: int = 12,
         query_dim: int = 0,
         hidden_dim: int = 40,
+        dropout: float = 0.0,
     ):
         super().__init__()
         self.use_query = query_dim > 0
@@ -35,11 +36,15 @@ class LGGSN(nn.Module):
 
         in_dim = geom_dim + (query_dim if self.use_query else 0)
 
+        # Keep mlp keys stable (mlp.0, mlp.2) regardless of dropout so old
+        # checkpoints load without key-index shifts.
         self.mlp = nn.Sequential(
             nn.Linear(in_dim, hidden_dim),
             nn.ReLU(inplace=True),
             nn.Linear(hidden_dim, 1),
         )
+        # Dropout has no parameters → absent from state_dict → no key conflicts.
+        self._drop: nn.Dropout | None = nn.Dropout(p=dropout) if dropout > 0.0 else None
 
     def forward(self, geom: torch.Tensor, query_id: torch.Tensor):
         """
@@ -51,7 +56,11 @@ class LGGSN(nn.Module):
             q = self.query_emb(query_id)  # [B, query_dim]
             x = torch.cat([geom, q], dim=-1)
 
-        logit = self.mlp(x).squeeze(-1)  # [B]
+        # mlp[0]=Linear, mlp[1]=ReLU, mlp[2]=Linear — inject dropout between them.
+        h = self.mlp[1](self.mlp[0](x))
+        if self._drop is not None:
+            h = self._drop(h)
+        logit = self.mlp[2](h).squeeze(-1)  # [B]
         return logit
 
 

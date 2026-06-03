@@ -3,6 +3,9 @@ import numpy as np
 import torch
 
 from lggsn_model import LGGSN, GC_LGGSN
+from grasp_6dof.grasp_sampler import (
+    rpy_to_R, local_point_density, normal_consistency, contact_width_ratio,
+)
 
 _USE_DIST = os.environ.get("FEAT_DIST", "1") == "1"   # module-level default, overridden per instance
 _USE_ZREL = os.environ.get("FEAT_ZREL", "1") == "1"
@@ -20,11 +23,29 @@ FEATURE_COLS_BASE = [
     "dz", "dz_lift", "need_dz", "H",
 ]
 FEATURE_COLS_FULL = FEATURE_COLS_BASE + ["dist_to_centroid", "z_rel"]
+FEATURE_COLS_EXT  = FEATURE_COLS_FULL + [
+    "local_point_density", "normal_consistency", "contact_width_ratio",
+]
 
 # Module-level alias kept for backward-compat imports
 FEATURE_COLS = FEATURE_COLS_FULL if (_USE_DIST and _USE_ZREL) else (
     FEATURE_COLS_BASE + (["dist_to_centroid"] if _USE_DIST else []) + (["z_rel"] if _USE_ZREL else [])
 )
+
+# Query class map used by v5+ checkpoints (must match train_lggsn_v5.py OBJECT_CLASSES).
+# Maps prompt/object-name variations → integer class ID.
+_OBJECT_CLASS_MAP: dict[str, int] = {}
+for _aliases, _cid in [
+    (["banana"],                               0),
+    (["can", "tomatosoupcan", "tomato"],       1),
+    (["cracker", "crackerbox"],                2),
+    (["cylinder", "mediumclamp", "clamp"],     3),
+    (["drill", "powerdrill"],                  4),
+    (["mustard", "mustardbottle"],             5),
+    (["pear"],                                 6),
+]:
+    for _a in _aliases:
+        _OBJECT_CLASS_MAP[_a] = _cid
 
 
 class LggsnGraspRanker:
@@ -49,50 +70,74 @@ class LggsnGraspRanker:
 
         # ── Step 1: probe checkpoint to get actual input dim ──────────────────
         raw_state = torch.load(model_path, map_location="cpu", weights_only=False)
-        ckpt_dim = raw_state["mlp.0.weight"].shape[1]
+        mlp_in_dim = raw_state["mlp.0.weight"].shape[1]
+
+        # Detect v5+ query embedding: presence of query_emb.weight in state dict.
+        _has_query_emb = "query_emb.weight" in raw_state
+        if _has_query_emb:
+            _emb_shape   = raw_state["query_emb.weight"].shape  # (n_queries, query_dim)
+            _query_dim   = int(_emb_shape[1])
+            _n_queries   = int(_emb_shape[0])
+            ckpt_dim     = mlp_in_dim - _query_dim
+        else:
+            _query_dim   = 0
+            _n_queries   = 1
+            ckpt_dim     = mlp_in_dim
+
+        self._use_query_emb = _has_query_emb
+        self._query_dim     = _query_dim
+        self._n_queries     = _n_queries
 
         # ── Step 2: validate against explicit config (if given) ───────────────
         if lggsn_input_dim is not None and lggsn_input_dim != ckpt_dim:
             raise ValueError(
                 f"lggsn_input_dim={lggsn_input_dim} conflicts with checkpoint "
-                f"mlp.0.weight input dim={ckpt_dim} in {model_path}"
+                f"geom_dim={ckpt_dim} (mlp_in={mlp_in_dim}) in {model_path}"
             )
 
-        # ── Step 3: derive per-instance feature flags from checkpoint dim ─────
+        # ── Step 3: derive per-instance feature flags from geom_dim ──────────
         if ckpt_dim == 12:
             self._use_dist = False
             self._use_zrel = False
+            self._use_pc_feats = False
             self._feature_cols = FEATURE_COLS_BASE[:]
             print(f"[LggsnGraspRanker] legacy 12-dim checkpoint — "
                   f"dist_to_centroid and z_rel disabled for this instance")
         elif ckpt_dim == 14:
             self._use_dist = True
             self._use_zrel = True
+            self._use_pc_feats = False
             self._feature_cols = FEATURE_COLS_FULL[:]
+        elif ckpt_dim == 17:
+            self._use_dist = True
+            self._use_zrel = True
+            self._use_pc_feats = True
+            self._feature_cols = FEATURE_COLS_EXT[:]
         else:
             raise ValueError(
-                f"Unsupported checkpoint input dim {ckpt_dim} in {model_path}; "
-                f"expected 12 or 14"
+                f"Unsupported checkpoint geom_dim={ckpt_dim} (mlp_in={mlp_in_dim}) "
+                f"in {model_path}; expected 12, 14, or 17"
             )
 
-        print(f"[LggsnGraspRanker] input_dim={ckpt_dim}  "
+        q_tag = f" + query_emb({_n_queries}×{_query_dim})" if _has_query_emb else ""
+        print(f"[LggsnGraspRanker] geom_dim={ckpt_dim}{q_tag}  "
               f"features={self._feature_cols}")
 
-        # ── Step 4: build model with the right geom_dim ───────────────────────
+        # ── Step 4: build model with the right dims ───────────────────────────
         if self._gc_mode:
             self.model = GC_LGGSN(
-                n_queries=1,
+                n_queries=_n_queries,
                 geom_dim=ckpt_dim,
-                query_dim=0,
+                query_dim=_query_dim,
                 hidden_dim=40,
                 context_dim=3,
             )
             print(f"[LggsnGraspRanker] GC-LGGSN mode | loading: {model_path}")
         else:
             self.model = LGGSN(
-                n_queries=1,
+                n_queries=_n_queries,
                 geom_dim=ckpt_dim,
-                query_dim=0,
+                query_dim=_query_dim,
                 hidden_dim=40,
             )
             print(f"[LggsnGraspRanker] loading checkpoint: {model_path}")
@@ -218,7 +263,7 @@ class LggsnGraspRanker:
             dz, dz_lift, need_dz, H,
         ]
 
-    def _featurize(self, grasps):
+    def _featurize(self, grasps, episode_pc=None):
         feats = [self._featurize_one(g) for g in grasps]
         arr   = np.asarray(feats, dtype=np.float32)   # [N, 12]
         extra = []
@@ -235,6 +280,21 @@ class LggsnGraspRanker:
                 z_rel = ((z - z_min) / (z_max - z_min + 1e-8)).reshape(-1, 1) # [N,1]
                 extra.append(z_rel)
 
+        if self._use_pc_feats and episode_pc is not None:
+            pc_rows = []
+            for i, g_raw in enumerate(grasps):
+                g     = self._unwrap_grasp(g_raw)
+                pos   = arr[i, :3]
+                rpy   = [float(r) for r in (g.get("rpy") or [np.pi, 0., 0.])[:3]]
+                R     = rpy_to_R(*rpy)
+                width = float(arr[i, 6])
+                pc_rows.append([
+                    local_point_density(pos, R, width, episode_pc),
+                    normal_consistency(pos, R, width, episode_pc),
+                    contact_width_ratio(pos, R, width, episode_pc),
+                ])
+            extra.append(np.array(pc_rows, dtype=np.float32))
+
         if extra:
             return np.concatenate([arr] + extra, axis=1)
         return arr
@@ -242,7 +302,7 @@ class LggsnGraspRanker:
     # --------- 排序接口 ---------
 
     def rank(self, grasps, query_text: str | None = None, obj_type: str | None = None,
-             verbose: bool = False):
+             verbose: bool = False, episode_pc: np.ndarray | None = None):
         """
         输入:
           grasps: list[dict 或 tuple]
@@ -264,7 +324,7 @@ class LggsnGraspRanker:
             identity = np.arange(len(grasps))
             return identity, np.full(len(grasps), 0.5, dtype=float)
 
-        X = self._featurize(grasps)
+        X = self._featurize(grasps, episode_pc=episode_pc)
 
         # Flat-object gate: if H_std < threshold, keep original (Stage-3) order
         H_col = 11  # index of H in FEATURE_COLS
@@ -273,7 +333,21 @@ class LggsnGraspRanker:
             return identity, np.full(len(grasps), 0.5, dtype=float)
 
         geom = torch.from_numpy(X).to(self.device)
-        q_id = torch.zeros(len(grasps), dtype=torch.long, device=self.device)
+
+        if self._use_query_emb and query_text is not None:
+            _key = query_text.lower().replace(" ", "").replace("ycb", "")
+            if _key in _OBJECT_CLASS_MAP:
+                _class_id = _OBJECT_CLASS_MAP[_key]
+                q_id = torch.full((len(grasps),), _class_id, dtype=torch.long, device=self.device)
+                _q_emb = None  # use standard embedding lookup below
+            else:
+                # Unknown object: use mean of all learned embeddings as a generic prior.
+                _q_emb = self.model.query_emb.weight.mean(dim=0, keepdim=True)  # [1, query_dim]
+                _q_emb = _q_emb.expand(len(grasps), -1)                         # [N, query_dim]
+                q_id = None
+        else:
+            q_id = torch.zeros(len(grasps), dtype=torch.long, device=self.device)
+            _q_emb = None
 
         with torch.no_grad():
             if self._gc_mode:
@@ -287,6 +361,10 @@ class LggsnGraspRanker:
                                      dtype=np.float32)
                 ctx = torch.from_numpy(ctx_vec).to(self.device)
                 logit = self.model(geom, q_id, ctx)   # GC_LGGSN forward
+            elif _q_emb is not None:
+                # Unknown object fallback: bypass embedding lookup, use mean emb directly.
+                x = torch.cat([geom, _q_emb.to(self.device)], dim=-1)
+                logit = self.model.mlp(x).squeeze(-1)
             else:
                 logit = self.model(geom, q_id)        # standard LGGSN forward
             score = torch.sigmoid(logit).cpu().numpy()
