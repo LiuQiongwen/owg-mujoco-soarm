@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  27 MAR 2026 14:32
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  4 JUN 2026 02:05
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -480,7 +480,7 @@ LaTeX Info: Redefining \labelcpageref on input line 2370.
 Package: balance 1999/02/23 4.3 (PWD)
 \oldvsize=\dimen184
 )
-LaTeX Font Info:    Trying to load font information for T1+lmr on input line 58
+LaTeX Font Info:    Trying to load font information for T1+lmr on input line 59
 .
 
 (/usr/share/texmf/tex/latex/lm/t1lmr.fd
@@ -498,24 +498,24 @@ LaTeX Warning: Unused global option(s):
 (./paper_final.aux)
 \openout1 = `paper_final.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 58.
-LaTeX Font Info:    ... okay on input line 58.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 58.
-LaTeX Font Info:    ... okay on input line 58.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 58.
-LaTeX Font Info:    ... okay on input line 58.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 58.
-LaTeX Font Info:    ... okay on input line 58.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 58.
-LaTeX Font Info:    ... okay on input line 58.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 58.
-LaTeX Font Info:    ... okay on input line 58.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 58.
-LaTeX Font Info:    ... okay on input line 58.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 58.
-LaTeX Font Info:    ... okay on input line 58.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 58.
-LaTeX Font Info:    ... okay on input line 58.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 59.
+LaTeX Font Info:    ... okay on input line 59.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 59.
+LaTeX Font Info:    ... okay on input line 59.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 59.
+LaTeX Font Info:    ... okay on input line 59.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 59.
+LaTeX Font Info:    ... okay on input line 59.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 59.
+LaTeX Font Info:    ... okay on input line 59.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 59.
+LaTeX Font Info:    ... okay on input line 59.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 59.
+LaTeX Font Info:    ... okay on input line 59.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 59.
+LaTeX Font Info:    ... okay on input line 59.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 59.
+LaTeX Font Info:    ... okay on input line 59.
 
 *geometry* driver: auto-detecting
 *geometry* detected driver: pdftex
@@ -551,18 +551,18 @@ LaTeX Font Info:    ... okay on input line 58.
 * \@reversemarginfalse
 * (1in=72.27pt=25.4mm, 1cm=28.453pt)
 
-LaTeX Info: Redefining \microtypecontext on input line 58.
-Package microtype Info: Applying patch `item' on input line 58.
-Package microtype Info: Applying patch `toc' on input line 58.
-Package microtype Info: Applying patch `eqnum' on input line 58.
-Package microtype Info: Applying patch `footnote' on input line 58.
+LaTeX Info: Redefining \microtypecontext on input line 59.
+Package microtype Info: Applying patch `item' on input line 59.
+Package microtype Info: Applying patch `toc' on input line 59.
+Package microtype Info: Applying patch `eqnum' on input line 59.
+Package microtype Info: Applying patch `footnote' on input line 59.
 Package microtype Info: Generating PDF output.
 Package microtype Info: Character protrusion enabled (level 2).
 Package microtype Info: Using default protrusion set `alltext'.
 Package microtype Info: Automatic font expansion enabled (level 2),
 (microtype)             stretch: 20, shrink: 20, step: 1, non-selected.
 Package microtype Info: Using default expansion set `alltext-nott'.
-LaTeX Info: Redefining \showhyphens on input line 58.
+LaTeX Info: Redefining \showhyphens on input line 59.
 Package microtype Info: No adjustment of tracking.
 Package microtype Info: No adjustment of interword spacing.
 Package microtype Info: No adjustment of character kerning.
@@ -592,7 +592,7 @@ Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 4
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Liv
 e
 ))
-Package hyperref Info: Link coloring OFF on input line 58.
+Package hyperref Info: Link coloring OFF on input line 59.
 
 (/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
 Package: nameref 2021-04-02 v2.47 Cross-referencing by name of section
@@ -605,60 +605,60 @@ Package: gettitlestring 2019/12/15 v1.6 Cleanup title references (HO)
 )
 \c@section@level=\count299
 )
-LaTeX Info: Redefining \ref on input line 58.
-LaTeX Info: Redefining \pageref on input line 58.
-LaTeX Info: Redefining \nameref on input line 58.
+LaTeX Info: Redefining \ref on input line 59.
+LaTeX Info: Redefining \pageref on input line 59.
+LaTeX Info: Redefining \nameref on input line 59.
 
 (./paper_final.out) (./paper_final.out)
 \@outlinefile=\write3
 \openout3 = `paper_final.out'.
 
 LaTeX Font Info:    Trying to load font information for OT1+lmr on input line 6
-1.
+2.
 
 (/usr/share/texmf/tex/latex/lm/ot1lmr.fd
 File: ot1lmr.fd 2009/10/30 v1.6 Font defs for Latin Modern
 )
 LaTeX Font Info:    Trying to load font information for OML+lmm on input line 6
-1.
+2.
 
 (/usr/share/texmf/tex/latex/lm/omllmm.fd
 File: omllmm.fd 2009/10/30 v1.6 Font defs for Latin Modern
 )
 LaTeX Font Info:    Trying to load font information for OMS+lmsy on input line 
-61.
+62.
 
 (/usr/share/texmf/tex/latex/lm/omslmsy.fd
 File: omslmsy.fd 2009/10/30 v1.6 Font defs for Latin Modern
 )
 LaTeX Font Info:    Trying to load font information for OMX+lmex on input line 
-61.
+62.
 
 (/usr/share/texmf/tex/latex/lm/omxlmex.fd
 File: omxlmex.fd 2009/10/30 v1.6 Font defs for Latin Modern
 )
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <12> on input line 61.
+(Font)              <12> on input line 62.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <9> on input line 61.
+(Font)              <9> on input line 62.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <7> on input line 61.
+(Font)              <7> on input line 62.
 LaTeX Font Info:    Trying to load font information for OT1+ptm on input line 6
-1.
+2.
 
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1ptm.fd
 File: ot1ptm.fd 2001/06/04 font definitions for OT1/ptm.
 )
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <12> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 61.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 62.
 
 (/usr/share/texlive/texmf-dist/tex/latex/microtype/mt-ptm.cfg
 File: mt-ptm.cfg 2006/04/20 v1.7 microtype config. file: Times (RS)
 )
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <9> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 61.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 62.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 61.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 62.
 
 (/usr/share/texlive/texmf-dist/tex/latex/microtype/mt-msa.cfg
 File: mt-msa.cfg 2006/02/04 v1.1 microtype config. file: AMS symbols (a) (RS)
@@ -673,19 +673,19 @@ LaTeX Warning: No \author given.
 LaTeX Warning: No \author given.
 
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <10> on input line 75.
+(Font)              <10> on input line 74.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <7.4> on input line 75.
+(Font)              <7.4> on input line 74.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <6> on input line 75.
+(Font)              <6> on input line 74.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <10> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 75.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 74.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7.4> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 75.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 74.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <6> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 75.
-LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 1
-20.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 74.
+LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 8
+0.
 (/usr/share/texmf/tex/latex/lm/t1lmtt.fd
 File: t1lmtt.fd 2009/10/30 v1.6 Font defs for Latin Modern
 )
@@ -694,7 +694,7 @@ Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             For optimal results, create family-specific settings.
 (microtype)             See the microtype manual for details.
 
-Underfull \hbox (badness 2189) in paragraph at lines 127--130
+Underfull \hbox (badness 2189) in paragraph at lines 129--132
 \T1/lmr/m/n/10 (+20) object ge-o-met-ric prop-er-ties (flat frac-tion,
  []
 
@@ -702,45 +702,59 @@ Underfull \hbox (badness 2189) in paragraph at lines 127--130
 
 
 ]
-Underfull \hbox (badness 10000) in paragraph at lines 181--181
-|[]\T1/lmr/bx/n/11 (+20) Open-World and Language-
+Underfull \hbox (badness 2326) in paragraph at lines 188--188
+|[]\T1/lmr/bx/n/11 (+20) Language-Conditioned and Open-
  []
 
-LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 1
-98.
+LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 2
+16.
 (/usr/share/texmf/tex/latex/lm/ts1lmr.fd
 File: ts1lmr.fd 2009/10/30 v1.6 Font defs for Latin Modern
 ) [2]
-Underfull \hbox (badness 1019) in paragraph at lines 278--281
-\T1/lmr/m/n/10 (+20) batch size 32, 30 epochs, 80/20 episode-level
+LaTeX Font Info:    Trying to load font information for OT1+lmtt on input line 
+249.
+
+(/usr/share/texmf/tex/latex/lm/ot1lmtt.fd
+File: ot1lmtt.fd 2009/10/30 v1.6 Font defs for Latin Modern
+)
+Package microtype Info: Loading generic protrusion settings for font family
+(microtype)             `lmtt' (encoding: OT1).
+(microtype)             For optimal results, create family-specific settings.
+(microtype)             See the microtype manual for details.
+
+Underfull \hbox (badness 2828) in paragraph at lines 247--257
+\T1/lmr/bx/n/10 (+20) Object query em-bed-ding (4-dim, v5d):
  []
 
 
-Underfull \vbox (badness 1603) has occurred while \output is active []
+Underfull \hbox (badness 3058) in paragraph at lines 247--257
+\T1/lmr/m/n/10 (+20) A learned em-bed-ding $\OT1/lmr/bx/n/10 (+20) e[] \OMS/lms
+y/m/n/10 2 \U/msb/m/n/10 R[]$\T1/lmr/m/n/10 (+20) , im-ple-mented
+ []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 332--338
+Underfull \hbox (badness 1019) in paragraph at lines 307--310
+\T1/lmr/m/n/10 (+20) batch size 32, 30 epochs, 80/20 episode-level
+ []
+
+[3]
+Underfull \hbox (badness 10000) in paragraph at lines 350--361
 []\T1/lmr/m/n/10 (+20) The can-di-date log
  []
 
 
-Underfull \hbox (badness 6364) in paragraph at lines 332--338
+Underfull \hbox (badness 6364) in paragraph at lines 350--361
 \T1/lmtt/m/n/10 lggsn_live_candidates.jsonl \T1/lmr/m/n/10 (+20) con-tains 3,02
 6
  []
 
 
-Underfull \hbox (badness 1210) in paragraph at lines 332--338
+Underfull \hbox (badness 1210) in paragraph at lines 350--361
 \T1/lmr/m/n/10 (+20) can-di-date records from live episode col-lec-tion
  []
 
-
-Underfull \vbox (badness 1242) has occurred while \output is active []
-
- [3]
 LaTeX Font Info:    Trying to load font information for T1+lmss on input line 3
-54.
-
+86.
 (/usr/share/texmf/tex/latex/lm/t1lmss.fd
 File: t1lmss.fd 2009/10/30 v1.6 Font defs for Latin Modern
 )
@@ -749,77 +763,94 @@ Package microtype Info: Loading generic protrusion settings for font family
 (microtype)             For optimal results, create family-specific settings.
 (microtype)             See the microtype manual for details.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <8> on input line 358.
+(Font)              <8> on input line 390.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <5> on input line 358.
+(Font)              <5> on input line 390.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <8> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 358.
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 390.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <5> not available
-(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 358.
-<figures//fig2_success_rate_bar.pdf, id=167, 403.38423pt x 219.72853pt>
+(Font)              Font shape `OT1/ptm/b/n' tried instead on input line 390.
+<figures//fig2_success_rate_bar.pdf, id=194, 403.38423pt x 219.72853pt>
 File: figures//fig2_success_rate_bar.pdf Graphic file (type pdf)
 <use figures//fig2_success_rate_bar.pdf>
 Package pdftex.def Info: figures//fig2_success_rate_bar.pdf  used on input line
- 379.
+ 440.
 (pdftex.def)             Requested size: 221.32687pt x 120.55936pt.
-<figures//fig3_ablation.pdf, id=170, 401.22548pt x 211.51146pt>
+
+Overfull \hbox (44.66113pt too wide) in paragraph at lines 464--476
+ [][] 
+ []
+
+<figures//fig3_ablation.pdf, id=197, 401.22548pt x 211.51146pt>
 File: figures//fig3_ablation.pdf Graphic file (type pdf)
 <use figures//fig3_ablation.pdf>
-Package pdftex.def Info: figures//fig3_ablation.pdf  used on input line 413.
+Package pdftex.def Info: figures//fig3_ablation.pdf  used on input line 483.
 (pdftex.def)             Requested size: 221.32687pt x 116.67697pt.
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
- [4 <./figures//fig2_success_rate_bar.pdf> <./figures//fig3_ablation.pdf>]
-<figures//fig1_flat_frac_vs_net.pdf, id=249, 281.19899pt x 219.82677pt>
+ [4]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+<figures//fig1_flat_frac_vs_net.pdf, id=218, 281.19899pt x 219.82677pt>
 File: figures//fig1_flat_frac_vs_net.pdf Graphic file (type pdf)
 <use figures//fig1_flat_frac_vs_net.pdf>
 Package pdftex.def Info: figures//fig1_flat_frac_vs_net.pdf  used on input line
- 542.
+ 579.
 (pdftex.def)             Requested size: 221.32687pt x 173.02727pt.
- [5]
+ [5 <./figures//fig2_success_rate_bar.pdf> <./figures//fig3_ablation.pdf>] [6 <
+./figures//fig1_flat_frac_vs_net.pdf>]
+Underfull \hbox (badness 3503) in paragraph at lines 680--680
+|[]\T1/lmr/bx/n/11 (+20) Difficulty Gen-er-al-iza-tion on SO-
+ []
+
+
+Underfull \vbox (badness 1748) has occurred while \output is active []
+
+
 
 Package balance Warning: You have called \balance in second column
 (balance)                Columns might not be balanced.
 
-[6 <./figures//fig1_flat_frac_vs_net.pdf>]
+[7]
 Overfull \vbox (2.25pt too high) has occurred while \output is active []
 
- [7]
+ [8]
 (./paper_final.aux)
 Package rerunfilecheck Info: File `paper_final.out' has not changed.
-(rerunfilecheck)             Checksum: 798EDA54F5FBC25DBB515CE21A23637D;4322.
+(rerunfilecheck)             Checksum: 677391E6E603B7C4D7E968D4A7C87AED;4765.
  ) 
 Here is how much of TeX's memory you used:
- 15763 strings out of 478287
- 259915 string characters out of 5849289
- 611579 words of memory out of 5000000
- 33360 multiletter control sequences out of 15000+600000
- 592949 words of font info for 251 fonts, out of 8000000 for 9000
+ 15855 strings out of 478287
+ 261337 string characters out of 5849289
+ 610579 words of memory out of 5000000
+ 33412 multiletter control sequences out of 15000+600000
+ 596133 words of font info for 270 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  70i,13n,76p,1008b,546s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texmf/fonts/enc/dvips/lm/lm-ec.enc}{/usr/share/texmf/fonts/enc/dv
 ips/lm/lm-rm.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/share
 /texmf/fonts/enc/dvips/lm/lm-mathsy.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm
--mathex.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm-ts1.enc}</usr/share/texmf/f
-onts/type1/public/lm/lmbx10.pfb></usr/share/texmf/fonts/type1/public/lm/lmbx12.
-pfb></usr/share/texmf/fonts/type1/public/lm/lmbx8.pfb></usr/share/texmf/fonts/t
-ype1/public/lm/lmex10.pfb></usr/share/texmf/fonts/type1/public/lm/lmmi10.pfb></
-usr/share/texmf/fonts/type1/public/lm/lmmi6.pfb></usr/share/texmf/fonts/type1/p
-ublic/lm/lmmi7.pfb></usr/share/texmf/fonts/type1/public/lm/lmmi8.pfb></usr/shar
-e/texmf/fonts/type1/public/lm/lmr10.pfb></usr/share/texmf/fonts/type1/public/lm
-/lmr6.pfb></usr/share/texmf/fonts/type1/public/lm/lmr7.pfb></usr/share/texmf/fo
-nts/type1/public/lm/lmr8.pfb></usr/share/texmf/fonts/type1/public/lm/lmr9.pfb><
-/usr/share/texmf/fonts/type1/public/lm/lmri10.pfb></usr/share/texmf/fonts/type1
-/public/lm/lmri9.pfb></usr/share/texmf/fonts/type1/public/lm/lmssbx10.pfb></usr
-/share/texmf/fonts/type1/public/lm/lmsy10.pfb></usr/share/texmf/fonts/type1/pub
-lic/lm/lmsy7.pfb></usr/share/texmf/fonts/type1/public/lm/lmsy8.pfb></usr/share/
-texmf/fonts/type1/public/lm/lmtt10.pfb></usr/share/texlive/texmf-dist/fonts/typ
-e1/public/amsfonts/symbols/msbm10.pfb>
-Output written on paper_final.pdf (7 pages, 488180 bytes).
+-mathex.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm-rmtt.enc}{/usr/share/texmf/
+fonts/enc/dvips/lm/lm-ts1.enc}</usr/share/texmf/fonts/type1/public/lm/lmbx10.pf
+b></usr/share/texmf/fonts/type1/public/lm/lmbx12.pfb></usr/share/texmf/fonts/ty
+pe1/public/lm/lmbx8.pfb></usr/share/texmf/fonts/type1/public/lm/lmex10.pfb></us
+r/share/texmf/fonts/type1/public/lm/lmmi10.pfb></usr/share/texmf/fonts/type1/pu
+blic/lm/lmmi6.pfb></usr/share/texmf/fonts/type1/public/lm/lmmi7.pfb></usr/share
+/texmf/fonts/type1/public/lm/lmmi8.pfb></usr/share/texmf/fonts/type1/public/lm/
+lmr10.pfb></usr/share/texmf/fonts/type1/public/lm/lmr6.pfb></usr/share/texmf/fo
+nts/type1/public/lm/lmr7.pfb></usr/share/texmf/fonts/type1/public/lm/lmr8.pfb><
+/usr/share/texmf/fonts/type1/public/lm/lmr9.pfb></usr/share/texmf/fonts/type1/p
+ublic/lm/lmri10.pfb></usr/share/texmf/fonts/type1/public/lm/lmri9.pfb></usr/sha
+re/texmf/fonts/type1/public/lm/lmssbx10.pfb></usr/share/texmf/fonts/type1/publi
+c/lm/lmsy10.pfb></usr/share/texmf/fonts/type1/public/lm/lmsy7.pfb></usr/share/t
+exmf/fonts/type1/public/lm/lmsy8.pfb></usr/share/texmf/fonts/type1/public/lm/lm
+tt10.pfb></usr/share/texmf/fonts/type1/public/lm/lmtti10.pfb></usr/share/texliv
+e/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb>
+Output written on paper_final.pdf (8 pages, 514452 bytes).
 PDF statistics:
- 415 PDF objects out of 1000 (max. 8388607)
- 318 compressed objects within 4 object streams
- 59 named destinations out of 1000 (max. 500000)
- 72408 words of extra memory for PDF output out of 74296 (max. 10000000)
+ 458 PDF objects out of 1000 (max. 8388607)
+ 357 compressed objects within 4 object streams
+ 67 named destinations out of 1000 (max. 500000)
+ 75496 words of extra memory for PDF output out of 89155 (max. 10000000)
 

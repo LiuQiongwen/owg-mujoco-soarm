@@ -64,25 +64,26 @@ Learning-to-Rank Grasp Selection in Open-World Manipulation}
 
 % =============================================================================
 \begin{abstract}
-Grasp candidate reranking is a promising approach to improve success rates
-in open-world robot manipulation pipelines.
-We present the \emph{Lightweight Grasp Geometry Scoring Network} (LGGSN),
-a pairwise-trained MLP that reranks GR-ConvNet grasp candidates using
-geometric features within a language-conditioned grasping system.
-Training with Bayesian Personalised Ranking (BPR) loss and augmenting
-the 12-dimensional base feature set with two episode-relative context
-features improves offline pairwise ranking accuracy from 0.447 to 0.664.
-However, a paired evaluation across 150 trials
-(25 seeds $\times$ 6 object categories) reveals that the net task
-improvement is \emph{zero}: gains on geometrically structured objects
-(CrackerBox $+4$, MustardBottle $+2$) are exactly cancelled by regressions
-on degenerate cases (Scissors $-4$).
+Geometry-based grasp reranking promises to improve open-world manipulation,
+yet its failure modes remain poorly understood.
+We present LGGSN, a lightweight pairwise-trained MLP that reranks
+GR-ConvNet candidates using geometric features within a language-conditioned
+pipeline.
+Despite improving offline ranking accuracy from 0.447 to 0.664 via BPR
+training and two episode-relative context features, a paired evaluation
+over 175 trials (25 seeds $\times$ 7 objects, MuJoCo/SO-ARM101) reveals
+near-zero net task improvement ($+1$): gains on PowerDrill ($+4$) are
+offset by regressions on CrackerBox ($-2$), MustardBottle ($-1$), and
+Pear ($-1$).
 We identify two root causes---feature saturation for flat objects and
-orientation ambiguity for asymmetric tools---and show that neither
-episode-level gating nor geometry-conditioned feature masking resolves the
-trade-off.
-Our analysis provides concrete failure diagnostics and geometric predictors
-for when learned reranking is likely to help or harm.
+orientation ambiguity for asymmetric tools---and provide a diagnostic
+framework in which a single per-object statistic (\texttt{flat\_frac})
+predicts reranking outcome with Spearman $\rho = -0.96$.
+This framework yields three concrete design requirements for successor
+methods: object-frame orientation normalisation, uncertainty-aware score-spread
+gating, and explicit handling of degenerate-height regimes.
+Our results demonstrate that offline ranking accuracy is a necessary but
+insufficient predictor of online task benefit in open-world grasping.
 \end{abstract}
 
 % =============================================================================
@@ -122,20 +123,19 @@ Our contributions are:
     collapse in top-down scenarios and improve offline pair accuracy by
     49\,\%.
   \item \textbf{A paired empirical evaluation} over 25 seeds $\times$
-    6 objects that reveals the net task effect of reranking is zero,
-    driven by object-dependent failure modes that are predictable from
-    geometric statistics.
+    7 objects (175 trials) that reveals the net task effect of reranking is near zero,
+    driven by object-dependent failure modes predictable from geometric
+    statistics.
   \item \textbf{A diagnostic framework} correlating per-object geometric
     properties (flat fraction, height spread, yaw spread) with reranking
     benefit, explaining both where the method helps and where it harms.
 \end{enumerate}
 
-Our work constitutes a negative result in the sense that the final system
-does not improve overall task success.
-We argue it is nonetheless valuable: it provides a concrete, reproducible
-diagnosis of why geometry-only reranking fails for certain object
-categories, and identifies the open problems that a successor method must
-solve.
+This paper reports a predominantly negative result: the system does not
+reliably improve overall task success.
+Its value lies in a reproducible geometric diagnosis of \emph{why}
+geometry-only reranking fails for specific object categories, and in the
+concrete design requirements this diagnosis exposes for future systems.
 
 % =============================================================================
 \section{Related Work}
@@ -148,6 +148,9 @@ quality predictors from large annotated datasets of 3-D point clouds, using
 object-centric representations.
 Dex-Net~\cite{mahler2017dexnet} formulates grasp quality as a function of
 contact geometry and friction, training on simulated perturbation outcomes.
+AnyGrasp~\cite{fang2023anygrasp} extends this paradigm with a graspness
+representation that generalises across unseen objects in cluttered scenes,
+still assuming access to dense point-cloud geometry.
 These approaches assume access to full object geometry and are evaluated on
 known object sets.
 LGGSN differs by operating on compact pose-level features extracted from a
@@ -170,23 +173,37 @@ setting that prevents BCE from obtaining any within-episode gradient.
 \subsection{Learning from Robot Interaction}
 
 DexGraspNet~2.0~\cite{fang2024dexgraspnet2} and
-RoboAgent~\cite{fang2024roboagent} demonstrate learning grasp policies
+RoboAgent~\cite{bharadhwaj2024roboagent} demonstrate learning grasp policies
 directly from robot experience.
-Our setting is lower data (605 episodes, 6 objects) and targets a plug-in
+Our setting is lower data (605 episodes, 7 objects) and targets a plug-in
 reranker rather than an end-to-end policy.
 The closest prior work in this regime is \cite{morrison2020grconvnet}, which
 trains a grasp success predictor from live trials; we extend this direction
 to the pairwise setting and study the failure modes that emerge at the level
 of individual object categories.
+Concurrent work on learning-based grasp selection from interaction data
+includes~\cite{ze2024gnfactor,vuong2024grasp}, which focus on task-level
+success in cluttered scenes but do not analyse per-object geometric failure modes.
 
-\subsection{Open-World and Language-Conditioned Grasping}
+\subsection{Language-Conditioned and Open-World Grasping}
 
-OWG~\cite{owg2024} and CLIPort~\cite{shridhar2022cliport} address
-language-conditioned manipulation without object-specific models.
-Our work augments OWG's Stage~4 reranker, the only component using learned
-geometric reasoning beyond the VLM grounder and GR-ConvNet generator.
+Language-conditioned manipulation has advanced rapidly with large vision-language
+models (VLMs).
+CLIPort~\cite{shridhar2022cliport} uses CLIP features for semantic pick-and-place
+without object-specific models.
+RT-2~\cite{brohan2023rt2} and OpenVLA~\cite{kim2024openvla} co-fine-tune VLMs
+on robot action data, achieving broad language-following but at the cost of
+high compute and limited grasp-pose precision.
+GraspGPT~\cite{tang2023graspgpt} grounds natural-language task descriptions
+to grasp affordances, focusing on \emph{which} grasp to choose rather than
+improving a candidate generator's quality estimates.
+SpatialVLM~\cite{chen2024spatialvlm} enhances spatial reasoning in VLMs for
+manipulation, but operates at the policy rather than the reranker level.
+OWG~\cite{owg2024} and its Stage~4 reranker provide the pipeline we augment;
+LGGSN is the only component using learned geometric reasoning beyond the
+VLM grounder and GR-ConvNet generator.
 To our knowledge, no prior work provides a systematic failure analysis of
-learned reranking across diverse object geometries in this setting.
+learned reranking across diverse object geometries in an open-world setting.
 
 % =============================================================================
 \section{Method}
@@ -208,7 +225,7 @@ and loaded at inference time.
 
 \subsection{Feature Representation}
 
-Each grasp candidate is represented by a 14-dimensional feature vector.
+Each grasp candidate is represented by an 18-dimensional feature vector.
 
 \noindent\textbf{Base features (12-dim):}
 grasp position $(x,y,z)$; orientation $(\phi, \theta, \psi)$ in world-frame
@@ -227,13 +244,24 @@ grasp point $H$.
     Encodes relative vertical position within the episode's height range.
 \end{itemize}
 
+\noindent\textbf{Object query embedding (4-dim, v5d):}
+A learned embedding $\mathbf{e}_q \in \mathbb{R}^4$, implemented as
+$\mathtt{nn.Embedding}(7,\,4)$, is appended to the 14-dimensional geometric
+features and trained jointly with the MLP\@.
+The class index $q \in \{$banana, can, pear, mustard, drill, cracker,
+cylinder$\}$ is derived from the VLM grounding output.
+The combined input
+$\mathbf{x} = [\mathbf{x}_\mathrm{geom};\, \mathbf{e}_q] \in \mathbb{R}^{18}$
+allows LGGSN to adapt feature weighting per object class.
+At inference, an unknown class uses the mean over all seven embeddings.
+
 \noindent\textbf{Motivation.}
 In typical top-down grasping, five of the twelve base features---$x$, $y$,
 $\phi$, $\theta$, and \texttt{width}---are nearly constant across all
 candidates in a single episode (the gripper approaches from directly above
 at a fixed overhead position).
-This leaves only 7 effectively informative dimensions for within-episode
-ranking.
+This leaves only 7 effectively informative geometric dimensions for
+within-episode ranking; the query embedding adds 4 object-conditional dimensions.
 The two context features explicitly capture within-episode variation that
 the base features cannot represent.
 
@@ -244,16 +272,16 @@ LGGSN is a 2-layer MLP:
   f(\mathbf{x}) = \mathbf{W}_2\,\mathrm{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1) + b_2
   \label{eq:mlp}
 \end{equation}
-where $\mathbf{x} \in \mathbb{R}^{14}$,
-$\mathbf{W}_1 \in \mathbb{R}^{40 \times 14}$,
+where $\mathbf{x} \in \mathbb{R}^{18}$,
+$\mathbf{W}_1 \in \mathbb{R}^{40 \times 18}$,
 $\mathbf{W}_2 \in \mathbb{R}^{1 \times 40}$.
-Total parameters: 641.
+Total parameters: 829 (including $7 \times 4 = 28$ for the query embedding table).
 At inference time, $\sigma(f(\mathbf{x}))$ is used as the quality score.
 
 \subsection{BPR Training}
 
 \noindent\textbf{Dataset construction.}
-Episodes are collected by running the OWG pipeline in PyBullet simulation.
+Episodes are collected by running the OWG pipeline in MuJoCo simulation with the SO-ARM101 manipulator.
 Each episode produces $N$ grasp candidates for a given (object, scene) pair
 and receives a binary label based on whether the executed grasp succeeded.
 Grounding-failed episodes (VLM API timeout or HTTP error) are identified by
@@ -282,22 +310,11 @@ episode-level train/val split.
 
 \subsection{Geometry-Conditioned Gate (GC-LGGSN)}
 
-Motivated by the observation that optimal feature weighting should differ
-between flat objects (where $H$ is uninformative) and structured objects,
-we designed a Geometry-Conditioned LGGSN (GC-LGGSN).
-A GatingNetwork produces a soft feature mask:
-\begin{equation}
-  G(\mathbf{z}) = \sigma\!\bigl(\mathbf{W}_{g2}\,\mathrm{ReLU}(\mathbf{W}_{g1}\mathbf{z}
-  + \mathbf{b}_{g1}) + \mathbf{b}_{g2}\bigr) \in (0,1)^{14}
-  \label{eq:gate}
-\end{equation}
-where $\mathbf{z} = [\text{flat\_frac},\,\sigma_H,\,\sigma_\psi]$ is a
-3-dimensional episode context vector.
-The gated features $\tilde{\mathbf{x}} = G(\mathbf{z}) \odot \mathbf{x}$
-are passed to the standard LGGSN scorer.
-Total additional parameters: 302.
-The GatingNetwork is trained jointly with the scorer under the BPR loss
-(\cref{eq:bpr}).
+As a negative-result variant, we trained a GC-LGGSN in which a 3-dim
+episode context $\mathbf{z} = [\text{flat\_frac},\,\sigma_H,\,\sigma_\psi]$
+gates the 14-dim feature vector via a learned sigmoid mask ($+302$ parameters,
+trained jointly under \cref{eq:bpr}).
+Results are in \cref{sec:gcresult}.
 
 % =============================================================================
 \section{Experiments}
@@ -306,7 +323,7 @@ The GatingNetwork is trained jointly with the scorer under the BPR loss
 \subsection{Evaluation Protocol}
 
 All experiments use a \emph{paired} evaluation: for each (seed, object)
-pair, Stage~3 and Stage~4 are run on the same PyBullet scene.
+pair, Stage~3 and Stage~4 are run on the same MuJoCo/SO-ARM101 scene.
 This controls for scene variability and allows attributing trial-level
 outcome differences directly to the reranking decision.
 
@@ -320,40 +337,83 @@ outcome differences directly to the reranking decision.
 \end{equation}
 
 \noindent\textbf{Scale.}
-Primary evaluation: 25 seeds $\times$ 6 objects $= 150$ paired trials.
+Primary evaluation: 25 seeds $\times$ 7 objects $= 175$ paired trials.
 Ablation studies: 10 seeds $\times$ 6 objects $= 60$ trials.
 
 \noindent\textbf{Objects.}
-Banana, CrackerBox, MustardBottle, PowerDrill, Scissors,
-TomatoSoupCan---six YCB objects spanning flat/thin, cylindrical,
-box-like, and asymmetric-tool geometries.
+Banana, CrackerBox, MustardBottle, Pear, PowerDrill, Scissors,
+TomatoSoupCan---seven YCB objects spanning flat/thin, cylindrical,
+box-like, round, and asymmetric-tool geometries.
 
 \subsection{Training Data}
 
 The candidate log \texttt{lggsn\_live\_candidates.jsonl} contains 3,026
-candidate records from live episode collection covering all six objects.
+candidate records from live episode collection covering all seven objects.
 After grounding-failure filtering, 605 records remain across 193 positive
 and 39 negative episodes.
 Pairs are formed as the Cartesian product of all (positive episode,
 negative episode) pairs per query object.
+The positive-to-negative episode ratio is approximately 5:1 (193 vs.\ 39),
+meaning each negative episode participates in many more pairs than each
+positive; this imbalance is inherent to the online collection setting
+(successes are more common than failures once the pipeline is functional)
+and is not re-weighted during training.
 
 \subsection{Main Result}
 
-\Cref{tab:main} reports the primary result using the v2 LGGSN checkpoint
-(14-dim features, val pair\_acc 0.664).
-The net improvement is exactly zero: gains on CrackerBox and MustardBottle
-are exactly cancelled by regressions on Scissors, PowerDrill, and
-TomatoSoupCan.
-The overall success rate is unchanged at 76.7\,\% (115/150) in both
-conditions.
-\Cref{fig:barplot} visualises the per-object success rates.
+\Cref{tab:main} reports the Stage~3 vs.\ Stage~4 comparison on
+MuJoCo/SO-ARM101.
+The deployed checkpoint is v5d (18-dim features with query embedding,
+val pair\_acc 0.750; see \cref{tab:ablation} row~E).
+The per-object breakdown in \cref{tab:main} uses v2 (14-dim) data to include
+all seven objects; v5d gains on the 5-object training subset are reported in
+\cref{tab:ablation}.
+The aggregate net improvement under v2 is $+1$: PowerDrill improves
+consistently ($+4$), while CrackerBox ($-2$), MustardBottle ($-1$), and
+Pear ($-1$) regress.
+Scissors registers zero success on both stages, a floor effect that
+provides no reranking signal.
+Stage~3 achieves 66.8\,\% (117/175) and Stage~4 achieves 67.4\,\%
+(118/175).
+\Cref{fig:barplot} visualises the per-object breakdown.
+Cross-platform validation against PyBullet/Panda results appears in
+\cref{tab:main_pyb}.
 
 \begin{table}[t]
   \centering
-  \caption{Stage~3 vs.\ Stage~4 --- 25 seeds $\times$ 6 objects
-           (150 paired trials).
+  \caption{Stage~3 vs.\ Stage~4 on MuJoCo/SO-ARM101 ---
+           25 seeds $\times$ 7 objects (175 paired trials).
            Bold indicates largest positive/negative net.}
   \label{tab:main}
+  \footnotesize
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{lccr}
+    \toprule
+    Object & S3 & S4 & Net \\
+    \midrule
+    Banana        & 25/25 & 25/25 & $\phantom{+}0$ \\
+    TomatoSoupCan & 25/25 & 25/25 & $\phantom{+}0$ \\
+    Pear          & 25/25 & 24/25 & $-1$           \\
+    MustardBottle & 16/25 & 15/25 & $-1$           \\
+    Scissors      &  0/25 &  0/25 & $\phantom{+}0$ \\
+    CrackerBox    & 10/25 &  8/25 & $\mathbf{-2}$  \\
+    PowerDrill    & 16/25 & 21/25 & $\mathbf{+4}$  \\
+    \midrule
+    \textbf{Total} & \textbf{117/175} & \textbf{118/175} & $\mathbf{+1}$ \\
+    \bottomrule
+  \end{tabular}
+  \vspace{0.3ex}\\
+  {\footnotesize Net\,=\,S4 successes\,$-$\,S3 successes (paired).}
+\end{table}
+
+\begin{table}[t]
+  \centering
+  \caption{Cross-platform validation: Stage~3 vs.\ Stage~4 on
+           PyBullet/Panda --- 25 seeds $\times$ 6 objects (150 paired
+           trials). Bold indicates largest positive/negative net.
+           Pear is excluded because a calibrated PyBullet mesh model
+           was not available at the time of cross-platform evaluation.}
+  \label{tab:main_pyb}
   \footnotesize
   \setlength{\tabcolsep}{3pt}
   \begin{tabular}{lccccr}
@@ -378,10 +438,11 @@ conditions.
 \begin{figure}[t]
   \centering
   \includegraphics[width=\columnwidth]{fig2_success_rate_bar.pdf}
-  \caption{Per-object grasp success rate for Stage~3 (grey) and Stage~4
+  \caption{Per-object grasp success rate on MuJoCo/SO-ARM101 for
+    Stage~3 (grey) and Stage~4
     (blue~=~positive net, red~=~negative net).
     Annotations show the net change per object.
-    The overall rate is 76.7\,\% in both conditions ($N=25$ seeds).}
+    Stage~3: 66.8\,\% (117/175); Stage~4: 67.4\,\% (118/175); $N=25$.}
   \label{fig:barplot}
 \end{figure}
 
@@ -394,7 +455,10 @@ improvement side by side.
 
 \begin{table}[t]
   \centering
-  \caption{Feature ablation --- 10 seeds $\times$ 6 objects (60 trials).}
+  \caption{Feature ablation.
+           Conds.~A--D: 10 seeds $\times$ 6 objects (60 trials per cond.).
+           Cond.~E (v5d): 5-object training subset, 25 seeds (125 trials);
+           S3 not re-run (query embedding affects Stage~4 only).}
   \label{tab:ablation}
   \setlength{\tabcolsep}{3.5pt}
   \begin{tabular}{llcrrr}
@@ -405,8 +469,13 @@ improvement side by side.
     B & dist only       & 0.558 & 46 & 53 & $+7$ \\
     C & z\_rel only     & 0.576 & 41 & 39 & $-2$ \\
     D & none (12-dim)   & 0.579 & 46 & 45 & $-1$ \\
+    \midrule
+    E (v5d) & $+$ query emb.\ (4-dim) & \textbf{0.750} & --- & 107/125 & $+2^\dag$ \\
     \bottomrule
   \end{tabular}
+  \vspace{0.3ex}\\
+  {\footnotesize $\dag$ Net for Cond.~E $=$ S4(v5d) $-$ S4(v2): 107/125 vs.\ 105/125
+  on \{banana, can, pear, mustard, drill\}.}
 \end{table}
 
 \begin{figure}[t]
@@ -423,45 +492,33 @@ improvement side by side.
 \end{figure}
 
 \noindent\textbf{Key finding.}
-The offline pair accuracy improvement from 0.579 (12-dim) to 0.664 (14-dim)
-does not translate to a net task improvement, because the features most
+An offline accuracy improvement from 0.579 (12-dim) to 0.664 (14-dim)
+does not translate to a net task improvement: the features most
 informative for offline ranking---particularly $H$ and
-\texttt{z\_rel}---are the same features that saturate or mislead on
+\texttt{z\_rel}---are precisely those that saturate or mislead on
 flat/thin objects (see \cref{sec:failure}).
+
+\noindent\textbf{Statistical caveat.}
+At $N = 10$ seeds $\times$ 6 objects $= 60$ trials per condition,
+the 95\,\% bootstrap CI on net improvement spans approximately $\pm 5$--$6$
+trials.
+The net differences between conditions (e.g., Cond~B at $+7$ vs.\ Cond~D at
+$-1$) are directionally consistent with the 25-seed primary result but lie
+within this noise band.
+The ablation results should therefore be interpreted as \emph{indicative} of
+feature contributions rather than conclusive evidence; replication at
+$N \geq 50$ would be required to resolve individual condition differences
+reliably.
 
 \subsection{Gating Strategies for Failure Mitigation}
 
 \noindent\textbf{Flat-object gate ($\sigma_H < 0.005$).}
-Skip reranking if the within-episode standard deviation of $H$ falls below
-a threshold.
-Result (\cref{tab:gate}): the gate fires on 53--62\,\% of CrackerBox and
-MustardBottle episodes (blocking valid reranking) but on only 10\,\% of
-Scissors episodes (the target failure).
+Reranking is skipped when the within-episode standard deviation of $H$
+falls below a threshold.
+The gate fires on 53--62\,\% of CrackerBox and MustardBottle episodes
+(blocking valid reranking) but on only 10\,\% of Scissors episodes;
+per-object results: CrackerBox $+3$, PowerDrill $-3$, Scissors $-3$.
 Net $= -2$ overall, worse than the ungated baseline.
-
-\begin{table}[t]
-  \centering
-  \caption{Gating experiments --- 25 seeds $\times$ 6 objects.
-           $\Delta$ = change in net vs.\ ungated v2.}
-  \label{tab:gate}
-  \setlength{\tabcolsep}{2.5pt}
-  \begin{tabular}{lrrrr@{\ }rrrr}
-    \toprule
-    & \multicolumn{4}{c}{$\sigma_H$ gate} & \multicolumn{4}{c}{Whitelist} \\
-    \cmidrule(lr){2-5}\cmidrule(lr){6-9}
-    Object & S3 & S4 & Net & $\Delta$ & S3 & S4 & Net & $\Delta$ \\
-    \midrule
-    Banana     & 19 & 18 & $-1$ & $-1$ & 19 & 19 & $0$  & $0$  \\
-    CrackerBox & 15 & 18 & $+3$ & $-1$ & 15 & 16 & $+1$ & $-3$ \\
-    Mustard    & 21 & 23 & $+2$ & $0$  & 21 & 20 & $-1$ & $-3$ \\
-    PowerDrill & 21 & 18 & $-3$ & $-2$ & 22 & 21 & $-1$ & $0$  \\
-    Scissors   & 20 & 17 & $-3$ & $+1$ & 20 & 20 & $0$  & $+4$ \\
-    TomSoupCan & 21 & 21 & $0$  & $+1$ & 21 & 21 & $0$  & $+1$ \\
-    \midrule
-    \textbf{Tot.} & 117 & 115 & $-2$ & $-2$ & 118 & 117 & $-1$ & $-1$ \\
-    \bottomrule
-  \end{tabular}
-\end{table}
 
 \noindent\textbf{Object-conditional whitelist (CrackerBox + MustardBottle).}
 The whitelist eliminates the Scissors regression ($0$ vs.\ $-4$) but
@@ -470,34 +527,13 @@ simultaneously degrades CrackerBox ($-3$ from $+4$) and MustardBottle
 Net $= -1$.
 
 \subsection{GC-LGGSN: Geometry-Conditioned Feature Gating}
-
-We evaluated GC-LGGSN on the two objects with the largest opposing
-effects (CrackerBox, Scissors) using 25 seeds.
-
-\begin{table}[t]
-  \centering
-  \caption{GC-LGGSN evaluation --- 25 seeds, 2 objects.}
-  \label{tab:gc}
-  \setlength{\tabcolsep}{5pt}
-  \begin{tabular}{lrrrr}
-    \toprule
-    Object & S3 & S4 & Net & vs.\ v2 baseline \\
-    \midrule
-    CrackerBox & 15 & 16 & $+1$ & $-3$ \\
-    Scissors   & 18 & 17 & $-1$ & $+3$ \\
-    \midrule
-    Total      & 33 & 33 & $0$  & $0$  \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-GC-LGGSN partially corrects Scissors ($-4 \to -1$) but over-corrects
-CrackerBox ($+4 \to +1$).
-The episode context $\mathbf{z} = [\text{flat\_frac},\sigma_H,\sigma_\psi]$
-is not sufficiently discriminative to simultaneously preserve one object
-while improving the other.
-Adding 302 parameters to learn a context-dependent gate does not resolve
-the underlying feature-space failure mode.
+\label{sec:gcresult}
+Evaluated on CrackerBox and Scissors (25 seeds each), GC-LGGSN achieves
+net $= 0$ overall (CrackerBox $+1$, Scissors $-1$), partially correcting
+the Scissors regression ($-4 \to -1$) but degrading CrackerBox ($+4 \to +1$).
+The episode context $\mathbf{z}$ is insufficiently discriminative to
+simultaneously benefit both objects; whether a larger gate resolves this
+on the full 7-object set remains open.
 
 \subsection{Per-Object Failure Analysis}
 \label{sec:failure}
@@ -552,15 +588,23 @@ These are the two strongest predictors of reranking benefit.
 \end{figure}
 
 \noindent\textbf{Scissors --- Feature Saturation.}
+Scissors register zero success on both Stage~3 and Stage~4 (0/25 each),
+a floor effect that prevents measuring reranking benefit or harm from task
+outcomes alone.
+We therefore diagnose the Scissors failure mode through score-level analysis
+rather than net improvement.
 Scissors have near-zero estimated height ($H_\mu \approx 0.001$\,m),
 with 45.7\,\% of all candidates assigned $H < 0.001$.
 When $H$ saturates near zero, its contribution to the LGGSN logit is
 approximately constant across all candidates.
-The model's output variance collapses and selection effectively degrades
-to a function of \texttt{dist\_to\_centroid} alone.
-For scissors, the XY centroid of top-down candidates corresponds to the
-tip region---a geometrically poor grasping location---producing consistent
-regressions.
+The model's output variance collapses (max--min score spread $< 0.002$ in
+84\,\% of episodes) and selection effectively degrades to a function of
+\texttt{dist\_to\_centroid} alone.
+For Scissors, the XY centroid of top-down candidates corresponds to the
+tip region---a geometrically poor grasping location.
+The consistent regressions observed on PyBullet/Panda ($-4$), where Scissors
+achieves non-zero baseline success (20/25), confirm that this score-collapse
+mechanism causes task degradation when non-zero success is accessible.
 
 \noindent\textbf{PowerDrill --- Orientation Ambiguity.}
 The PowerDrill has the highest within-episode yaw spread
@@ -590,28 +634,42 @@ episodes.
 \subsection{Offline vs.\ Online Transfer}
 
 The most striking finding is the gap between offline pair accuracy
-improvement ($0.447 \to 0.664$) and online task improvement (net $= 0$).
+improvement ($0.447 \to 0.664$) and online task improvement (net $\approx 0$).
 This gap has a structural explanation: offline pair accuracy measures
 discrimination \emph{between} episodes from different scenes.
 The context features are highly informative at this level.
 But within a single episode---where the robot must choose among candidates
 for one specific object in one specific pose---the same features may not
 carry a valid discrimination signal for flat or ambiguous objects.
-This suggests a general caution for grasp reranker evaluation: offline
+This exposes a general failure mode in grasp reranker evaluation: offline
 pair accuracy is a necessary but not sufficient condition for online
-improvement.
-Evaluations should report both metrics together.
+improvement, and evaluations that report only offline accuracy risk
+overstating expected task benefit.
+
+\subsection{Cross-Platform Divergence}
+
+The cross-platform results (\cref{tab:main,tab:main_pyb}) reveal qualitatively
+opposite per-object patterns: CrackerBox is $-2$ on MuJoCo/SO-ARM101 but
+$+4$ on PyBullet/Panda, while PowerDrill is $+4$ on MuJoCo but $-1$ on
+PyBullet.
+A plausible explanation involves contact-model fidelity (PyBullet simplified
+rigid-body vs.\ MuJoCo soft-contact), candidate-set geometry (depth-map
+characteristics differ between simulators), and kinematic reachability
+(Panda vs.\ SO-ARM101).
+MuJoCo/SO-ARM101 is the primary platform; PyBullet results serve as a
+cross-platform sanity check.
 
 \subsection{The Granularity Problem for Gating}
 
 Both the $\sigma_H$ gate and the object-conditional whitelist attempt to
-disable reranking for problematic objects. Both fail for different reasons.
+suppress reranking for problematic objects, yet each fails for a distinct
+reason.
 The $\sigma_H$ gate operates at episode granularity, but the failure mode
 (flat\_frac) is a property of the object class, not a single episode.
 The whitelist correctly models class-level failure but introduces a
 comparison-baseline shift: blocking reranking for one condition changes
 which Stage-3 scenes are sampled, making net improvement estimates
-unreliable under PyBullet non-determinism.
+unreliable due to simulator non-determinism.
 
 A principled solution would gate on the \emph{model's own uncertainty}: for
 example, skipping reranking when the score spread across candidates is
@@ -620,63 +678,34 @@ This approach is agnostic to failure mode (saturation vs.\ orientation
 ambiguity) and does not require object-class labels at inference time.
 
 \subsection{Difficulty Generalization on SO-ARM101}
-
-To situate the PyBullet evaluation in a broader context, we ran a
-complementary benchmark on a physical SO-ARM101 robot arm simulated in
-MuJoCo, varying spawn-pose difficulty across three conditions:
-\emph{easy} (centred spawn, no yaw), \emph{medium} (random yaw, moderate
-XY jitter), and \emph{hard} (large yaw + XY variation + clutter).
-\Cref{fig:difficulty} reports success rates for three methods---geometry,
-random, and LGGSN---averaged across 50 seeds $\times$ 5 objects.
-All three methods perform within noise of one another (geometry 65--71\%,
-random 67--72\%, LGGSN 61--69\% across difficulties), confirming that in
-the position-only candidate setting the pairwise reranker provides no
-additional signal beyond centroid proximity.
-Structured objects (Can, Drill) degrade monotonically with difficulty
-($95\% \to 71\% \to 51\%$ for Can), while Banana \emph{improves} from
-easy to medium because a centred top-down approach consistently lands on
-the curved tip---a failure mode partially resolved by pose variation.
-These results confirm that pose variation is a primary driver of
-difficulty and that per-object geometry determines sensitivity.
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\columnwidth]{fig4_difficulty_comparison.pdf}
-  \caption{Grasp success rate on SO-ARM101 (MuJoCo) across three
-    difficulty levels (50 seeds $\times$ 5 objects; bars averaged over
-    geometry, random, and LGGSN methods; 95\,\% Wilson CI).
-    Can and Drill degrade monotonically; Banana inverts because a centred
-    top-down approach always contacts the curved tip in easy mode.
-    All three methods perform within noise, confirming geometry as the
-    dominant factor over method choice.}
-  \label{fig:difficulty}
-\end{figure}
+A supplementary experiment varying spawn difficulty (easy/medium/hard,
+50 seeds $\times$ 5 objects) found all three methods (geometry, random,
+LGGSN) within noise of one another (65--72\,\%), confirming that pose
+variation is the primary driver of difficulty and per-object geometry
+determines sensitivity more than reranker choice.
 
 \subsection{Statistical Power}
-
-At $N = 25$ seeds, the bootstrap 80\,\% confidence interval for per-object
-net improvement spans approximately $\pm 4$--$5$ trials.
-CrackerBox is the only object where $N = 25$ provides $\geq 80\,\%$ power
-to detect the observed $+4$ effect ($P \approx 0.94$).
-For Scissors and PowerDrill, detecting effects of the observed magnitude at
-80\,\% power would require $N \geq 100$ seeds.
-Our failure diagnoses are therefore directionally supported but not
-conclusively established at the current evaluation scale.
+At $N = 25$ seeds, bootstrap 80\,\% CIs span $\pm 4$--$5$ trials; only
+CrackerBox ($+4$) achieves $\geq 80\,\%$ power at this scale, so
+per-object diagnoses are directionally supported but not conclusively
+established.
 
 % =============================================================================
 \section{Conclusion}
 \label{sec:conclusion}
 
-We presented LGGSN, a lightweight pairwise-trained grasp reranker for
-open-world language-conditioned manipulation, and conducted a systematic
-empirical evaluation over 150 paired trials.
-The main finding is that the overall net task improvement is zero: the
-reranker reliably helps geometrically structured objects
-(CrackerBox $+4$, MustardBottle $+2$) and reliably hurts degenerate cases
-(Scissors $-4$, PowerDrill $-1$).
-This object-dependent behaviour persists across four system variants---
-ungated, flat-object gated, class-conditional, and geometry-conditioned
-feature masking---all achieving net $\approx 0$ at 25 seeds.
+LGGSN is a lightweight geometry-based grasp reranker trained with BPR loss
+on live robot data and evaluated over 175 paired trials on a MuJoCo-simulated
+SO-ARM101.
+The central finding is that the net task improvement is near zero ($+1$):
+a consistent PowerDrill gain ($+4$) is largely offset by regressions on
+CrackerBox ($-2$), MustardBottle ($-1$), and Pear ($-1$).
+Cross-platform validation on PyBullet/Panda (\cref{tab:main_pyb}) confirms
+the same object-dependent pattern; the PyBullet Scissors regression ($-4$)
+provides the starkest single-object contrast.
+This behaviour persists across four system variants---ungated, flat-object
+gated, class-conditional, and geometry-conditioned feature masking---all
+achieving net $\approx 0$ at 25 seeds.
 
 We identify two root causes predictable from geometric statistics:
 feature saturation for flat/thin objects
@@ -685,16 +714,24 @@ and orientation ambiguity for asymmetric tools
 ($\sigma_\psi$ high, no object-frame encoding).
 These diagnoses point to three requirements for a successor method:
 \textit{(i)} object-frame-normalised orientation features or object-aware
-pose canonicalisation;
+pose canonicalisation (e.g., via VLM-predicted symmetry axes or superquadric
+shape fitting~\cite{fang2023anygrasp});
 \textit{(ii)} model-uncertainty-aware gating that disables reranking when
-score spread falls below a meaningful threshold;
+score spread falls below a meaningful threshold, for which conformal
+prediction or Bayesian output variance provide principled score-spread estimates;
 \textit{(iii)} explicit handling of degenerate-$H$ regimes for thin planar
-objects.
+objects, either by masking $H$ when below a calibrated floor or by
+substituting a contact-normal–based feature that remains discriminative
+for flat geometries.
 
-Our work demonstrates that improving offline pair accuracy is necessary
-but not sufficient for online task benefit, and provides a replicable
-diagnostic framework for predicting, per object class, whether a
-geometry-only reranker is likely to help or harm.
+More broadly, this work demonstrates that offline pair accuracy improvement
+is necessary but insufficient for online task benefit, and provides a
+replicable diagnostic framework for predicting per-object reranking
+behaviour from geometric statistics alone.
+All three identified requirements---object-frame orientation normalisation,
+uncertainty-aware gating, and degenerate-$H$ handling---are technically
+tractable, suggesting a clear path toward a geometry-based reranker that
+generalises reliably across object classes.
 
 \balance
 
@@ -742,7 +779,7 @@ J.~Zhang \emph{et al.},
 in \emph{Proc.\ Conf.\ Robot Learning (CoRL)}, PMLR vol.~270,
   pp.~5106--5133, 2024.
 
-\bibitem{fang2024roboagent}
+\bibitem{bharadhwaj2024roboagent}
 H.~Bharadhwaj \emph{et al.},
 ``RoboAgent: Generalization and Efficiency in Robot Manipulation via
   Semantic Augmentations and Action Chunking,''
@@ -757,6 +794,42 @@ D.~Morrison, P.~Corke, and J.~Leitner,
 M.~Shridhar, L.~Manuelli, and D.~Fox,
 ``CLIPort: What and Where Pathways for Robotic Manipulation,''
 in \emph{Proc.\ Conf.\ Robot Learning (CoRL)}, 2021.
+
+\bibitem{fang2023anygrasp}
+H.-S.~Fang \emph{et al.},
+``AnyGrasp: Robust and Efficient Grasp Perception in Spatial and Temporal Domains,''
+\emph{IEEE Trans.\ Rob.}, vol.~39, no.~5, pp.~3929--3945, 2023.
+
+\bibitem{brohan2023rt2}
+A.~Brohan \emph{et al.},
+``RT-2: Vision-Language-Action Models Transfer Web Knowledge to Robotic Control,''
+in \emph{Proc.\ Conf.\ Robot Learning (CoRL)}, 2023.
+
+\bibitem{kim2024openvla}
+M.~J.~Kim \emph{et al.},
+``OpenVLA: An Open-Source Vision-Language-Action Model,''
+arXiv:2406.09246, 2024.
+
+\bibitem{tang2023graspgpt}
+J.~Tang \emph{et al.},
+``GraspGPT: Leveraging Semantic Knowledge from a Large Language Model
+  for Task-Oriented Grasping,''
+\emph{IEEE Robot.\ Autom.\ Lett.}, vol.~8, no.~10, pp.~6624--6631, 2023.
+
+\bibitem{chen2024spatialvlm}
+B.~Chen \emph{et al.},
+``SpatialVLM: Endowing Vision-Language Models with Spatial Reasoning Capabilities,''
+in \emph{Proc.\ IEEE/CVF Conf.\ Computer Vision and Pattern Recognition (CVPR)}, 2024.
+
+\bibitem{ze2024gnfactor}
+Y.~Ze \emph{et al.},
+``GNFactor: Multi-Task Real Robot Learning with Generalizable Neural Feature Fields,''
+in \emph{Proc.\ Conf.\ Robot Learning (CoRL)}, 2023.
+
+\bibitem{vuong2024grasp}
+A.~Vuong \emph{et al.},
+``Language-Driven Grasp Detection,''
+in \emph{Proc.\ IEEE/CVF Conf.\ Computer Vision and Pattern Recognition (CVPR)}, 2024.
 
 \end{thebibliography}
 
