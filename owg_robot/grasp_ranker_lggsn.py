@@ -149,6 +149,7 @@ class LggsnGraspRanker:
                 geom_dim=ckpt_dim,
                 query_dim=_query_dim,
                 hidden_dim=40,
+                dropout=0.1,
             )
             print(f"[LggsnGraspRanker] loading checkpoint: {model_path}")
 
@@ -290,20 +291,24 @@ class LggsnGraspRanker:
                 z_rel = ((z - z_min) / (z_max - z_min + 1e-8)).reshape(-1, 1) # [N,1]
                 extra.append(z_rel)
 
-        if self._use_pc_feats and episode_pc is not None:
-            pc_rows = []
-            for i, g_raw in enumerate(grasps):
-                g     = self._unwrap_grasp(g_raw)
-                pos   = arr[i, :3]
-                rpy   = [float(r) for r in (g.get("rpy") or [np.pi, 0., 0.])[:3]]
-                R     = rpy_to_R(*rpy)
-                width = float(arr[i, 6])
-                pc_rows.append([
-                    local_point_density(pos, R, width, episode_pc),
-                    normal_consistency(pos, R, width, episode_pc),
-                    contact_width_ratio(pos, R, width, episode_pc),
-                ])
-            extra.append(np.array(pc_rows, dtype=np.float32))
+        if self._use_pc_feats:
+            if episode_pc is not None:
+                pc_rows = []
+                for i, g_raw in enumerate(grasps):
+                    g     = self._unwrap_grasp(g_raw)
+                    pos   = arr[i, :3]
+                    rpy   = [float(r) for r in (g.get("rpy") or [np.pi, 0., 0.])[:3]]
+                    R     = rpy_to_R(*rpy)
+                    width = float(arr[i, 6])
+                    pc_rows.append([
+                        local_point_density(pos, R, width, episode_pc),
+                        normal_consistency(pos, R, width, episode_pc),
+                        contact_width_ratio(pos, R, width, episode_pc),
+                    ])
+                extra.append(np.array(pc_rows, dtype=np.float32))
+            else:
+                # no point cloud available: zero-fill so feature dim stays consistent
+                extra.append(np.zeros((len(grasps), 3), dtype=np.float32))
 
         if self._use_pe_ik:
             pe_vals = []
@@ -403,4 +408,35 @@ class LggsnGraspRanker:
 
         order = np.argsort(-score)                # 从大到小排序
         return order, score
+
+    def rank_mc(
+        self,
+        grasps,
+        query_text: str | None = None,
+        T: int = 20,
+        episode_pc: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Like rank() but uses MC Dropout. Returns (order, mean_score, std_score).
+        Falls back to rank() for GC-LGGSN (no uncertainty support there)."""
+        if self._gc_mode or len(grasps) == 0:
+            order, scores = self.rank(grasps, query_text=query_text, episode_pc=episode_pc)
+            return order, scores, np.zeros_like(scores)
+
+        X = self._featurize(grasps, episode_pc=episode_pc)
+        geom = torch.from_numpy(X).to(self.device)
+        if self._use_query_emb and query_text is not None:
+            _key = query_text.lower().replace(" ", "").replace("ycb", "")
+            _cid = _OBJECT_CLASS_MAP.get(_key)
+            if _cid is not None:
+                q_id = torch.full((len(grasps),), _cid, dtype=torch.long, device=self.device)
+            else:
+                q_id = torch.zeros(len(grasps), dtype=torch.long, device=self.device)
+        else:
+            q_id = torch.zeros(len(grasps), dtype=torch.long, device=self.device)
+
+        mean_s, std_s = self.model.predict_with_uncertainty(geom, q_id, T=T)
+        mean_np = mean_s.cpu().numpy()
+        std_np  = std_s.cpu().numpy()
+        order   = np.argsort(-mean_np)
+        return order, mean_np, std_np
 

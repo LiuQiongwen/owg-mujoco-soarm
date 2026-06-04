@@ -398,18 +398,29 @@ class OwgPolicy:
             if len(obj_grasps) == 0:
                 action['grasps'] = []
             else:
-                # 用 LGGSN 对 3D grasps 打分并排序
-                order, scores = self.grasp_ranker.rank(
-                    obj_grasps,
-                    query_text=user_input,
-                    obj_type=None,
-                )
-                score_spread = float(scores.max() - scores.min()) if len(scores) > 1 else 0.0
-                gate_delta = float(os.environ.get("OWG_GATE_DELTA", "0.0"))
-                if gate_delta > 0.0 and score_spread < gate_delta:
-                    print(f"[GATE] score_spread={score_spread:.4f}, skipping reranking")
+                mc_delta = float(os.environ.get("OWG_MC_GATE_DELTA", "0.0"))
+                if mc_delta > 0.0 and not getattr(self.grasp_ranker, '_gc_mode', False):
+                    order, scores, std_scores = self.grasp_ranker.rank_mc(
+                        obj_grasps, query_text=user_input
+                    )
+                    uncertainty = float(std_scores.mean())
+                    if uncertainty > mc_delta:
+                        print(f"[MC-GATE] uncertainty={uncertainty:.4f} > {mc_delta:.3f}, skipping reranking")
+                    else:
+                        print(f"[MC-GATE] uncertainty={uncertainty:.4f} <= {mc_delta:.3f}, using reranking")
+                        action['grasps'] = order.tolist()
                 else:
-                    action['grasps'] = order.tolist()
+                    order, scores = self.grasp_ranker.rank(
+                        obj_grasps,
+                        query_text=user_input,
+                        obj_type=None,
+                    )
+                    score_spread = float(scores.max() - scores.min()) if len(scores) > 1 else 0.0
+                    gate_delta = float(os.environ.get("OWG_GATE_DELTA", "0.0"))
+                    if gate_delta > 0.0 and score_spread < gate_delta:
+                        print(f"[GATE] score_spread={score_spread:.4f}, skipping reranking")
+                    else:
+                        action['grasps'] = order.tolist()
                 if getattr(self, "verbose", False) and len(order) > 0:
                     print("🟢 LGGSN grasp scores (top 5):", scores[order[:5]])
 

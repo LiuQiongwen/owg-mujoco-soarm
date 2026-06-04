@@ -63,6 +63,30 @@ class LGGSN(nn.Module):
         logit = self.mlp[2](h).squeeze(-1)  # [B]
         return logit
 
+    def predict_with_uncertainty(
+        self,
+        geom: torch.Tensor,
+        query_id: torch.Tensor,
+        T: int = 20,
+        p: float = 0.1,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """MC Dropout: T stochastic forward passes, returns (mean_score, std_score)."""
+        drop = self._drop if self._drop is not None else nn.Dropout(p=p)
+        drop.train()  # activate dropout regardless of parent module's mode
+        stacked = []
+        with torch.no_grad():
+            for _ in range(T):
+                x = geom
+                if self.use_query:
+                    q = self.query_emb(query_id)
+                    x = torch.cat([geom, q], dim=-1)
+                h = self.mlp[1](self.mlp[0](x))
+                h = drop(h)
+                logit = self.mlp[2](h).squeeze(-1)
+                stacked.append(torch.sigmoid(logit))
+        scores = torch.stack(stacked, dim=0)  # [T, N]
+        return scores.mean(dim=0), scores.std(dim=0)
+
 
 class GatingNetwork(nn.Module):
     """

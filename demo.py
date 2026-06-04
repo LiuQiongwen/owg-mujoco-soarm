@@ -118,10 +118,14 @@ def main():
     parser.add_argument("--gate-delta", type=float, default=0.15, dest="gate_delta",
                         help="Uncertainty gate threshold: if max(scores)-min(scores) < gate_delta, "
                              "skip LGGSN reranking and use GR-ConvNet top-1. 0.0 = disabled.")
+    parser.add_argument("--mc-gate-delta", type=float, default=0.0, dest="mc_gate_delta",
+                        help="MC Dropout uncertainty gate: if mean(std) > delta, skip reranking. "
+                             "0.0 = disabled. Overrides --gate-delta when non-zero.")
 
     args = parser.parse_args()
 
     os.environ["OWG_GATE_DELTA"] = str(args.gate_delta)
+    os.environ["OWG_MC_GATE_DELTA"] = str(args.mc_gate_delta)
 
     # ---- Load config FIRST ----
     cfg = load_config(args.config)
