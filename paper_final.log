@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  4 JUN 2026 02:55
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  4 JUN 2026 09:31
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -776,7 +776,7 @@ LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <8> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 390.
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <5> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 390.
-<figures//fig2_success_rate_bar.pdf, id=194, 403.38423pt x 219.72853pt>
+<figures//fig2_success_rate_bar.pdf, id=198, 403.38423pt x 219.72853pt>
 File: figures//fig2_success_rate_bar.pdf Graphic file (type pdf)
 <use figures//fig2_success_rate_bar.pdf>
 Package pdftex.def Info: figures//fig2_success_rate_bar.pdf  used on input line
@@ -787,44 +787,41 @@ Overfull \hbox (44.66113pt too wide) in paragraph at lines 464--476
  [][] 
  []
 
-<figures//fig3_ablation.pdf, id=197, 401.22548pt x 211.51146pt>
+<figures//fig3_ablation.pdf, id=201, 401.22548pt x 211.51146pt>
 File: figures//fig3_ablation.pdf Graphic file (type pdf)
 <use figures//fig3_ablation.pdf>
 Package pdftex.def Info: figures//fig3_ablation.pdf  used on input line 483.
 (pdftex.def)             Requested size: 221.32687pt x 116.67697pt.
 [4] [5 <./figures//fig2_success_rate_bar.pdf> <./figures//fig3_ablation.pdf>]
-<figures//fig1_flat_frac_vs_net.pdf, id=284, 281.19899pt x 219.82677pt>
+<figures//fig1_flat_frac_vs_net.pdf, id=289, 281.19899pt x 219.82677pt>
 File: figures//fig1_flat_frac_vs_net.pdf Graphic file (type pdf)
 <use figures//fig1_flat_frac_vs_net.pdf>
 Package pdftex.def Info: figures//fig1_flat_frac_vs_net.pdf  used on input line
- 590.
+ 622.
 (pdftex.def)             Requested size: 221.32687pt x 173.02727pt.
 
 [6 <./figures//fig1_flat_frac_vs_net.pdf>]
-Underfull \hbox (badness 3503) in paragraph at lines 693--693
+Underfull \vbox (badness 2310) has occurred while \output is active []
+
+
+Underfull \hbox (badness 3503) in paragraph at lines 726--726
 |[]\T1/lmr/bx/n/11 (+20) Difficulty Gen-er-al-iza-tion on SO-
  []
 
 [7]
-Underfull \vbox (badness 3260) has occurred while \output is active []
-
-
-Overfull \vbox (2.125pt too high) has occurred while \output is active []
+Overfull \vbox (1.375pt too high) has occurred while \output is active []
 
  [8]
 (./paper_final.aux)
-
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
-
 Package rerunfilecheck Info: File `paper_final.out' has not changed.
-(rerunfilecheck)             Checksum: 677391E6E603B7C4D7E968D4A7C87AED;4765.
+(rerunfilecheck)             Checksum: 60621BACE9D87B6F4A7EAB92CDCD3100;4984.
  ) 
 Here is how much of TeX's memory you used:
- 15865 strings out of 478287
- 261477 string characters out of 5849289
+ 15876 strings out of 478287
+ 261632 string characters out of 5849289
  609579 words of memory out of 5000000
- 33412 multiletter control sequences out of 15000+600000
- 596667 words of font info for 275 fonts, out of 8000000 for 9000
+ 33417 multiletter control sequences out of 15000+600000
+ 596833 words of font info for 277 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  70i,13n,76p,1008b,442s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texmf/fonts/enc/dvips/lm/lm-ec.enc}{/usr/share/texmf/fonts/enc/dv
@@ -847,10 +844,10 @@ exmf/fonts/type1/public/lm/lmsy7.pfb></usr/share/texmf/fonts/type1/public/lm/lm
 sy8.pfb></usr/share/texmf/fonts/type1/public/lm/lmtt10.pfb></usr/share/texmf/fo
 nts/type1/public/lm/lmtti10.pfb></usr/share/texlive/texmf-dist/fonts/type1/publ
 ic/amsfonts/symbols/msbm10.pfb>
-Output written on paper_final.pdf (8 pages, 519002 bytes).
+Output written on paper_final.pdf (8 pages, 521698 bytes).
 PDF statistics:
- 465 PDF objects out of 1000 (max. 8388607)
- 361 compressed objects within 4 object streams
- 67 named destinations out of 1000 (max. 500000)
- 75496 words of extra memory for PDF output out of 89155 (max. 10000000)
+ 473 PDF objects out of 1000 (max. 8388607)
+ 369 compressed objects within 4 object streams
+ 69 named destinations out of 1000 (max. 500000)
+ 75504 words of extra memory for PDF output out of 89155 (max. 10000000)
 

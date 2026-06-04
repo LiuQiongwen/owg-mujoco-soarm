@@ -526,6 +526,38 @@ simultaneously degrades CrackerBox ($-3$ from $+4$) and MustardBottle
 ($-3$ from $+2$).
 Net $= -1$.
 
+\subsection{Score-Spread Uncertainty Gating}
+\label{sec:spreadgate}
+
+\begin{table}[t]
+  \centering
+  \caption{Score-spread gate ablation (Stage~4, v5d; 25 seeds $\times$ 7
+           objects $= 175$ trials). Gate fires when LGGSN max$-$min score
+           $< \Delta$; fired episodes fall back to GR-ConvNet order.}
+  \label{tab:spreadgate}
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{lrrc}
+    \toprule
+    Condition & Trials & Net & Gate\% \\
+    \midrule
+    S3 baseline                  & 117/175 & ---  & ---  \\
+    S4, $\Delta{=}0$ (no gate)   & 118/175 & $+1$ & ---  \\
+    S4, $\Delta{=}0.1$           & 116/175 & $-1$ & 84\% \\
+    S4, $\Delta{=}0.2$           & 114/175 & $-3$ & 82\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The gate fires on 84\,\% of episodes at $\Delta=0.1$ because LGGSN score
+spread is near-zero for most objects---a direct consequence of the
+feature-saturation failure mode (\cref{sec:failure}).
+Thresholds of 0.1 and 0.2 are too aggressive: they swamp the real signal
+(CrackerBox net drops from $+4$ to $+3$ and $+2$), reducing overall net
+from $+1$ to $-1$ and $-3$ respectively.
+Raw score spread is therefore an insufficient proxy for model uncertainty;
+a calibrated measure (e.g.\ conformal prediction or Bayesian output variance)
+is needed to distinguish genuinely uncertain episodes (\cref{sec:discussion}).
+
 \subsection{GC-LGGSN: Geometry-Conditioned Feature Gating}
 \label{sec:gcresult}
 Evaluated on CrackerBox and Scissors (25 seeds each), GC-LGGSN achieves
@@ -687,8 +719,9 @@ unreliable due to simulator non-determinism.
 A principled solution would gate on the \emph{model's own uncertainty}: for
 example, skipping reranking when the score spread across candidates is
 below a threshold~$\delta$.
-This approach is agnostic to failure mode (saturation vs.\ orientation
-ambiguity) and does not require object-class labels at inference time.
+\Cref{sec:spreadgate} tests this directly: at $\Delta \in \{0.1, 0.2\}$,
+the gate fires on 82--84\,\% of episodes and net degrades to $-1$ and $-3$,
+confirming that raw spread is insufficient without calibration.
 
 \subsection{Difficulty Generalization on SO-ARM101}
 A supplementary experiment varying spawn difficulty (easy/medium/hard,

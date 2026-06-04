@@ -83,23 +83,28 @@
 \@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces Feature ablation study. \textbf  {(a)}\nobreakspace  {}Offline validation pair accuracy (dashed line = random baseline 0.50). \textbf  {(b)}\nobreakspace  {}Task-level net improvement (blue $> 0$, red $< 0$). Condition\nobreakspace  {}A achieves the highest offline accuracy but not the highest task net, illustrating the offline--online transfer gap. ($N = 10$ seeds $\times $ 6 objects $= 60$ trials per condition.)}}{5}{figure.2}\protected@file@percent }
 \newlabel{fig:ablation}{{2}{5}{Feature ablation study. \textbf {(a)}~Offline validation pair accuracy (dashed line = random baseline 0.50). \textbf {(b)}~Task-level net improvement (blue $> 0$, red $< 0$). Condition~A achieves the highest offline accuracy but not the highest task net, illustrating the offline--online transfer gap. ($N = 10$ seeds $\times $ 6 objects $= 60$ trials per condition.)}{figure.2}{}}
 \newlabel{fig:ablation@cref}{{[figure][2][]2}{[1][4][]5}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}GC-LGGSN: Geometry-Conditioned Feature Gating}{5}{subsection.4.6}\protected@file@percent }
-\newlabel{sec:gcresult}{{4.6}{5}{GC-LGGSN: Geometry-Conditioned Feature Gating}{subsection.4.6}{}}
-\newlabel{sec:gcresult@cref}{{[subsection][6][4]4.6}{[1][5][]5}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}Per-Object Failure Analysis}{5}{subsection.4.7}\protected@file@percent }
-\newlabel{sec:failure}{{4.7}{5}{Per-Object Failure Analysis}{subsection.4.7}{}}
-\newlabel{sec:failure@cref}{{[subsection][7][4]4.7}{[1][5][]5}}
-\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Per-object geometric properties (measured from MuJoCo/SO-ARM101 grasp episodes) paired with Stage\nobreakspace  {}4 net improvement from PyBullet/Panda (Table\nobreakspace  {}\ref  {tab:main_pyb}; Pear excluded). Scissors' non-zero PyBullet baseline (20/25) exposes the regression that the MuJoCo floor effect (0/25) masks. Objects sorted by PyBullet S4 net (descending).}}{6}{table.4}\protected@file@percent }
-\newlabel{tab:geom}{{4}{6}{Per-object geometric properties (measured from MuJoCo/SO-ARM101 grasp episodes) paired with Stage~4 net improvement from PyBullet/Panda (Table~\ref {tab:main_pyb}; Pear excluded). Scissors' non-zero PyBullet baseline (20/25) exposes the regression that the MuJoCo floor effect (0/25) masks. Objects sorted by PyBullet S4 net (descending)}{table.4}{}}
-\newlabel{tab:geom@cref}{{[table][4][]4}{[1][6][]6}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Score-spread gate ablation (Stage\nobreakspace  {}4, v5d; 25 seeds $\times $ 7 objects $= 175$ trials). Gate fires when LGGSN max$-$min score $< \Delta $; fired episodes fall back to GR-ConvNet order.}}{5}{table.4}\protected@file@percent }
+\newlabel{tab:spreadgate}{{4}{5}{Score-spread gate ablation (Stage~4, v5d; 25 seeds $\times $ 7 objects $= 175$ trials). Gate fires when LGGSN max$-$min score $< \Delta $; fired episodes fall back to GR-ConvNet order}{table.4}{}}
+\newlabel{tab:spreadgate@cref}{{[table][4][]4}{[1][5][]5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.6}Score-Spread Uncertainty Gating}{5}{subsection.4.6}\protected@file@percent }
+\newlabel{sec:spreadgate}{{4.6}{5}{Score-Spread Uncertainty Gating}{subsection.4.6}{}}
+\newlabel{sec:spreadgate@cref}{{[subsection][6][4]4.6}{[1][5][]5}}
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces Per-object geometric properties (measured from MuJoCo/SO-ARM101 grasp episodes) paired with Stage\nobreakspace  {}4 net improvement from PyBullet/Panda (Table\nobreakspace  {}\ref  {tab:main_pyb}; Pear excluded). Scissors' non-zero PyBullet baseline (20/25) exposes the regression that the MuJoCo floor effect (0/25) masks. Objects sorted by PyBullet S4 net (descending).}}{6}{table.5}\protected@file@percent }
+\newlabel{tab:geom}{{5}{6}{Per-object geometric properties (measured from MuJoCo/SO-ARM101 grasp episodes) paired with Stage~4 net improvement from PyBullet/Panda (Table~\ref {tab:main_pyb}; Pear excluded). Scissors' non-zero PyBullet baseline (20/25) exposes the regression that the MuJoCo floor effect (0/25) masks. Objects sorted by PyBullet S4 net (descending)}{table.5}{}}
+\newlabel{tab:geom@cref}{{[table][5][]5}{[1][6][]6}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.7}GC-LGGSN: Geometry-Conditioned Feature Gating}{6}{subsection.4.7}\protected@file@percent }
+\newlabel{sec:gcresult}{{4.7}{6}{GC-LGGSN: Geometry-Conditioned Feature Gating}{subsection.4.7}{}}
+\newlabel{sec:gcresult@cref}{{[subsection][7][4]4.7}{[1][6][]6}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.8}Per-Object Failure Analysis}{6}{subsection.4.8}\protected@file@percent }
+\newlabel{sec:failure}{{4.8}{6}{Per-Object Failure Analysis}{subsection.4.8}{}}
+\newlabel{sec:failure@cref}{{[subsection][8][4]4.8}{[1][6][]6}}
 \@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces Flat fraction vs.\ Stage\nobreakspace  {}4 net improvement (PyBullet/Panda, 6 objects; geometric statistics from MuJoCo/SO-ARM101 episodes). Each point is one object; colour encodes sign of net (blue $>0$, red $<0$, grey $=0$); point size encodes within-episode yaw spread $\sigma _\psi $ (larger $=$ more orientation ambiguity). The dashed line is an OLS fit. Spearman $\rho = -0.96$ ($p < 0.01$, computed from PyBullet/Panda evaluation) indicates that high flat fraction is the strongest single predictor of reranking regression.}}{6}{figure.3}\protected@file@percent }
 \newlabel{fig:scatter}{{3}{6}{Flat fraction vs.\ Stage~4 net improvement (PyBullet/Panda, 6 objects; geometric statistics from MuJoCo/SO-ARM101 episodes). Each point is one object; colour encodes sign of net (blue $>0$, red $<0$, grey $=0$); point size encodes within-episode yaw spread $\sigma _\psi $ (larger $=$ more orientation ambiguity). The dashed line is an OLS fit. Spearman $\rho = -0.96$ ($p < 0.01$, computed from PyBullet/Panda evaluation) indicates that high flat fraction is the strongest single predictor of reranking regression}{figure.3}{}}
 \newlabel{fig:scatter@cref}{{[figure][3][]3}{[1][6][]6}}
-\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{6}{section.5}\protected@file@percent }
-\newlabel{sec:discussion}{{5}{6}{Discussion}{section.5}{}}
-\newlabel{sec:discussion@cref}{{[section][5][]5}{[1][6][]6}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Offline vs.\ Online Transfer}{6}{subsection.5.1}\protected@file@percent }
-\citation{fang2023anygrasp}
+\@writefile{toc}{\contentsline {section}{\numberline {5}Discussion}{7}{section.5}\protected@file@percent }
+\newlabel{sec:discussion}{{5}{7}{Discussion}{section.5}{}}
+\newlabel{sec:discussion@cref}{{[section][5][]5}{[1][7][]7}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}Offline vs.\ Online Transfer}{7}{subsection.5.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.2}Cross-Platform Divergence}{7}{subsection.5.2}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.3}The Granularity Problem for Gating}{7}{subsection.5.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {5.4}Difficulty Generalization on SO-ARM101}{7}{subsection.5.4}\protected@file@percent }
@@ -107,6 +112,7 @@
 \@writefile{toc}{\contentsline {section}{\numberline {6}Conclusion}{7}{section.6}\protected@file@percent }
 \newlabel{sec:conclusion}{{6}{7}{Conclusion}{section.6}{}}
 \newlabel{sec:conclusion@cref}{{[section][6][]6}{[1][7][]7}}
+\citation{fang2023anygrasp}
 \bibcite{kumra2020grconvnet}{1}
 \bibcite{mahler2017dexnet}{2}
 \bibcite{fang2020graspnet1b}{3}
