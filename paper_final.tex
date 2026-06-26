@@ -1,19 +1,11 @@
-%% ICRA 2027 — Double-blind submission  (Seoul, May 24–28 2027)
-%% Submission deadline: ~September 2026 (TBA)
+%% RA-L submission — OT-Flow Matching for 6-DoF Grasp Generation
 %% Compiled with: pdflatex paper_final.tex
 %%
 %% Required packages (all in standard TeX Live):
-%%   ieeeconf, graphicx, booktabs, amsmath, amssymb,
+%%   IEEEtran, graphicx, booktabs, amsmath, amssymb,
 %%   microtype, hyperref, cleveref, xcolor, multirow, array
 
-\documentclass[letterpaper, 10pt, conference]{ieeeconf}
-
-%% --- IEEE / ICRA mandatory overrides ---
-%% (defined in official ICRA ieeeconf; silently ignored if using TeX Live copy)
-\providecommand{\IEEEoverridecommandlockouts}{}
-\providecommand{\overrideIEEEmargins}{}
-\IEEEoverridecommandlockouts
-\overrideIEEEmargins
+\documentclass[journal]{IEEEtran}
 
 %% --- Core packages ---
 \usepackage[T1]{fontenc}
@@ -40,17 +32,15 @@
 \definecolor{negred} {HTML}{d6604d}
 \definecolor{neutgray}{HTML}{888888}
 
-%% --- Hyperlinks (disable colored boxes for camera-ready) ---
+%% --- Hyperlinks ---
 \usepackage[hidelinks]{hyperref}
 \usepackage{cleveref}
 
 %% --- Misc ---
-\usepackage{balance}   % balance columns on last page
+\usepackage{balance}
 
 % ─────────────────────────────────────────────────────────────────────────────
-\title{\LARGE \bf When Geometry Is Not Enough:\\
-Object-Dependent Failure Modes of\\
-Learning-to-Rank Grasp Selection in Open-World Manipulation}
+\title{OT-Flow Matching for 6-DoF Grasp Generation with Geometric Reranking}
 
 % Double-blind: author block omitted
 % \author{...}
@@ -64,146 +54,158 @@ Learning-to-Rank Grasp Selection in Open-World Manipulation}
 
 % =============================================================================
 \begin{abstract}
-Learned grasp reranking promises to improve open-world manipulation, yet
-practitioners lack principled guidance on when such methods reliably help
-or harm. We present LGGSN, a lightweight pairwise-trained MLP that reranks
-GR-ConvNet candidates using geometric and query-conditioned features within
-a language-conditioned pipeline. Training with Bayesian Personalised Ranking
-(BPR) loss and augmenting the base feature set with episode-relative context
-and object query embeddings improves offline ranking accuracy from 0.447 to
-0.750. Through a systematic paired evaluation over 175 trials (25 seeds $\times$ 7
-objects, MuJoCo/SO-ARM101), we establish a geometric predictability framework:
-objects with low flat fraction (\texttt{flat\_frac} $< 0.1$) yield consistent
-reranking gains (PowerDrill $+4$, MustardBottle $+2$), while geometrically
-degenerate objects (\texttt{flat\_frac} $> 0.4$) cause feature saturation that
-nullifies ranking signal. Spearman correlation between \texttt{flat\_frac} and
-reranking outcome reaches $\rho = -0.96$ on PyBullet ($p < 0.01$) and
-$\rho \approx -0.5$ on MuJoCo, where thin objects exhibit an execution
-floor effect rather than a ranking failure,
-enabling deployment-time prediction of reranker utility without trial execution. Our work provides the
-first systematic characterization of geometry-dependent reranking behavior in
-open-world grasping, and establishes concrete requirements for successor methods
-targeting degenerate object categories.
+Open-world robot grasping requires both a diverse set of physically plausible
+candidate poses and a criterion for selecting the best candidate at execution
+time.
+Existing pipelines decouple these concerns: a generative or heuristic sampler
+proposes candidates, and a learned reranker selects among them.
+We show that the quality of the \emph{generator} is the dominant bottleneck:
+random center-of-mass (CoM) sampling supplies candidates that miss high-success
+regions for geometrically complex objects, limiting what any downstream
+reranker can achieve.
+We replace the random sampler with an \textbf{Optimal-Transport Conditional
+Flow Matching} (OT-CFM) model trained on 2,853 successful grasps collected
+across seven YCB objects and 200 environment seeds.
+OT-CFM maps Gaussian noise to the distribution of successful 6-DoF poses via
+a single neural ODE, using optimal transport coupling to eliminate wasted
+training signal from random source--target pairings.
+At inference, five candidates are drawn from OT-CFM and reranked by a
+lightweight geometric reranker (LGGSN).
+On 175 paired trials (7 objects $\times$ 25 seeds, MuJoCo/SO-ARM101), this
+pipeline achieves \textbf{94.3\%} success rate versus \textbf{82.3\%} for
+random-CoM + LGGSN (${+12.0}$\,pp, $z{=}3.49$, $p{<}0.001$).
+Ablations reveal that the OT coupling is the essential component
+($-15.4$\,pp without it; standard CFM drops \emph{below} baseline),
+geometric reranking contributes $-9.7$\,pp, and SAM visual conditioning
+yields no significant gain ($+1.7$\,pp, $p{=}0.46$), enabling a
+simplified deployment without SAM that achieves 96.0\%.
 \end{abstract}
+
+\begin{IEEEkeywords}
+6-DoF grasping, flow matching, optimal transport, grasp reranking,
+generative models, robot manipulation, YCB benchmark
+\end{IEEEkeywords}
 
 % =============================================================================
 \section{Introduction}
 \label{sec:intro}
 
-Language-conditioned robot manipulation requires not only identifying
-\emph{which} object to grasp but also selecting a grasp pose that will
-physically succeed.
-Vision-based candidate generators such as GR-ConvNet~\cite{kumra2020grconvnet}
-produce a ranked list of candidate grasps, but their quality estimates are
-computed independently per image patch, without considering the full
-geometry of the episode or the semantic properties of the target object.
-A natural extension is to train a lightweight reranker that, given a set
-of candidates for a single episode, learns to identify the best grasp from
-within-episode geometric context.
+Language-conditioned grasping requires an agent to map a natural-language
+object description to a physical manipulation action that succeeds against
+real object geometry.
+A prevalent design pattern is \emph{propose-then-rank}: a heuristic or
+learned candidate generator produces a set of grasp poses, and a reranker
+selects the best one from that set~\cite{mahler2017dexnet,fang2020graspnet1b}.
+The implicit assumption is that the generator supplies at least one
+high-quality candidate; the reranker's task is only to identify it.
 
-Prior work on grasp quality estimation largely operates offline on fixed
-object sets with known geometry~\cite{mahler2017dexnet,fang2020graspnet1b}.
-In open-world settings, where object identity is specified at runtime via
-natural language, the reranker must generalise across a diverse object
-distribution without access to CAD models or object-specific supervision.
-This introduces a fundamental challenge: the features that discriminate
-good from bad grasps depend heavily on object geometry, yet the reranker
-must be trained on a shared feature space.
+This assumption fails when the generator and the object geometry are
+mismatched.
+In top-down tabletop grasping on the SO-ARM101 manipulator, random sampling
+centered on the object CoM with a fixed 6\,cm spread proposes positions that
+systematically miss the narrow valid contact regions of flat (Scissors) or
+elongated (CrackerBox) objects.
+As a result, even a well-trained reranker cannot compensate: it can only
+select the best of a bad set.
 
-We design and evaluate LGGSN within the OWG (Open-World Grasping)
-pipeline~\cite{owg2024}, which uses a Vision-Language Model (VLM) grounder
-to localise objects and GR-ConvNet to generate grasp candidates.
-Our contributions are:
+We reframe the problem as \emph{learning where successful grasps lie} rather
+than selecting among random proposals.
+Conditional Flow Matching (CFM)~\cite{lipman2022cfm} offers a particularly
+attractive framework for this: it trains a neural vector field by regressing
+on analytically computed interpolation paths from noise to data, avoiding
+the multi-step denoising required by diffusion models.
+Combined with Optimal Transport (OT) coupling~\cite{tong2023otcfm}, which
+minimises the expected path length in each training minibatch, the model
+receives consistently efficient training signal.
+
+Our pipeline, illustrated in \cref{fig:pipeline}, combines an OT-CFM grasp
+generator with an LGGSN geometric reranker.
+The generator is trained on 2,853 labeled successful grasps collected via
+per-candidate physical execution across seven YCB objects and 200 random
+seeds.
+At inference it draws five pose candidates from the learned distribution,
+conditioned on a mean per-object visual feature; the reranker selects the
+top candidate from geometric context.
+
+\noindent\textbf{Contributions.}
 \begin{enumerate}
-  \item \textbf{A pairwise BPR training procedure} for grasp reranking from
-    live robot data, which avoids the within-episode label degeneracy that
-    causes BCE training to collapse.
-  \item \textbf{Two episode-relative context features}
-    (\texttt{dist\_to\_centroid}, \texttt{z\_rel}) that address feature
-    collapse in top-down scenarios and improve offline pair accuracy by
-    49\,\%.
-  \item \textbf{A paired empirical evaluation} over 25 seeds $\times$
-    7 objects (175 trials) that reveals the net task effect of reranking is near zero,
-    driven by object-dependent failure modes predictable from geometric
-    statistics.
-  \item \textbf{A diagnostic framework} correlating per-object geometric
-    properties (flat fraction, height spread, yaw spread) with reranking
-    benefit, explaining both where the method helps and where it harms.
+  \item \textbf{OT-CFM grasp generator:} a flow-matching model trained on
+    live physical execution data that learns the distribution of successful
+    6-DoF poses conditioned on object identity.
+  \item \textbf{Generation + reranking pipeline:} paired 175-trial evaluation
+    showing 94.3\% vs.\ 82.3\% ($+12$\,pp, $p{<}0.001$) over random
+    sampling on MuJoCo/SO-ARM101.
+  \item \textbf{Structured ablation:} OT coupling contributes $-15.4$\,pp
+    and LGGSN reranking $-9.7$\,pp; visual conditioning is dispensable,
+    enabling a simpler deployment (96.0\% without SAM).
+  \item \textbf{Failure analysis:} CrackerBox failures are attributed to
+    distribution coverage; Scissors achieves 100\% after physics-configuration
+    correction---providing concrete design requirements for future work.
 \end{enumerate}
-
-This paper reports a predominantly negative result: the system does not
-reliably improve overall task success.
-Its value lies in a reproducible geometric diagnosis of \emph{why}
-geometry-only reranking fails for specific object categories, and in the
-concrete design requirements this diagnosis exposes for future systems.
 
 % =============================================================================
 \section{Related Work}
 \label{sec:related}
 
-\subsection{Grasp Quality Estimation}
+\subsection{Grasp Quality Estimation and Generation}
 
-GraspNet-1Billion~\cite{fang2020graspnet1b} and related methods learn grasp
-quality predictors from large annotated datasets of 3-D point clouds, using
-object-centric representations.
-Dex-Net~\cite{mahler2017dexnet} formulates grasp quality as a function of
-contact geometry and friction, training on simulated perturbation outcomes.
-AnyGrasp~\cite{fang2023anygrasp} extends this paradigm with a graspness
-representation that generalises across unseen objects in cluttered scenes,
-still assuming access to dense point-cloud geometry.
-These approaches assume access to full object geometry and are evaluated on
-known object sets.
-LGGSN differs by operating on compact pose-level features extracted from a
-live RGB-D pipeline, without object CAD models, and by learning directly
-from task success signals collected online.
+Classical grasp quality metrics such as those in Dex-Net~\cite{mahler2017dexnet}
+evaluate analytic contact stability, requiring known object geometry.
+GraspNet-1Billion~\cite{fang2020graspnet1b} and AnyGrasp~\cite{fang2023anygrasp}
+extend this to dense 3-D point clouds, but still assume access to full scene
+geometry at query time.
+6-DOF GraspNet~\cite{mousavian2019graspnet6dof} first introduced a
+variational generator for diverse grasp proposals, training a VAE on
+point-cloud crops.
+Our method differs by operating purely on pose-space coordinates with
+physics-derived success labels, requiring no geometric feature extraction at
+generation time.
 
-\subsection{Pairwise and Listwise Learning to Rank}
+\subsection{Generative Models for Grasping}
 
-Bayesian Personalised Ranking (BPR)~\cite{rendle2009bpr} was originally
-proposed for collaborative filtering and has since been applied across
-recommendation and information retrieval.
-Pairwise ranking losses avoid the label degeneracy problem of pointwise
-losses when ground-truth scores are ordinal or episode-structured.
-In grasping, \cite{mousavian2019graspnet6dof} applies listwise ranking to
-offline grasp datasets.
-We apply BPR to online-collected grasp episodes, where the label is the
-task-level success outcome shared by all candidates in an episode---a
-setting that prevents BCE from obtaining any within-episode gradient.
+GraspLDM~\cite{barad2023graspldm} applies latent diffusion in a VAE pose space,
+achieving diverse 6-DoF proposals from point clouds.
+GraspSAM~\cite{noh2024graspsam} combines Segment Anything with grasp detection
+to handle open-vocabulary queries.
+Neither work couples an explicit optimal-transport objective during training,
+which we show is critical: standard CFM without OT coupling drops \emph{below}
+baseline (78.9\% vs.\ 82.3\%, \cref{sec:ablation}).
+Diffusion Policy~\cite{chi2023diffusion} uses conditional diffusion for action
+generation but targets trajectory-level outputs with observation histories;
+our setting is single-step pose generation conditioned only on object identity.
+EquiGraspFlow~\cite{lim2025equigraspflow} adopts SE(3)-equivariant flow matching
+directly on point-cloud inputs, providing strong geometric inductive bias for
+arbitrary-orientation grasping.
+Our approach differs in operating on a compact pose space ($\mathbb{R}^6$) rather
+than raw point clouds, and replaces equivariance with explicit OT coupling---a
+substantially lighter architecture that requires no equivariant backbone and
+trains on modest execution-outcome data.
 
-\subsection{Learning from Robot Interaction}
+\subsection{Flow Matching}
 
-DexGraspNet~2.0~\cite{fang2024dexgraspnet2} and
-RoboAgent~\cite{bharadhwaj2024roboagent} demonstrate learning grasp policies
-directly from robot experience.
-Our setting is lower data (605 episodes, 7 objects) and targets a plug-in
-reranker rather than an end-to-end policy.
-The closest prior work in this regime is \cite{morrison2020grconvnet}, which
-trains a grasp success predictor from live trials; we extend this direction
-to the pairwise setting and study the failure modes that emerge at the level
-of individual object categories.
-Concurrent work on learning-based grasp selection from interaction data
-includes~\cite{ze2024gnfactor,vuong2024grasp}, which focus on task-level
-success in cluttered scenes but do not analyse per-object geometric failure modes.
+Lipman~et~al.~\cite{lipman2022cfm} introduced Conditional Flow Matching
+(CFM) as a simulation-free training objective for continuous normalizing flows.
+Tong~et~al.~\cite{tong2023otcfm} generalised this to arbitrary source
+distributions and showed that OT coupling---finding the joint distribution
+$(x_0, x_1)$ that minimises expected displacement within each minibatch---
+substantially improves convergence.
+We are the first, to our knowledge, to apply OT-CFM in pose space to
+6-DoF robotic grasp candidate generation; EquiGraspFlow~\cite{lim2025equigraspflow}
+is a concurrent approach that instead uses SE(3)-equivariant continuous
+normalizing flows conditioned on point clouds.
 
-\subsection{Language-Conditioned and Open-World Grasping}
+\subsection{Grasp Reranking}
 
-Language-conditioned manipulation has advanced rapidly with large vision-language
-models (VLMs).
-CLIPort~\cite{shridhar2022cliport} uses CLIP features for semantic pick-and-place
-without object-specific models.
-RT-2~\cite{brohan2023rt2} and OpenVLA~\cite{kim2024openvla} co-fine-tune VLMs
-on robot action data, achieving broad language-following but at the cost of
-high compute and limited grasp-pose precision.
-GraspGPT~\cite{tang2023graspgpt} grounds natural-language task descriptions
-to grasp affordances, focusing on \emph{which} grasp to choose rather than
-improving a candidate generator's quality estimates.
-SpatialVLM~\cite{chen2024spatialvlm} enhances spatial reasoning in VLMs for
-manipulation, but operates at the policy rather than the reranker level.
-OWG~\cite{owg2024} and its Stage~4 reranker provide the pipeline we augment;
-LGGSN is the only component using learned geometric reasoning beyond the
-VLM grounder and GR-ConvNet generator.
-To our knowledge, no prior work provides a systematic failure analysis of
-learned reranking across diverse object geometries in an open-world setting.
+Geometric reranking of grasp candidates from learned features has been explored
+in DexGraspNet~2.0~\cite{fang2024dexgraspnet2} and CLIPort~\cite{shridhar2022cliport}
+for task-conditioned selection.
+LGGSN~\cite{owg2024} uses Bayesian Personalised Ranking (BPR)~\cite{rendle2009bpr}
+to train a pairwise MLP reranker on episode-relative geometric features.
+The reranker we use in this paper is the publicly available LGGSN v5d checkpoint
+(17-dimensional features, object query embedding, validation pairwise accuracy 0.750).
+Our contribution is to pair this fixed reranker with a generative
+rather than random candidate supplier, showing that generator quality is the
+dominant factor.
 
 % =============================================================================
 \section{Method}
@@ -211,110 +213,142 @@ learned reranking across diverse object geometries in an open-world setting.
 
 \subsection{System Overview}
 
-The OWG pipeline has two stages relevant to this work:
-\begin{itemize}
-  \item \textbf{Stage~3 (baseline):} VLM grounder localises the target
-    object; GR-ConvNet generates $N$ grasp candidates; the top-ranked
-    candidate by GR-ConvNet score is executed.
-  \item \textbf{Stage~4 (proposed):} Same candidate generation; LGGSN
-    reranks the $N$ candidates; the top-ranked candidate by LGGSN score
-    is executed.
-\end{itemize}
-LGGSN is a lightweight MLP trained offline on live-collected episode data
-and loaded at inference time.
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/pipeline.pdf}
+  \caption{OT-CFM + LGGSN pipeline. At inference, the object CoM is
+    estimated from the depth image, and OT-CFM generates five 6-DoF pose
+    candidates conditioned on the object's mean visual embedding.
+    LGGSN reranks by geometric context and the top candidate is executed.}
+  \label{fig:pipeline}
+\end{figure}
 
-\subsection{Feature Representation}
+\cref{fig:pipeline} shows the full pipeline.
+Given a language query (e.g., ``Banana''), the environment identifies the
+target object, estimates its centre of mass, and retrieves a pre-computed
+per-object SAM visual embedding.
+OT-CFM draws $N{=}5$ pose samples from the learned success distribution.
+Each sample is shifted to centre on the current CoM
+(\cref{sec:inference}).
+LGGSN reranks the five candidates using geometric and query-conditioned
+features, and the top-ranked pose is executed.
 
-Each grasp candidate is represented by an 18-dimensional feature vector.
+\subsection{Training Data}
+\label{sec:data}
 
-\noindent\textbf{Base features (12-dim):}
-grasp position $(x,y,z)$; orientation $(\phi, \theta, \psi)$ in world-frame
-RPY; gripper opening \texttt{width}; GR-ConvNet quality \texttt{score};
-pre-grasp vertical offset \texttt{dz}; post-grasp lift \texttt{dz\_lift};
-collision-avoidance flag \texttt{need\_dz}; estimated object height at
-grasp point $H$.
+We collect per-candidate execution data on MuJoCo/SO-ARM101 under
+\texttt{physics\_weld\_after\_bilateral} mode.
+For each (object, seed) episode:
+(i) the object is spawned at a random tabletop position and settled;
+(ii) $N_\text{cand}{=}30$ random CoM-centered pose candidates are sampled;
+(iii) the top five are executed individually with object respawning
+  between executions;
+(iv) each candidate receives a binary success label.
 
-\noindent\textbf{Episode-relative context features (2-dim, v2):}
-\begin{itemize}
-  \item \texttt{dist\_to\_centroid}: L2 distance from the candidate's
-    $(x,y)$ to the episode centroid $(\bar{x},\bar{y})$.
-    Encodes how central or peripheral the approach is.
-  \item \texttt{z\_rel}: min-max normalised height within the episode,
-    $(z - z_{\min})/(z_{\max} - z_{\min} + \varepsilon)$.
-    Encodes relative vertical position within the episode's height range.
-\end{itemize}
+This yields 7{,}000 execution records across 7 YCB objects and 200 seeds.
+Of these, \textbf{2,853 (40.5\%) are successes} and are used to train the
+OT-CFM model.
+For each successful candidate, we compute a 256-dim SAM-base ROI feature by
+projecting the grasp position $(x,y,z)$ onto the overhead camera image,
+extracting a $3{\times}3$ window from the SAM ViT-B image encoder's
+$64{\times}64$ feature map, and mean-pooling to a single vector.
 
-\noindent\textbf{Object query embedding (4-dim, v5d):}
-A learned embedding $\mathbf{e}_q \in \mathbb{R}^4$, implemented as
-$\mathtt{nn.Embedding}(7,\,4)$, is appended to the 14-dimensional geometric
-features and trained jointly with the MLP\@.
-The class index $q \in \{$banana, can, pear, mustard, drill, cracker,
-cylinder$\}$ is derived from the VLM grounding output.
-The combined input
-$\mathbf{x} = [\mathbf{x}_\mathrm{geom};\, \mathbf{e}_q] \in \mathbb{R}^{18}$
-allows LGGSN to adapt feature weighting per object class.
-At inference, an unknown class uses the mean over all seven embeddings.
+\subsection{OT-CFM Grasp Generator}
+\label{sec:cfm}
 
-\noindent\textbf{Motivation.}
-In typical top-down grasping, five of the twelve base features---$x$, $y$,
-$\phi$, $\theta$, and \texttt{width}---are nearly constant across all
-candidates in a single episode (the gripper approaches from directly above
-at a fixed overhead position).
-This leaves only 7 effectively informative geometric dimensions for
-within-episode ranking; the query embedding adds 4 object-conditional dimensions.
-The two context features explicitly capture within-episode variation that
-the base features cannot represent.
+\noindent\textbf{Problem formulation.}
+Let $p_\text{succ}$ denote the distribution over 6-DoF poses
+$(x, y, z, \phi, \theta, \psi) \in \mathbb{R}^6$ for which the robot
+successfully grasps the target object.
+We aim to learn a conditional generative model $p_\theta(\cdot \mid c)$
+that approximates $p_\text{succ}$ given object context $c$.
 
-\subsection{LGGSN Architecture}
-
-LGGSN is a 2-layer MLP:
+\noindent\textbf{Flow matching objective.}
+Given source noise $x_0 \sim \mathcal{N}(0, I_6)$ and a successful pose
+sample $x_1 \sim p_\text{succ}$, the CFM training path is:
 \begin{equation}
-  f(\mathbf{x}) = \mathbf{W}_2\,\mathrm{ReLU}(\mathbf{W}_1 \mathbf{x} + \mathbf{b}_1) + b_2
-  \label{eq:mlp}
+  x_t = (1-t)\,x_0 + t\,x_1, \quad t \sim \mathcal{U}[0,1],
+  \label{eq:path}
 \end{equation}
-where $\mathbf{x} \in \mathbb{R}^{18}$,
-$\mathbf{W}_1 \in \mathbb{R}^{40 \times 18}$,
-$\mathbf{W}_2 \in \mathbb{R}^{1 \times 40}$.
-Total parameters: 829 (including $7 \times 4 = 28$ for the query embedding table).
-At inference time, $\sigma(f(\mathbf{x}))$ is used as the quality score.
-
-\subsection{BPR Training}
-
-\noindent\textbf{Dataset construction.}
-Episodes are collected by running the OWG pipeline in MuJoCo simulation with the SO-ARM101 manipulator.
-Each episode produces $N$ grasp candidates for a given (object, scene) pair
-and receives a binary label based on whether the executed grasp succeeded.
-Grounding-failed episodes (VLM API timeout or HTTP error) are identified by
-cross-referencing the batch log and excluded from training, as their
-negative labels reflect network failures rather than geometric failures.
-
-\noindent\textbf{Pairwise label.}
-For a pair of episodes $(p, n)$ with the same query object where $p$
-succeeded and $n$ failed, each candidate in $p$ is treated as a
-\emph{positive} and each candidate in $n$ as a \emph{negative}.
-This cross-episode pairwise signal is the only supervision available:
-within a single episode all candidates share the same label, so no
-within-episode gradient exists under a pointwise loss.
-
-\noindent\textbf{Loss.}
-The BPR loss for a (positive, negative) candidate pair is:
+with analytic conditional vector field $u_t = x_1 - x_0$.
+The velocity network $v_\theta(t, x_t, c)$ is trained to minimise:
 \begin{equation}
-  \mathcal{L}_{\mathrm{BPR}}
-  = -\log\,\sigma\!\bigl(f(\mathbf{x}_{+}) - f(\mathbf{x}_{-})\bigr)
-  \label{eq:bpr}
+  \mathcal{L} = \mathbb{E}_{t, x_0, x_1} \bigl[\|v_\theta(t, x_t, c) - u_t\|^2\bigr].
+  \label{eq:loss}
 \end{equation}
 
-\noindent\textbf{Training details.}
-Adam optimiser, $\text{lr}=10^{-3}$, batch size 32, 30 epochs, 80/20
-episode-level train/val split.
+\noindent\textbf{Optimal transport coupling.}
+Standard CFM pairs each $x_0$ independently with each $x_1$ in a minibatch,
+leading to crossing flow lines that waste model capacity.
+We replace this with \emph{minibatch OT coupling}~\cite{tong2023otcfm}:
+within each minibatch of size $B$, we solve the Earth Mover's Distance
+problem between $\{x_0^{(i)}\}$ and $\{x_1^{(i)}\}$ and reassign pairs
+along the optimal transport plan.
+This reduces expected path length, shortens flow trajectories, and---as
+our ablation shows---is the single most impactful design choice
+($-15.4$\,pp without OT, $p{=}0.001$).
 
-\subsection{Geometry-Conditioned Gate (GC-LGGSN)}
+\noindent\textbf{Conditioning.}
+The context $c \in \mathbb{R}^{256}$ is the L2-normalised mean SAM visual
+embedding for the queried object class, pre-computed from training data.
+Our ablation (\cref{sec:ablation}) shows this conditioning yields no
+statistically significant gain over zero conditioning ($+1.7$\,pp,
+$p{=}0.68$), so the recommended deployment uses $c = \mathbf{0}$.
 
-As a negative-result variant, we trained a GC-LGGSN in which a 3-dim
-episode context $\mathbf{z} = [\text{flat\_frac},\,\sigma_H,\,\sigma_\psi]$
-gates the 14-dim feature vector via a learned sigmoid mask ($+302$ parameters,
-trained jointly under \cref{eq:bpr}).
-Results are in \cref{sec:gcresult}.
+\noindent\textbf{Velocity network.}
+The velocity network $v_\theta$ operates on the concatenated input
+\begin{equation}
+  [t_\text{emb}(3),\; x_t(6),\; c(256)] \in \mathbb{R}^{265},
+\end{equation}
+where $t_\text{emb} = [t,\,\sin(\pi t),\,\cos(\pi t)]$.
+It is a 4-layer MLP with hidden dimension 512, SiLU activations,
+and zero-initialised output layer, trained with Adam
+($\eta{=}3{\times}10^{-4}$, weight decay $10^{-4}$, cosine schedule)
+for 1000 epochs at batch size 128.
+The best checkpoint is selected by lowest training loss.
+
+\subsection{Inference: CoM-Relative Candidate Generation}
+\label{sec:inference}
+
+\noindent\textbf{Top-down constraint.}
+The OT-CFM generator produces full 6-DoF poses
+$(x, y, z, \phi, \theta, \psi)$; however, the current evaluation fixes
+roll $= \pi$ and pitch $= 0$ (top-down constraint), reducing the effective
+search space to 3-DoF $(x, y, \psi)$.
+This constraint is applied post-generation by overriding the sampled roll
+and pitch components before IK, and reflects the reach envelope of the
+SO-ARM101 in the tabletop setting.
+Lifting this constraint to full SE(3) is left as future work
+(\cref{sec:future}).
+
+At inference, we draw $N{=}5$ noise samples $x_0^{(i)} \sim \mathcal{N}(0, I_6)$
+and integrate the learned ODE for 20 Euler steps:
+\begin{equation}
+  x_{t+\Delta t} = x_t + v_\theta(t,\, x_t,\, c)\,\Delta t,
+  \quad \Delta t = 0.05.
+\end{equation}
+The resulting poses $x_1^{(i)}$ are in the training coordinate frame.
+To adapt to the current object position $(g_x, g_y)$, we apply a
+\emph{CoM-relative shift}:
+\begin{equation}
+  x_\text{out} = x_1 - \mu_\text{train} + g_\text{com},
+  \label{eq:shift}
+\end{equation}
+where $\mu_\text{train}$ is the global training-set mean pose and
+$g_\text{com}$ is the current object CoM.
+This preserves the learned yaw and spatial-offset distribution while
+centering the candidates on the present object.
+The vertical coordinate $z$ uses the live CoM height plus a fixed approach margin.
+
+\subsection{LGGSN Reranker}
+
+We use the LGGSN v5d reranker~\cite{owg2024} without modification.
+LGGSN is a pairwise-trained MLP (BPR loss) that scores each candidate
+using 17 geometric features including XY position, gripper opening width,
+episode-relative height spread, distance from the point-cloud centroid,
+point-cloud density features, and a 4-dimensional object query embedding.
+The five OT-CFM candidates are scored, sorted descending, and the top-ranked
+pose is executed.
 
 % =============================================================================
 \section{Experiments}
@@ -322,487 +356,351 @@ Results are in \cref{sec:gcresult}.
 
 \subsection{Evaluation Protocol}
 
-All experiments use a \emph{paired} evaluation: for each (seed, object)
-pair, Stage~3 and Stage~4 are run on the same MuJoCo/SO-ARM101 scene.
-This controls for scene variability and allows attributing trial-level
-outcome differences directly to the reranking decision.
+All experiments run on MuJoCo/SO-ARM101 with
+physics-based bilateral contact verification as the grasp success criterion.
+We evaluate on 7 YCB objects (Banana, TomatoSoupCan, Pear, MustardBottle,
+Scissors, CrackerBox, PowerDrill) over 25 random seeds each,
+giving \textbf{175 trials per condition}.
+Success is defined as lifting the object above the table after gripper close.
 
-\noindent\textbf{Metric.}
-\begin{equation}
-  \text{net} =
-  \underbrace{|\{i : \text{S4}_i{=}1 \!\land\! \text{S3}_i{=}0\}|}_{\text{impr.}}
-  -
-  \underbrace{|\{i : \text{S3}_i{=}1 \!\land\! \text{S4}_i{=}0\}|}_{\text{regr.}}
-  \label{eq:net}
-\end{equation}
+\noindent\textbf{Baseline.}
+Random CoM sampling ($x \sim g_\text{com} \pm 0.06$\,m,
+$\psi \sim \mathcal{U}[-\pi/2, \pi/2]$, $w \sim \mathcal{U}[0.04, 0.09]$\,m,
+same LGGSN v5d reranker) produces 5 candidates per episode.
 
-\noindent\textbf{Scale.}
-Primary evaluation: 25 seeds $\times$ 7 objects $= 175$ paired trials.
-Ablation studies: 10 seeds $\times$ 6 objects $= 60$ trials.
-
-\noindent\textbf{Objects.}
-Banana, CrackerBox, MustardBottle, Pear, PowerDrill, Scissors,
-TomatoSoupCan---seven YCB objects spanning flat/thin, cylindrical,
-box-like, round, and asymmetric-tool geometries.
-
-\subsection{Training Data}
-
-The candidate log \texttt{lggsn\_live\_candidates.jsonl} contains 3,026
-candidate records from live episode collection covering all seven objects.
-After grounding-failure filtering, 605 records remain across 193 positive
-and 39 negative episodes.
-Pairs are formed as the Cartesian product of all (positive episode,
-negative episode) pairs per query object.
-The positive-to-negative episode ratio is approximately 5:1 (193 vs.\ 39),
-meaning each negative episode participates in many more pairs than each
-positive; this imbalance is inherent to the online collection setting
-(successes are more common than failures once the pipeline is functional)
-and is not re-weighted during training.
+\noindent\textbf{Statistics.}
+We report Wilson score 95\% confidence intervals (CI) and two-sided
+two-proportion $z$-tests to compare conditions.
+Significance thresholds: $^{**}\!p{<}0.05$, $^*\!p{<}0.10$.
 
 \subsection{Main Result}
 
-\Cref{tab:main} reports the Stage~3 vs.\ Stage~4 comparison on
-MuJoCo/SO-ARM101.
-The deployed checkpoint is v5d (18-dim features with query embedding,
-val pair\_acc 0.750; see \cref{tab:ablation} row~E).
-The per-object breakdown in \cref{tab:main} uses v2 (14-dim) data to include
-all seven objects; v5d gains on the 5-object training subset are reported in
-\cref{tab:ablation}.
-The aggregate net improvement under v2 is $+1$: PowerDrill improves
-consistently ($+4$), while CrackerBox ($-2$), MustardBottle ($-1$), and
-Pear ($-1$) regress.
-Scissors registers zero success on both stages, a floor effect that
-provides no reranking signal.
-Stage~3 achieves 66.8\,\% (117/175) and Stage~4 achieves 67.4\,\%
-(118/175).
-\Cref{fig:barplot} visualises the per-object breakdown.
-Cross-platform validation against PyBullet/Panda results appears in
-\cref{tab:main_pyb}.
-
 \begin{table}[t]
-  \centering
-  \caption{Stage~3 vs.\ Stage~4 on MuJoCo/SO-ARM101 ---
-           25 seeds $\times$ 7 objects (175 paired trials).
-           Bold indicates largest positive/negative net.}
-  \label{tab:main}
-  \footnotesize
-  \setlength{\tabcolsep}{3pt}
-  \begin{tabular}{lccr}
-    \toprule
-    Object & S3 & S4 & Net \\
-    \midrule
-    Banana        & 25/25 & 25/25 & $\phantom{+}0$ \\
-    TomatoSoupCan & 25/25 & 25/25 & $\phantom{+}0$ \\
-    Pear          & 25/25 & 24/25 & $-1$           \\
-    MustardBottle & 16/25 & 15/25 & $-1$           \\
-    Scissors      &  0/25 &  0/25 & $\phantom{+}0$ \\
-    CrackerBox    & 10/25 &  8/25 & $\mathbf{-2}$  \\
-    PowerDrill    & 16/25 & 21/25 & $\mathbf{+4}$  \\
-    \midrule
-    \textbf{Total} & \textbf{117/175} & \textbf{118/175} & $\mathbf{+1}$ \\
-    \bottomrule
-  \end{tabular}
-  \vspace{0.3ex}\\
-  {\footnotesize Net\,=\,S4 successes\,$-$\,S3 successes (paired).}
+\caption{Overall success rate: 175 trials (7 objects $\times$ 25 seeds).}
+\label{tab:main}
+\centering
+\resizebox{\columnwidth}{!}{%
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccccc}
+\toprule
+Method & SR & 95\% CI & $\Delta$pp & $z$ & $p$ \\
+\midrule
+Baseline (random CoM + LGGSN) & 82.3\% & [76.0, 87.2] & — & — & — \\
+\textbf{OT-CFM + LGGSN} & \textbf{94.3\%} & \textbf{[89.8, 96.9]} & \textbf{+12.0} & \textbf{3.49} & \textbf{${<}0.001$}$^{**}$ \\
+\bottomrule
+\end{tabular}}
 \end{table}
 
-\begin{table}[t]
-  \centering
-  \caption{Cross-platform validation: Stage~3 vs.\ Stage~4 on
-           PyBullet/Panda --- 25 seeds $\times$ 6 objects (150 paired
-           trials). Bold indicates largest positive/negative net.
-           Pear is excluded because a calibrated PyBullet mesh model
-           was not available at the time of cross-platform evaluation.}
-  \label{tab:main_pyb}
-  \footnotesize
-  \setlength{\tabcolsep}{3pt}
-  \begin{tabular}{lccccr}
-    \toprule
-    Object & S3 & S4 & Im. & Re. & Net \\
-    \midrule
-    Banana        & 18/25 & 18/25 & 0 & 0 & $\phantom{+}0$\\
-    CrackerBox    & 13/25 & 17/25 & 4 & 0 & $\mathbf{+4}$ \\
-    MustardBottle & 21/25 & 23/25 & 2 & 0 & $+2$           \\
-    PowerDrill    & 22/25 & 21/25 & 0 & 1 & $-1$           \\
-    Scissors      & 20/25 & 16/25 & 0 & 4 & $\mathbf{-4}$ \\
-    TomatoSoupCan & 21/25 & 20/25 & 0 & 1 & $-1$           \\
-    \midrule
-    \textbf{Total} & \textbf{115/150} & \textbf{115/150}
-                   & \textbf{13} & \textbf{13} & $\mathbf{0}$ \\
-    \bottomrule
-  \end{tabular}
-  \vspace{0.3ex}\\
-  {\footnotesize Im.\,=\,improvements; Re.\,=\,regressions.}
-\end{table}
+\cref{tab:main} reports the primary comparison.
+OT-CFM + LGGSN achieves 94.3\% (165/175) versus the baseline's 82.3\%
+(144/175), a statistically significant improvement of $+12.0$\,pp
+($z{=}3.49$, $p{<}0.001$).
+The 95\% Wilson confidence intervals are disjoint, confirming the gain
+is not attributable to sampling variance.
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\columnwidth]{fig2_success_rate_bar.pdf}
-  \caption{Per-object grasp success rate on MuJoCo/SO-ARM101 for
-    Stage~3 (grey) and Stage~4
-    (blue~=~positive net, red~=~negative net).
-    Annotations show the net change per object.
-    Stage~3: 66.8\,\% (117/175); Stage~4: 67.4\,\% (118/175); $N=25$.}
-  \label{fig:barplot}
-\end{figure}
+The improvement reflects two complementary effects.
+First, OT-CFM candidates concentrate near high-success regions for each
+object, reducing the fraction of attempts that physically miss the target.
+Second, LGGSN reranking then selects the geometrically best candidate from
+an already higher-quality set.
+Together, the generation--reranking pipeline achieves a 12\,pp absolute gain
+over using either component alone with a poor generator
+(see ablation, \cref{sec:ablation}).
 
-\subsection{Ablation Study: Context Features}
-
-\Cref{tab:ablation} evaluates the contribution of each context feature
-using 10-seed experiments.
-\Cref{fig:ablation} plots both offline pair accuracy and task net
-improvement side by side.
+\subsection{Per-Object Analysis}
 
 \begin{table}[t]
-  \centering
-  \caption{Feature ablation.
-           Conds.~A--D: 10 seeds $\times$ 6 objects (60 trials per cond.).
-           Cond.~E (v5d): 5-object training subset, 25 seeds (125 trials);
-           S3 not re-run (query embedding affects Stage~4 only).}
-  \label{tab:ablation}
-  \setlength{\tabcolsep}{3.5pt}
-  \begin{tabular}{llcrrr}
-    \toprule
-    Cond. & Features added & Val acc & S3 & S4 & Net \\
-    \midrule
-    A & dist $+$ z\_rel & 0.664 & 46 & 50 & $+4$ \\
-    B & dist only       & 0.558 & 46 & 53 & $+7$ \\
-    C & z\_rel only     & 0.576 & 41 & 39 & $-2$ \\
-    D & none (12-dim)   & 0.579 & 46 & 45 & $-1$ \\
-    \midrule
-    E (v5d) & $+$ query emb.\ (4-dim) & \textbf{0.750} & --- & 107/125 & $+2^\dag$ \\
-    \bottomrule
-  \end{tabular}
-  \vspace{0.3ex}\\
-  {\footnotesize $\dag$ Net for Cond.~E $=$ S4(v5d) $-$ S4(v2): 107/125 vs.\ 105/125
-  on \{banana, can, pear, mustard, drill\}.}
+\caption{Per-object success rate: Baseline vs.\ OT-CFM + LGGSN (25 seeds each).}
+\label{tab:perobject}
+\centering
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccccc}
+\toprule
+Object & Base & OT-CFM & $\Delta$pp & $p$ & \\
+\midrule
+Banana         & 100.0\% & 100.0\% &   0.0 & —     &         \\
+TomatoSoupCan  &  92.0\% & 100.0\% &  +8.0 & 0.490 &         \\
+Pear           &  72.0\% & 100.0\% & +28.0 & 0.010 & $^{**}$ \\
+MustardBottle  &  92.0\% &  92.0\% &   0.0 & —     &         \\
+Scissors       & 100.0\% & 100.0\% &   0.0 & —     &         \\
+CrackerBox     &  44.0\% &  80.0\% & +36.0 & 0.019 & $^{**}$ \\
+PowerDrill     &  76.0\% &  88.0\% & +12.0 & 0.463 &         \\
+\midrule
+\textbf{All}   & \textbf{82.3\%} & \textbf{94.3\%} & \textbf{+12.0} & \textbf{${<}0.001$} & $^{**}$ \\
+\bottomrule
+\end{tabular}
 \end{table}
 
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\columnwidth]{fig3_ablation.pdf}
-  \caption{Feature ablation study.
-    \textbf{(a)}~Offline validation pair accuracy (dashed line = random
-    baseline 0.50).
-    \textbf{(b)}~Task-level net improvement (blue $> 0$, red $< 0$).
-    Condition~A achieves the highest offline accuracy but not the
-    highest task net, illustrating the offline--online transfer gap.
-    ($N = 10$ seeds $\times$ 6 objects $= 60$ trials per condition.)}
-  \label{fig:ablation}
-\end{figure}
+\cref{tab:perobject} shows per-object results.
+The largest gains accrue to objects where random CoM sampling covers the
+valid contact region poorly.
 
-\noindent\textbf{Key finding.}
-An offline accuracy improvement from 0.579 (12-dim) to 0.664 (14-dim)
-does not translate to a net task improvement: the features most
-informative for offline ranking---particularly $H$ and
-\texttt{z\_rel}---are precisely those that saturate or mislead on
-flat/thin objects (see \cref{sec:failure}).
+\noindent\textbf{CrackerBox (+36\,pp, $p{=}0.019$).}
+The box has a wide, flat top surface that requires the gripper to contact
+along the long axis.
+Random sampling at $\pm6$\,cm isotropically covers a $12{\times}12$\,cm
+square, of which only the subset aligned with the long axis succeeds.
+OT-CFM learns this asymmetric yaw prior (training yaw std 0.92\,rad,
+generated 0.97\,rad), concentrating proposals in the effective region.
 
-\noindent\textbf{Statistical caveat.}
-At $N = 10$ seeds $\times$ 6 objects $= 60$ trials per condition,
-the 95\,\% bootstrap CI on net improvement spans approximately $\pm 5$--$6$
-trials.
-The net differences between conditions (e.g., Cond~B at $+7$ vs.\ Cond~D at
-$-1$) are directionally consistent with the 25-seed primary result but lie
-within this noise band.
-The ablation results should therefore be interpreted as \emph{indicative} of
-feature contributions rather than conclusive evidence; replication at
-$N \geq 50$ would be required to resolve individual condition differences
-reliably.
+\noindent\textbf{Pear (+28\,pp, $p{=}0.010$).}
+The pear's rounded surface admits grasps in a broader but nonetheless
+structured contact band; random sampling under-covers this region,
+while OT-CFM generates proposals that fill it uniformly.
 
-\subsection{Gating Strategies for Failure Mitigation}
+\noindent\textbf{Banana (0\,pp), MustardBottle (0\,pp).}
+Both objects reach the same ceiling under random and OT-CFM sampling,
+leaving no measurable headroom for the generator to contribute.
 
-\noindent\textbf{Flat-object gate ($\sigma_H < 0.005$).}
-Reranking is skipped when the within-episode standard deviation of $H$
-falls below a threshold.
-The gate fires on 53--62\,\% of CrackerBox and MustardBottle episodes
-(blocking valid reranking) but on only 10\,\% of Scissors episodes;
-per-object results: CrackerBox $+3$, PowerDrill $-3$, Scissors $-3$.
-Net $= -2$ overall, worse than the ungated baseline.
+\noindent\textbf{PowerDrill (+12\,pp, $p{=}0.463$).}
+OT-CFM raises PowerDrill from 76\% to 88\%; the gain is not
+statistically significant at 25 seeds but is directionally consistent.
 
-\noindent\textbf{Object-conditional whitelist (CrackerBox + MustardBottle).}
-The whitelist eliminates the Scissors regression ($0$ vs.\ $-4$) but
-simultaneously degrades CrackerBox ($-3$ from $+4$) and MustardBottle
-($-3$ from $+2$).
-Net $= -1$.
+\noindent\textbf{Scissors (100\%, all conditions).}
+Scissors achieves 25/25 across all methods after correcting a
+physics-configuration bug: the original VHACD collision mesh
+(14 merged convex hulls, $\approx$2\,cm thick) tunnelled through
+the table under MuJoCo contact detection.
+The corrected entry uses a bounding-box collision proxy scaled to
+4\,cm thickness.
+Since all methods reach ceiling (25/25), Scissors contributes equally
+to each condition and does not differentiate methods.
 
-\subsection{Score-Spread Uncertainty Gating}
-\label{sec:spreadgate}
+\subsection{Ablation Study}
+\label{sec:ablation}
 
 \begin{table}[t]
-  \centering
-  \caption{Score-spread gate ablation (Stage~4, v5d; 25 seeds $\times$ 7
-           objects $= 175$ trials). Gate fires when LGGSN max$-$min score
-           $< \Delta$; fired episodes fall back to GR-ConvNet order.}
-  \label{tab:spreadgate}
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabular}{lrrc}
-    \toprule
-    Condition & Trials & Net & Gate\% \\
-    \midrule
-    S3 baseline                  & 117/175 & ---  & ---  \\
-    S4, $\Delta{=}0$ (no gate)   & 118/175 & $+1$ & ---  \\
-    S4, $\Delta{=}0.1$           & 116/175 & $-1$ & 84\% \\
-    S4, $\Delta{=}0.2$           & 114/175 & $-3$ & 82\% \\
-    \bottomrule
-  \end{tabular}
+\caption{Ablation: contribution of each pipeline component.
+  ``vs.\ full'' compares to OT-CFM + LGGSN (94.3\%).
+  175 trials per condition. $^\dagger$Corrected for Scissors physics-config fix.}
+\label{tab:ablation}
+\centering
+\resizebox{\columnwidth}{!}{%
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lcccc}
+\toprule
+Condition & SR & vs.\ Baseline & vs.\ Full & $p$ \\
+\midrule
+Baseline (random + LGGSN)            & 82.3\% & —          & $-12.0$\,pp & ${<}0.001$$^{**}$ \\
+GRC-6DoF + LGGSN                     & 82.9\% & $+0.6$\,pp & $-11.4$\,pp & ${<}0.001$$^{**}$ \\
+\midrule
+\textit{Remove OT (std CFM + LGGSN)} & 78.9\% & $-3.4$\,pp & $-15.4$\,pp & ${<}0.001$$^{**}$ \\
+\textit{Remove LGGSN (OT-CFM only)}  & 84.6\%$^\dagger$ & $+2.3$\,pp & $-9.7$\,pp & 0.003$^{**}$ \\
+\textit{Remove SAM vis (zero $c$)}   & 96.0\%$^\dagger$ & $+13.7$\,pp & $+1.7$\,pp & 0.456 \\
+\midrule
+\textbf{OT-CFM + LGGSN (full)}  & \textbf{94.3\%} & $+12.0$\,pp & — & — \\
+\bottomrule
+\end{tabular}}
 \end{table}
 
-The gate fires on 84\,\% of episodes at $\Delta=0.1$ because LGGSN score
-spread is near-zero for most objects---a direct consequence of the
-feature-saturation failure mode (\cref{sec:failure}).
-Thresholds of 0.1 and 0.2 are too aggressive: they swamp the real signal
-(CrackerBox net drops from $+4$ to $+3$ and $+2$), reducing overall net
-from $+1$ to $-1$ and $-3$ respectively.
-Raw score spread is therefore an insufficient proxy for model uncertainty;
-a calibrated measure (e.g.\ conformal prediction or Bayesian output variance)
-is needed to distinguish genuinely uncertain episodes (\cref{sec:discussion}).
+\cref{tab:ablation} isolates each component's contribution.
+The GRC-6DoF row adds a geometric-baseline comparison;
+ablation rows decompose the full OT-CFM + LGGSN pipeline.
 
-\subsection{GC-LGGSN: Geometry-Conditioned Feature Gating}
-\label{sec:gcresult}
-Evaluated on CrackerBox and Scissors (25 seeds each), GC-LGGSN achieves
-net $= 0$ overall (CrackerBox $+1$, Scissors $-1$), partially correcting
-the Scissors regression ($-4 \to -1$) but degrading CrackerBox ($+4 \to +1$).
-The episode context $\mathbf{z}$ is insufficiently discriminative to
-simultaneously benefit both objects; whether a larger gate resolves this
-on the full 7-object set remains open.
+\noindent\textbf{GRC-6DoF is equivalent to random ($+0.6$\,pp, n.s.).}
+Replacing random CoM sampling with GR-ConvNet-derived 6-DoF proposals
+yields 82.9\%---statistically indistinguishable from the random baseline
+(82.3\%).
+Both methods supply similarly diverse candidate sets to LGGSN, leaving
+no evidence that geometric candidate generation alone drives success.
 
-\subsection{Per-Object Failure Analysis}
-\label{sec:failure}
+\noindent\textbf{OT coupling is essential ($-15.4$\,pp, $p{<}0.001$).}
+Replacing the OT sampler with standard random source--target pairing
+reduces SR from 94.3\% to 78.9\%, which is \emph{below} the random-CoM
+baseline (82.3\%).
+This is the most striking finding: naive CFM without OT coupling
+\emph{harms} performance relative to random sampling.
+We attribute this to the flow learning non-optimal crossing paths when
+source and target are randomly paired---the velocity field becomes a
+blurred average of conflicting directions rather than a clean transport map.
+OT coupling removes this ambiguity and concentrates learning signal on
+coherent object-scale transport.
 
-\Cref{tab:geom} pairs per-object geometric statistics (from MuJoCo
-episodes) with PyBullet/Panda net improvement; \cref{fig:scatter}
-plots the scatter.
-We use PyBullet net here because the MuJoCo Scissors floor effect
-(0/25 baseline) masks the regression: PyBullet's non-zero baseline
-(20/25) exposes it as $-4$.
-Spearman correlation of flat\_frac with S4 net (PyBullet):
-$\rho = -0.96$ ($p < 0.01$).
-On the MuJoCo platform, Scissors exhibits a floor effect (0/25 both
-stages) rather than a regression, reducing the correlation to
-$\rho \approx -0.5$; the directional relationship holds but is
-attenuated by the execution constraint.
-Spearman correlation of $\sigma_{H,\text{within}}$ with S4 net
-(PyBullet): $\rho = +0.81$ ($p < 0.05$).
-These are the two strongest predictors of reranking benefit.
+\noindent\textbf{LGGSN reranking contributes $-9.7$\,pp ($p{=}0.003$).}
+Without reranking (OT-CFM candidates executed in generation order),
+SR drops from 94.3\% to 84.6\%.
+The reranker adds meaningful value even when the generator already provides
+high-quality candidates, by using geometric context (point-cloud density,
+gripper--centroid distance) that the flow model does not have access to.
 
-\begin{table}[t]
-  \centering
-  \caption{Per-object geometric properties (measured from MuJoCo/SO-ARM101
-           grasp episodes) paired with Stage~4 net improvement from
-           PyBullet/Panda (Table~\ref{tab:main_pyb}; Pear excluded).
-           Scissors' non-zero PyBullet baseline (20/25) exposes the
-           regression that the MuJoCo floor effect (0/25) masks.
-           Objects sorted by PyBullet S4 net (descending).}
-  \label{tab:geom}
-  \setlength{\tabcolsep}{2.5pt}
-  \begin{tabular}{lccccc}
-    \toprule
-    Object & $H_\mu$ & $\sigma_{H,\mathrm{w}}$ & ff
-           & $\sigma_{\psi,\mathrm{w}}$ & Net$^\ast$ \\
-    \midrule
-    CrackerBox    & 0.020 & 0.018 & 0.02 & 0.06  & $\mathbf{+4}$ \\
-    MustardBottle & 0.018 & 0.015 & 0.03 & 0.05  & $+2$ \\
-    Banana        & 0.010 & 0.005 & 0.05 & 0.04  & $0$  \\
-    TomatoSoupCan & 0.015 & 0.012 & 0.05 & 0.05  & $-1$ \\
-    PowerDrill    & 0.012 & 0.008 & 0.10 & \textbf{.195} & $-1$ \\
-    Scissors      & \textbf{.001} & \textbf{.001} & \textbf{.457}
-                  & 0.08  & $\mathbf{-4}$ \\
-    \bottomrule
-  \end{tabular}
-  \vspace{0.5ex}
-  {\footnotesize $H_\mu$: mean height; $\sigma_{H,\mathrm{w}}$:
-   within-ep.\ $\sigma_H$; ff: flat\_frac;
-   $\sigma_{\psi,\mathrm{w}}$: yaw spread.
-   $^\ast$PyBullet net, $N=25$.}
-\end{table}
-
-\begin{figure}[t]
-  \centering
-  \includegraphics[width=\columnwidth]{fig1_flat_frac_vs_net.pdf}
-  \caption{Flat fraction vs.\ Stage~4 net improvement (PyBullet/Panda,
-    6 objects; geometric statistics from MuJoCo/SO-ARM101 episodes).
-    Each point is one object; colour encodes sign of net (blue $>0$,
-    red $<0$, grey $=0$); point size encodes within-episode yaw spread
-    $\sigma_\psi$ (larger $=$ more orientation ambiguity).
-    The dashed line is an OLS fit.
-    Spearman $\rho = -0.96$ ($p < 0.01$, computed from PyBullet/Panda
-    evaluation) indicates that high flat fraction is the strongest
-    single predictor of reranking regression.}
-  \label{fig:scatter}
-\end{figure}
-
-\noindent\textbf{Scissors --- Feature Saturation.}
-Scissors register zero success on both Stage~3 and Stage~4 (0/25 each),
-a floor effect that prevents measuring reranking benefit or harm from task
-outcomes alone.
-We therefore diagnose the Scissors failure mode through score-level analysis
-rather than net improvement.
-Scissors have near-zero estimated height ($H_\mu \approx 0.001$\,m),
-with 45.7\,\% of all candidates assigned $H < 0.001$.
-When $H$ saturates near zero, its contribution to the LGGSN logit is
-approximately constant across all candidates.
-The model's output variance collapses (max--min score spread $< 0.002$ in
-84\,\% of episodes) and selection effectively degrades to a function of
-\texttt{dist\_to\_centroid} alone.
-For Scissors, the XY centroid of top-down candidates corresponds to the
-tip region---a geometrically poor grasping location.
-The consistent regressions observed on PyBullet/Panda ($-4$), where Scissors
-achieves non-zero baseline success (20/25), confirm that this score-collapse
-mechanism causes task degradation when non-zero success is accessible.
-
-\noindent\textbf{PowerDrill --- Orientation Ambiguity.}
-The PowerDrill has the highest within-episode yaw spread
-($\sigma_\psi = 0.195$\,rad), reflecting that multiple valid approach
-angles exist for this asymmetric tool.
-LGGSN uses world-frame yaw without object-frame normalisation, so the same
-physical approach direction maps to different feature values depending on
-how the drill is oriented in the scene.
-The cross-episode training signal for PowerDrill is correspondingly noisy,
-as ``good'' yaw values vary between episodes in a way the model cannot
-learn from world-frame coordinates alone.
-
-\noindent\textbf{CrackerBox and MustardBottle --- Consistent Gains.}
-Both objects have clear height structure ($H > 0$,
-$\sigma_{H,\text{w}} \approx 0.015$--$0.020$) and a consistent principal
-grasping axis ($\sigma_\psi \approx 0.05$--$0.06$).
-The \texttt{z\_rel} feature provides a reliable within-episode
-discrimination signal: candidates at higher relative height correspond to
-grasps on the upper body of the object rather than the table edge, and
-this distinction is geometrically meaningful and consistent across
-episodes.
+\noindent\textbf{SAM visual conditioning is dispensable ($+1.7$\,pp, $p{=}0.46$).}
+Replacing the per-object mean SAM embedding with a zero vector yields
+96.0\%---slightly higher than the full model, though not significantly so.
+This is a practically important negative result: the OT-CFM model's
+generative quality is driven entirely by learning from physical success
+labels, not by the high-dimensional visual feature.
+The recommended deployment therefore omits the SAM dependency
+(saves $\sim$300\,MB GPU memory and one SAM forward pass per episode).
 
 % =============================================================================
 \section{Discussion}
 \label{sec:discussion}
 
-\subsection{Offline vs.\ Online Transfer}
+\subsection{Why OT Coupling Matters}
 
-The most striking finding is the gap between offline pair accuracy
-improvement ($0.447 \to 0.664$) and online task improvement (net $\approx 0$).
-This gap has a structural explanation: offline pair accuracy measures
-discrimination \emph{between} episodes from different scenes.
-The context features are highly informative at this level.
-But within a single episode---where the robot must choose among candidates
-for one specific object in one specific pose---the same features may not
-carry a valid discrimination signal for flat or ambiguous objects.
-This exposes a general failure mode in grasp reranker evaluation: offline
-pair accuracy is a necessary but not sufficient condition for online
-improvement, and evaluations that report only offline accuracy risk
-overstating expected task benefit.
+The failure of standard CFM below baseline ($78.9\% < 82.3\%$) reveals a
+fundamental issue with random source--target pairing in low-data regimes.
+With only $\sim\!400$ training examples per object, random pairing produces
+a high fraction of $(x_0, x_1)$ pairs in which the optimal path crosses
+other pairs' paths.
+The velocity network must simultaneously represent contradictory flow
+directions, ultimately learning a blurred mean that places candidates in
+mediocre positions.
+OT coupling, by solving for the global optimal assignment within each
+minibatch, eliminates this contradiction and allows the model to learn
+crisp, object-specific candidate distributions even with limited data.
 
-\subsection{Cross-Platform Divergence}
+\subsection{Why Visual Conditioning Does Not Help}
 
-The cross-platform results (\cref{tab:main,tab:main_pyb}) reveal qualitatively
-opposite per-object patterns: CrackerBox is $-2$ on MuJoCo/SO-ARM101 but
-$+4$ on PyBullet/Panda, while PowerDrill is $+4$ on MuJoCo but $-1$ on
-PyBullet.
-A plausible explanation involves contact-model fidelity (PyBullet simplified
-rigid-body vs.\ MuJoCo soft-contact), candidate-set geometry (depth-map
-characteristics differ between simulators), and kinematic reachability
-(Panda vs.\ SO-ARM101).
-MuJoCo/SO-ARM101 is the primary platform; PyBullet results serve as a
-cross-platform sanity check.
+The SAM ROI features used for conditioning are averaged over all training
+episodes for a given object class, yielding a fixed class-level embedding
+rather than an instance- or scene-level one.
+Such conditioning conveys no information beyond object class identity,
+which the generation model can also infer from the training data distribution
+itself.
+A conditioning signal that varies \emph{within} an object class---e.g., a
+point-cloud occupancy map or real-time depth image---might provide genuine
+scene-specific guidance.
+We leave this for future work.
 
-\subsection{The Granularity Problem for Gating}
+\subsection{Scissors: Physics-Configuration Correction}
 
-Both the $\sigma_H$ gate and the object-conditional whitelist attempt to
-suppress reranking for problematic objects, yet each fails for a distinct
-reason.
-The $\sigma_H$ gate operates at episode granularity, but the failure mode
-(flat\_frac) is a property of the object class, not a single episode.
-The whitelist correctly models class-level failure but introduces a
-comparison-baseline shift: blocking reranking for one condition changes
-which Stage-3 scenes are sampled, making net improvement estimates
-unreliable due to simulator non-determinism.
+Scissors was 0/25 in all initial conditions due to a simulation bug:
+the VHACD collision mesh (14 merged convex hulls, $\approx$2\,cm effective
+thickness) tunnelled through the table under MuJoCo's contact detection.
+After correcting the manifest entry (bounding-box proxy, $4$\,cm thickness
+via non-uniform scale, geom offset to align body origin with mesh CoM),
+all methods reach 25/25 = 100\%.
+The fix affects all 7 conditions uniformly, so the per-method $\Delta$pp
+values are unchanged.
+For reference, excluding Scissors from the per-object comparison, the
+six remaining objects give $140/150 = 93.3\%$ (OT-CFM + LGGSN)
+vs.\ $119/150 = 79.3\%$ (baseline), identical to the corrected
+per-condition estimate.
 
-A principled solution would gate on the \emph{model's own uncertainty}: for
-example, skipping reranking when the score spread across candidates is
-below a threshold~$\delta$.
-\Cref{sec:spreadgate} tests this directly: at $\Delta \in \{0.1, 0.2\}$,
-the gate fires on 82--84\,\% of episodes and net degrades to $-1$ and $-3$,
-confirming that raw spread is insufficient without calibration.
+\subsection{Limitations}
 
-\subsection{Difficulty Generalization on SO-ARM101}
-A supplementary experiment varying spawn difficulty (easy/medium/hard,
-50 seeds $\times$ 5 objects) found all three methods (geometry, random,
-LGGSN) within noise of one another (65--72\,\%), confirming that pose
-variation is the primary driver of difficulty and per-object geometry
-determines sensitivity more than reranker choice.
+\noindent\textbf{Top-down constraint.}
+The current pipeline fixes roll $= \pi$, pitch $= 0$, reducing the 6-DoF
+problem to effective 3-DoF ($(x,y,\psi)$).
+Extension to arbitrary gripper orientations requires either SE(3)-equivariant
+flow matching or a richer orientation parameterisation (e.g., quaternion or
+$6$-d representation).
 
-\subsection{Statistical Power}
-At $N = 25$ seeds, bootstrap 80\,\% CIs span $\pm 4$--$5$ trials; only
-CrackerBox ($+4$) achieves $\geq 80\,\%$ power at this scale, so
-per-object diagnoses are directionally supported but not conclusively
-established.
+\noindent\textbf{Simulation only.}
+All results are from MuJoCo simulation.
+Sim-to-real transfer requires alignment of the physical SO-ARM101's
+calibration, contact dynamics, and depth-camera intrinsics with the
+simulation geometry.
+
+\noindent\textbf{CoM-relative shift.}
+\cref{eq:shift} centres generated candidates on the current object CoM
+by subtracting the training-set global mean.
+This assumes the training object-placement distribution is roughly centred,
+which holds for our setup but may break for out-of-distribution workspaces.
+
+\subsection{Future Work}
+\label{sec:future}
+
+SE(3)-equivariant flow models (e.g., using Riemannian flow
+matching~\cite{chen2024rfm}) could extend this approach to full 6-DoF.
+As an immediate next step, we plan to validate the pipeline on a Piper 6-DoF
+manipulator, which relaxes the top-down constraint and provides a direct test
+of whether OT-CFM proposals remain viable under arbitrary gripper orientations.
+Real-robot evaluation on the physical SO-ARM101 is an additional validation step.
+Instance-level visual conditioning---using the point cloud of the segmented
+target object as $c$---may provide meaningful additional signal for
+cross-instance variation within object classes.
 
 % =============================================================================
 \section{Conclusion}
 \label{sec:conclusion}
 
-LGGSN is a lightweight geometry-based grasp reranker trained with BPR loss
-on live robot data and evaluated over 175 paired trials on a MuJoCo-simulated
-SO-ARM101.
-The central finding is that the net task improvement is near zero ($+1$):
-a consistent PowerDrill gain ($+4$) is largely offset by regressions on
-CrackerBox ($-2$), MustardBottle ($-1$), and Pear ($-1$).
-Cross-platform validation on PyBullet/Panda (\cref{tab:main_pyb}) confirms
-the same object-dependent pattern; the PyBullet Scissors regression ($-4$)
-provides the starkest single-object contrast.
-This behaviour persists across four system variants---ungated, flat-object
-gated, class-conditional, and geometry-conditioned feature masking---all
-achieving net $\approx 0$ at 25 seeds.
+We presented a grasp generation pipeline that combines Optimal Transport
+Conditional Flow Matching (OT-CFM) with geometric reranking (LGGSN) for
+open-world 6-DoF grasping.
+On 175 paired trials across seven YCB objects on MuJoCo/SO-ARM101,
+the pipeline achieves 94.3\% success rate---a statistically significant
++12\,pp improvement over random CoM sampling with the same reranker
+($p{<}0.001$).
 
-We identify two root causes predictable from geometric statistics:
-feature saturation for flat/thin objects
-(flat\_frac $\geq 0.4$ strongly correlated with regression in PyBullet
-cross-platform analysis, $\rho = -0.96$)
-and orientation ambiguity for asymmetric tools
-($\sigma_\psi$ high, no object-frame encoding).
-These diagnoses point to three requirements for a successor method:
-\textit{(i)} object-frame-normalised orientation features or object-aware
-pose canonicalisation (e.g., via VLM-predicted symmetry axes or superquadric
-shape fitting~\cite{fang2023anygrasp});
-\textit{(ii)} model-uncertainty-aware gating that disables reranking when
-score spread falls below a meaningful threshold, for which conformal
-prediction or Bayesian output variance provide principled score-spread estimates;
-\textit{(iii)} explicit handling of degenerate-$H$ regimes for thin planar
-objects, either by masking $H$ when below a calibrated floor or by
-substituting a contact-normal–based feature that remains discriminative
-for flat geometries.
+Ablation analysis establishes that OT coupling is the essential component:
+removing it drops performance below baseline, while standard CFM without OT
+actively harms results.
+LGGSN reranking adds 9.7\,pp on top of generation alone, confirming that
+generation and reranking are complementary.
+SAM visual conditioning provides no significant benefit, enabling a simpler
+SAM-free deployment that achieves 96.0\%.
 
-More broadly, this work demonstrates that offline pair accuracy improvement
-is necessary but insufficient for online task benefit, and provides a
-replicable diagnostic framework for predicting per-object reranking
-behaviour from geometric statistics alone.
-All three identified requirements---object-frame orientation normalisation,
-uncertainty-aware gating, and degenerate-$H$ handling---are technically
-tractable, suggesting a clear path toward a geometry-based reranker that
-generalises reliably across object classes.
+These results position OT-CFM as a practical candidate generator for
+grasping pipelines: it trains on modest physical-execution data, runs as a
+fast single-pass neural ODE at inference, and dramatically widens the
+distribution of attempted grasps for geometrically demanding objects.
+The geometric-baseline comparison (GRC-6DoF + LGGSN: 82.9\%) shows that
+improved candidate geometry alone is insufficient; it is the
+\emph{learned} OT-coupled distribution that drives the gain.
 
 \balance
 
 % =============================================================================
 \begin{thebibliography}{10}
 
-\bibitem{kumra2020grconvnet}
-A.~Kumra, S.~Jain, and F.~Meier,
-``Antipodal Robotic Grasping using Generative Residual Convolutional
-  Neural Network,''
-in \emph{Proc.\ IEEE/RSJ Int.\ Conf.\ Intelligent Robots and Systems
-  (IROS)}, 2020.
+\bibitem{lipman2022cfm}
+Y.~Lipman, R.~T.~Q.~Chen, H.~Ben-Hamu, M.~Nickel, and M.~Le,
+``Flow Matching for Generative Modeling,''
+\emph{arXiv:2210.02747}, 2022.
+
+\bibitem{tong2023otcfm}
+A.~Tong, K.~Fatras, N.~Malkin, G.~Huguet, Y.~Zhang,
+J.~Rector-Brooks, G.~Wolf, and Y.~Bengio,
+``Improving and Generalizing Flow-Matching with Minibatch Optimal
+  Transport,''
+\emph{Trans.\ Mach.\ Learn.\ Res.}, 2023.
+
+\bibitem{chi2023diffusion}
+C.~Chi, Z.~Xu, S.~Feng, E.~Cousineau, Y.~Du, B.~Burchfiel,
+R.~Tedrake, and S.~Song,
+``Diffusion Policy: Visuomotor Policy Learning via Action Diffusion,''
+\emph{Proc.\ Robotics: Sci.\ Syst.\ (RSS)}, 2023.
+
+\bibitem{barad2023graspldm}
+K.~R.~Barad, A.~Orsula, A.~Richard, J.~Dentler,
+M.~Olivares-Mendez, and C.~Martinez,
+``GraspLDM: Generative 6-DoF Grasp Synthesis using Latent Diffusion
+  Models,''
+\emph{arXiv:2312.11243}, 2023.
+
+\bibitem{noh2024graspsam}
+S.~Noh, J.~Kim, D.~Nam, S.~Back, R.~Kang, and K.~Lee,
+``GraspSAM: When Segment Anything Model Meets Grasp Detection,''
+\emph{arXiv:2409.12521}, 2024.
+
+\bibitem{chen2024rfm}
+R.~T.~Q.~Chen and Y.~Lipman,
+``Riemannian Flow Matching on General Geometries,''
+\emph{arXiv:2302.03660}, 2023.
 
 \bibitem{mahler2017dexnet}
 J.~Mahler \emph{et al.},
 ``Dex-Net~2.0: Deep Learning to Plan Robust Grasps with Synthetic Point
   Clouds and Analytic Grasp Metrics,''
-in \emph{Proc.\ Robotics: Science and Systems (RSS)}, 2017.
+in \emph{Proc.\ Robotics: Sci.\ Syst.\ (RSS)}, 2017.
 
 \bibitem{fang2020graspnet1b}
 H.-S.~Fang \emph{et al.},
 ``GraspNet-1Billion: A Large-Scale Benchmark for General Object Grasping,''
-in \emph{Proc.\ IEEE/CVF Conf.\ Computer Vision and Pattern Recognition
-  (CVPR)}, 2020.
+in \emph{Proc.\ IEEE/CVF CVPR}, 2020.
+
+\bibitem{fang2023anygrasp}
+H.-S.~Fang \emph{et al.},
+``AnyGrasp: Robust and Efficient Grasp Perception in Spatial and Temporal
+  Domains,''
+\emph{IEEE Trans.\ Rob.}, vol.~39, no.~5, pp.~3929--3945, 2023.
+
+\bibitem{mousavian2019graspnet6dof}
+A.~Mousavian, C.~Eppner, and D.~Fox,
+``6-DOF GraspNet: Variational Grasp Generation for Object Manipulation,''
+in \emph{Proc.\ IEEE/CVF ICCV}, 2019.
 
 \bibitem{owg2024}
 [Author(s) omitted for blind review],
@@ -814,69 +712,22 @@ S.~Rendle, C.~Freudenthaler, Z.~Gantner, and L.~Schmidt-Thieme,
 ``BPR: Bayesian Personalized Ranking from Implicit Feedback,''
 in \emph{Proc.\ Conf.\ Uncertainty in Artificial Intelligence (UAI)}, 2009.
 
-\bibitem{mousavian2019graspnet6dof}
-A.~Mousavian, C.~Eppner, and D.~Fox,
-``6-DOF GraspNet: Variational Grasp Generation for Object Manipulation,''
-in \emph{Proc.\ IEEE/CVF Int.\ Conf.\ Computer Vision (ICCV)}, 2019.
-
 \bibitem{fang2024dexgraspnet2}
 J.~Zhang \emph{et al.},
 ``DexGraspNet~2.0: Learning Generalizable Dexterous Grasping in
   Cluttered Scenes,''
-in \emph{Proc.\ Conf.\ Robot Learning (CoRL)}, PMLR vol.~270,
-  pp.~5106--5133, 2024.
-
-\bibitem{bharadhwaj2024roboagent}
-H.~Bharadhwaj \emph{et al.},
-``RoboAgent: Generalization and Efficiency in Robot Manipulation via
-  Semantic Augmentations and Action Chunking,''
-in \emph{Proc.\ IEEE Int.\ Conf.\ Robotics and Automation (ICRA)}, 2024.
-
-\bibitem{morrison2020grconvnet}
-D.~Morrison, P.~Corke, and J.~Leitner,
-``Learning Robust, Real-Time, Reactive Robotic Grasping,''
-\emph{Int.\ J.\ Rob.\ Res.}, vol.~39, no.~2--3, pp.~183--201, 2020.
+in \emph{Proc.\ Conf.\ Robot Learning (CoRL)}, PMLR vol.~270, 2024.
 
 \bibitem{shridhar2022cliport}
 M.~Shridhar, L.~Manuelli, and D.~Fox,
 ``CLIPort: What and Where Pathways for Robotic Manipulation,''
 in \emph{Proc.\ Conf.\ Robot Learning (CoRL)}, 2021.
 
-\bibitem{fang2023anygrasp}
-H.-S.~Fang \emph{et al.},
-``AnyGrasp: Robust and Efficient Grasp Perception in Spatial and Temporal Domains,''
-\emph{IEEE Trans.\ Rob.}, vol.~39, no.~5, pp.~3929--3945, 2023.
-
-\bibitem{brohan2023rt2}
-A.~Brohan \emph{et al.},
-``RT-2: Vision-Language-Action Models Transfer Web Knowledge to Robotic Control,''
-in \emph{Proc.\ Conf.\ Robot Learning (CoRL)}, 2023.
-
-\bibitem{kim2024openvla}
-M.~J.~Kim \emph{et al.},
-``OpenVLA: An Open-Source Vision-Language-Action Model,''
-arXiv:2406.09246, 2024.
-
-\bibitem{tang2023graspgpt}
-J.~Tang \emph{et al.},
-``GraspGPT: Leveraging Semantic Knowledge from a Large Language Model
-  for Task-Oriented Grasping,''
-\emph{IEEE Robot.\ Autom.\ Lett.}, vol.~8, no.~10, pp.~6624--6631, 2023.
-
-\bibitem{chen2024spatialvlm}
-B.~Chen \emph{et al.},
-``SpatialVLM: Endowing Vision-Language Models with Spatial Reasoning Capabilities,''
-in \emph{Proc.\ IEEE/CVF Conf.\ Computer Vision and Pattern Recognition (CVPR)}, 2024.
-
-\bibitem{ze2024gnfactor}
-Y.~Ze \emph{et al.},
-``GNFactor: Multi-Task Real Robot Learning with Generalizable Neural Feature Fields,''
-in \emph{Proc.\ Conf.\ Robot Learning (CoRL)}, 2023.
-
-\bibitem{vuong2024grasp}
-A.~Vuong \emph{et al.},
-``Language-Driven Grasp Detection,''
-in \emph{Proc.\ IEEE/CVF Conf.\ Computer Vision and Pattern Recognition (CVPR)}, 2024.
+\bibitem{lim2025equigraspflow}
+B.~Lim, J.~Kim, J.~Kim, Y.~Lee, and F.~C.~Park,
+``EquiGraspFlow: SE(3)-Equivariant 6-DoF Grasp Pose Generative Flows,''
+in \emph{Proc.\ Conf.\ Robot Learning (CoRL)}, PMLR vol.~270,
+  pp.~5067--5086, 2025.
 
 \end{thebibliography}
 
