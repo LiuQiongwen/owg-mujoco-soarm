@@ -14,7 +14,94 @@ except ImportError:
 from owg_robot.env_soarm import (EnvironmentSoArm,      # MuJoCo backend
                                   GRASP_MODE_PHYSICS,
                                   GRASP_MODE_DEMO_ATTACH,
-                                  GRASP_Z_TABLE_MARGIN)
+                                  GRASP_Z_TABLE_MARGIN,
+                                  TABLE_TOP_Z)
+
+# XY spread around CoM when generating grasp candidates — must match
+# collect_lggsn_data._SPREAD_XY so inference features lie in the training distribution.
+_LGGSN_SPREAD_XY = 0.06
+
+# ── CFM grasp generator (optional) ────────────────────────────────────────────
+# Set env var CFM_CKPT to enable CFM candidate generation in _setup_grasps_mujoco.
+# The matching _stats.json must exist alongside the .pt checkpoint.
+_CFM_CKPT = os.environ.get("CFM_CKPT", "")
+
+def _load_cfm_model(ckpt_path: str):
+    """Load OT-CFM VelocityNet and inference stats.  Returns (model, stats) or (None, None)."""
+    if not ckpt_path or not os.path.isfile(ckpt_path):
+        return None, None
+    stats_path = ckpt_path.replace(".pt", "_stats.json")
+    if not os.path.isfile(stats_path):
+        print(f"[CFM] stats file not found: {stats_path}")
+        return None, None
+    try:
+        import torch, json as _json
+        from train_cfm_grasp import VelocityNet
+        stats = _json.load(open(stats_path))
+        model = VelocityNet(hidden=512)
+        sd    = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        model.load_state_dict(sd)
+        model.eval()
+        dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = model.to(dev)
+        print(f"[CFM] Loaded {ckpt_path} — objects: {list(stats['mean_vis_per_obj'].keys())}")
+        return model, stats
+    except Exception as e:
+        print(f"[CFM] Failed to load: {e}")
+        return None, None
+
+def _cfm_sample_candidates(model, stats, obj_name: str, n: int,
+                            gx: float, gy: float, gz: float, pe: float,
+                            rng: np.random.Generator):
+    """Generate n grasp candidates via CFM conditioned on obj_name's mean vis_feat.
+
+    CFM was trained on absolute world-frame positions.  To ensure generated
+    poses are centred on the *current* object CoM (not the training-set mean),
+    we subtract the training global mean (x,y) and add the live CoM (gx,gy).
+    This preserves the learned yaw distribution while adapting to the actual
+    object location at inference time.
+
+    Returns list of grasp dicts, or None if obj_name not in stats.
+    """
+    import torch
+    from train_cfm_grasp import sample_poses
+    key = obj_name.lower().replace("ycb", "").replace(" ", "")
+    # fuzzy match: "MustardBottle" → "mustard"
+    vis_map = stats["mean_vis_per_obj"]
+    cond_vec = None
+    for k in vis_map:
+        if k in key or key.startswith(k):
+            cond_vec = vis_map[k]
+            break
+    if cond_vec is None:
+        return None
+
+    dev    = next(model.parameters()).device
+    # CFM_ZERO_VIS=1: condition on zeros to ablate the visual feature contribution
+    if os.environ.get("CFM_ZERO_VIS") == "1":
+        cond_vec = [0.0] * len(cond_vec)
+    cond_t = torch.tensor(cond_vec, dtype=torch.float32, device=dev)
+    pmean  = np.array(stats["pose_mean"], dtype=np.float32)   # global training mean
+    pstd   = np.array(stats["pose_std"],  dtype=np.float32)
+
+    poses_norm = sample_poses(model, cond_t, n=n, steps=20)   # (n, 6) normalised
+    poses      = poses_norm * pstd + pmean                     # denormalise → absolute
+
+    grasps = []
+    for p in poses:
+        cfm_x, cfm_y, _z, roll, pitch, yaw = [float(v) for v in p]
+        # Shift from training-mean centre → current object CoM
+        x = cfm_x - float(pmean[0]) + gx
+        y = cfm_y - float(pmean[1]) + gy
+        width = float(rng.uniform(0.04, 0.09))
+        grasps.append({
+            "position": [x, y, gz],
+            "rpy":      [roll, pitch, yaw],
+            "width":    width,
+            "score":    0.0,
+            "_metrics": {"H": 0.05, "dz": 0.0, "dz_lift": 0.0, "need_dz": 0.0, "pe_ik": pe},
+        })
+    return grasps
 try:
     from owg_robot.camera import Camera
 except ImportError:
@@ -55,6 +142,8 @@ class RobotEnvUI:
         self.seed = self.cfg.seed
 
         self.n_grasp_attempts = self.cfg.n_grasp_attempts
+        # Read CFM_CKPT at __init__ time (not module level) so demo.py can set it before UI creation
+        self._cfm_model, self._cfm_stats = _load_cfm_model(os.environ.get("CFM_CKPT", ""))
 
         if self.backend == "mujoco":
             # ── MuJoCo / SO-ARM101 backend ─────────────────────────────────
@@ -246,19 +335,32 @@ class RobotEnvUI:
         self.env.dummy_simulation_steps(10)
         return obs
 
-    def _setup_grasps_mujoco(self):
-        """MuJoCo backend: generate centroid-based grasps from actual object pose.
+    @staticmethod
+    def _compute_obj_H(obs: dict, obj_id: int) -> float:
+        """Estimate object height from segmented point cloud (H = max_z - TABLE_TOP_Z).
+        Mirrors collect_lggsn_data._compute_H so inference matches training features."""
+        seg = obs.get("seg") if obs else None
+        pts = obs.get("points") if obs else None
+        if seg is None or pts is None:
+            return 0.05
+        flat_pts = pts.reshape(-1, 3)
+        flat_seg = seg.ravel()
+        n = min(len(flat_seg), len(flat_pts))
+        obj_pts = flat_pts[:n][flat_seg[:n] == obj_id]
+        if len(obj_pts) < 5:
+            return 0.05
+        return float(max(0.005, obj_pts[:, 2].max() - TABLE_TOP_Z))
 
-        GR-ConvNet's camera→robot coordinate transform is calibrated for PyBullet
-        and produces wrong x/y in MuJoCo. Instead, sample grasps directly from
-        the object's 3D CoM position — identical to the collect_mujoco_transitions
-        approach.
+    def _setup_grasps_mujoco(self, obs: dict | None = None):
+        """Generate top-down grasp candidates whose feature distribution matches
+        the LGGSN training data (collect_lggsn_data._sample_candidates).
 
-        Uses get_obj_com_pos() (body world-frame CoM) rather than get_obj_pos()
-        (free-joint qpos) so the jaw-midpoint IK target z equals the object CoM
-        height.  YCB meshes have varying origin offsets relative to the CoM; a
-        fixed GRASP_Z_OFFSET over qpos_z caused the jaw to sit above short objects
-        (e.g. Banana: 4 cm tall, offset was 6 cm) with no contact on close.
+        Key alignment with training:
+          - XY positions: CoM ± _LGGSN_SPREAD_XY (was 0 → all features degenerate)
+          - H: computed from live point cloud (was hardcoded 0.05)
+          - roll=π, pitch=0, yaw=uniform(-π/2, π/2)
+          - width=uniform(0.04, 0.09), score=0, dz=dz_lift=need_dz=0
+          - pe_ik: CoM-target IK error (episode-level constant, same as training)
         """
         IK_PE_THRESHOLD = float(os.environ.get("IK_PE_THRESH", "0.005"))
         rng = np.random.default_rng(self.seed)
@@ -270,16 +372,20 @@ class RobotEnvUI:
 
             gx, gy = float(com[0]), float(com[1])
             gz     = float(com[2]) + GRASP_Z_TABLE_MARGIN
+            H      = self._compute_obj_H(obs, obj_id) if obs is not None else 0.05
 
             candidates = [
-                (float(rng.uniform(-np.pi / 2, np.pi / 2)),
+                (float(gx + rng.uniform(-_LGGSN_SPREAD_XY, _LGGSN_SPREAD_XY)),
+                 float(gy + rng.uniform(-_LGGSN_SPREAD_XY, _LGGSN_SPREAD_XY)),
+                 float(rng.uniform(-np.pi / 2, np.pi / 2)),
                  float(rng.uniform(0.04, 0.09)))
                 for _ in range(self.n_grasp_attempts)
             ]
 
-            target = np.array([gx, gy, gz])
-            pe_iks = self.env.compute_ik_reachability([target] * len(candidates))
-            pe = pe_iks[0]  # same target for all candidates within episode
+            # pe_ik: IK error at CoM target (episode-level, same for all candidates)
+            com_target = np.array([gx, gy, gz])
+            pe_iks = self.env.compute_ik_reachability([com_target] * len(candidates))
+            pe = pe_iks[0]
 
             reachable = [i for i, e in enumerate(pe_iks) if e <= IK_PE_THRESHOLD]
             if reachable:
@@ -293,15 +399,144 @@ class RobotEnvUI:
                       f"> {IK_PE_THRESHOLD*1000:.0f}mm threshold; "
                       f"fallback to first {len(use_idx)}")
 
+            # ── CFM candidate generation (replaces random sampling when enabled) ─
+            cfm_grasps = None
+            if self._cfm_model is not None:
+                obj_name = (self.env.obj_names[self.env.obj_ids.index(obj_id)]
+                            if obj_id in self.env.obj_ids and self.env.obj_names
+                            else "")
+                cfm_grasps = _cfm_sample_candidates(
+                    self._cfm_model, self._cfm_stats, obj_name,
+                    n=len(use_idx), gx=gx, gy=gy, gz=gz, pe=pe, rng=rng,
+                )
+                if cfm_grasps is not None:
+                    print(f"  [CFM] Generated {len(cfm_grasps)} candidates for '{obj_name}'")
+
+            if cfm_grasps is not None:
+                grasps = cfm_grasps
+            else:
+                grasps = []
+                for i in use_idx:
+                    cx, cy, yaw, opening = candidates[i]
+                    grasps.append({
+                        "position": [cx, cy, gz],
+                        "rpy":      [np.pi, 0.0, yaw],
+                        "width":    opening,
+                        "score":    0.0,
+                        "_metrics": {
+                            "H":       H,
+                            "dz":      0.0,
+                            "dz_lift": 0.0,
+                            "need_dz": 0.0,
+                            "pe_ik":   pe,
+                        },
+                    })
+
+            self.env.set_obj_grasps(obj_id, grasps, grasp_rects=[])
+
+    def _setup_grasps_grconvnet(self, obs: dict | None = None):
+        """GR-ConvNet 2D prediction lifted to 6-DoF via MuJoCo camera model.
+
+        Replaces uniform-random CoM sampling with GR-ConvNet spatial predictions.
+        All downstream logic (IK filter, LGGSN reranker) stays identical to the
+        random-sampling path, so this is a clean A/B swap of the candidate generator.
+
+        Back-projection: MuJoCo metric depth (already metres) + pinhole intrinsics
+        derived from FOVY=55°/224px.  Yaw = -image_angle (Y-flip, CAM_ROT=0).
+        Fallback: random CoM candidate when GR-ConvNet returns fewer than needed.
+        """
+        from owg_robot.pointcloud import compute_intrinsics
+
+        IK_PE_THRESHOLD = float(os.environ.get("IK_PE_THRESH", "0.005"))
+        rng = np.random.default_rng(self.seed)
+
+        rgb          = obs['image']          # (H, W, 3) uint8
+        depth        = obs['depth']          # (H, W) float32 metric metres
+        seg          = obs.get('seg')
+        cam_to_world = obs['cam_to_world']   # (4, 4) camera → world
+
+        img_h, img_w = depth.shape
+        K    = compute_intrinsics(img_w, img_h, 55.0)  # FOVY = 55°
+        fx   = float(K[0, 0])   # ≈ 215.6
+        px   = float(K[0, 2])   # principal point x = 112.0
+        py   = float(K[1, 2])   # principal point y = 112.0
+
+        for obj_id in self.env.obj_ids:
+            try:
+                com = self.env.get_obj_com_pos(obj_id)
+            except Exception:
+                com = self.env.get_obj_pos(obj_id)
+
+            gx, gy = float(com[0]), float(com[1])
+            gz     = float(com[2]) + GRASP_Z_TABLE_MARGIN
+            H      = self._compute_obj_H(obs, obj_id) if obs is not None else 0.05
+
+            # IK pre-check identical to random path
+            com_target = np.array([gx, gy, gz])
+            pe_iks  = self.env.compute_ik_reachability(
+                [com_target] * self.n_grasp_attempts)
+            pe      = pe_iks[0]
+            reachable = [i for i, e in enumerate(pe_iks) if e <= IK_PE_THRESHOLD]
+            n_needed  = len(reachable) if reachable else min(3, self.n_grasp_attempts)
+
+            # Masked RGB + depth for GR-ConvNet
+            mask = (seg == obj_id) if seg is not None else np.ones(
+                (img_h, img_w), dtype=bool)
+            mask_rgb = np.where(np.stack([mask] * 3, axis=-1), rgb,
+                                np.full_like(rgb, 0xff))
+            mask_d   = np.where(mask, depth, float(depth.max()))
+
+            grasps_2d, _ = self.grasp_generator.predict(
+                mask_rgb, mask_d.copy(), n_grasps=n_needed)
+
             grasps = []
-            for i in use_idx:
-                yaw, opening = candidates[i]
+            for g in grasps_2d:
+                row = int(np.clip(g.center[0], 0, img_h - 1))
+                col = int(np.clip(g.center[1], 0, img_w - 1))
+
+                d = float(depth[row, col])
+                if d < 0.05 or d > 2.5:   # bad depth pixel → object median
+                    obj_depths = depth[mask]
+                    d = float(np.median(obj_depths)) if obj_depths.size else 1.115
+
+                # Back-project: +X right, +Y up (row flip), -Z into scene
+                xc = (col - px) / fx * d
+                yc = -(row - py) / fx * d   # fx == fy (square pixels)
+                zc = -d
+                world_pt = (cam_to_world @ np.array([xc, yc, zc, 1.0]))[:3]
+                x_w, y_w = float(world_pt[0]), float(world_pt[1])
+
+                # Yaw: image angle → world yaw (Y-flip, CAM_ROT=0 → negate)
+                world_yaw = float(-g.angle)
+
+                # Width: GR-ConvNet pixel length → metres
+                max_g    = float(self.grasp_generator.MAX_GRASP)    # 0.085
+                pix_conv = float(self.grasp_generator.PIX_CONVERSION)  # 277
+                width    = float(np.clip(
+                    float(g.length) / (max_g * pix_conv) * max_g, 0.04, 0.09))
+
                 grasps.append({
-                    "position": [gx, gy, gz],
-                    "rpy":      [np.pi, 0.0, yaw],
-                    "width":    opening,
-                    "score":    0.0,
-                    "_metrics": {"H": 0.05, "pe_ik": pe},
+                    "position": [x_w, y_w, gz],
+                    "rpy":      [np.pi, 0.0, world_yaw],
+                    "width":    width,
+                    "score":    float(g.quality),
+                    "_metrics": {"H": H, "dz": 0.0, "dz_lift": 0.0,
+                                 "need_dz": 0.0, "pe_ik": pe},
+                })
+
+            # Pad with random candidates if GR-ConvNet returned fewer than needed
+            while len(grasps) < n_needed:
+                grasps.append({
+                    "position": [
+                        gx + float(rng.uniform(-_LGGSN_SPREAD_XY, _LGGSN_SPREAD_XY)),
+                        gy + float(rng.uniform(-_LGGSN_SPREAD_XY, _LGGSN_SPREAD_XY)),
+                        gz,
+                    ],
+                    "rpy":   [np.pi, 0.0, float(rng.uniform(-np.pi / 2, np.pi / 2))],
+                    "width": float(rng.uniform(0.04, 0.09)),
+                    "score": 0.0,
+                    "_metrics": {"H": H, "dz": 0.0, "dz_lift": 0.0,
+                                 "need_dz": 0.0, "pe_ik": pe},
                 })
 
             self.env.set_obj_grasps(obj_id, grasps, grasp_rects=[])
@@ -313,7 +548,10 @@ class RobotEnvUI:
         Run inference with GR-ConvNet grasp generator on current observation
         """
         if self.backend == "mujoco":
-            self._setup_grasps_mujoco()
+            if os.environ.get("OWG_GRC6DOF") == "1":
+                self._setup_grasps_grconvnet(obs)
+            else:
+                self._setup_grasps_mujoco(obs)
             return
 
         rgb, depth, seg = obs['image'], obs['depth'], obs['seg']

@@ -121,11 +121,32 @@ def main():
     parser.add_argument("--mc-gate-delta", type=float, default=0.0, dest="mc_gate_delta",
                         help="MC Dropout uncertainty gate: if mean(std) > delta, skip reranking. "
                              "0.0 = disabled. Overrides --gate-delta when non-zero.")
+    parser.add_argument("--no-ranker", action="store_true", dest="no_ranker",
+                        help="Disable LGGSN grasp ranking; use CFM candidates in generation order.")
+    parser.add_argument("--no-semantic", action="store_true", dest="no_semantic",
+                        help="Skip GPT-4o grounding; match target by name directly. "
+                             "Use when API quota is exhausted or for offline benchmarking.")
+    parser.add_argument("--cfm-ckpt", type=str, default="", dest="cfm_ckpt",
+                        help="Path to OT-CFM checkpoint (.pt).  When set, replaces random "
+                             "CoM-based candidate sampling with CFM-generated poses.  "
+                             "Matching _stats.json must exist alongside the checkpoint.")
+    parser.add_argument("--grconvnet-6dof", action="store_true", dest="grconvnet_6dof",
+                        help="Use GR-ConvNet 2D predictions lifted to 6-DoF instead of "
+                             "uniform random CoM sampling.  Benchmark baseline for comparing "
+                             "GR-ConvNet spatial quality against OT-CFM.")
 
     args = parser.parse_args()
 
-    os.environ["OWG_GATE_DELTA"] = str(args.gate_delta)
+    os.environ["OWG_GATE_DELTA"]    = str(args.gate_delta)
     os.environ["OWG_MC_GATE_DELTA"] = str(args.mc_gate_delta)
+    if args.cfm_ckpt:
+        os.environ["CFM_CKPT"] = args.cfm_ckpt
+    if args.no_ranker:
+        os.environ["OWG_NO_RANKER"] = "1"
+    if args.no_semantic:
+        os.environ["OWG_NO_SEMANTIC"] = "1"
+    if args.grconvnet_6dof:
+        os.environ["OWG_GRC6DOF"] = "1"
 
     # ---- Load config FIRST ----
     cfg = load_config(args.config)
