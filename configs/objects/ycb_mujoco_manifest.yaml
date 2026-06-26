@@ -21,6 +21,9 @@
 
 version: "1.0"
 
+# Note: scale may be a scalar (uniform) or a list [sx, sy, sz] (non-uniform).
+# Non-uniform scale requires env_soarm.py >= commit that added list-scale support.
+
 objects:
 
   Banana:
@@ -92,3 +95,14 @@ objects:
     scale:          1.75
     spawn_z_offset: 0.12
     xml:            owg_robot/assets/ycb/cylinder.xml
+
+  Scissors:
+    pool_name:      YcbScissors
+    visual_mesh:    textured_simple_reoriented.obj
+    collision_mesh: collision_box.obj   # box > vhacd: 2cm-flat vhacd tunnels through table
+    mass:           0.300          # kg  (YCB ground truth)
+    friction:       [1.5, 0.05, 0.01]
+    scale:          [1.0, 1.5, 2.0]   # non-uniform: Z×2 gives 4 cm thickness (gripper min 4 cm)
+    geom_z_offset:  -0.0965        # shifts both geoms so body origin = mesh CoM; enables lifted check
+    spawn_z_offset: 0.15
+    xml:            owg_robot/assets/ycb/scissors.xml

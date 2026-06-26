@@ -302,11 +302,18 @@ def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
           + ("" if entry else "  (manifest entry missing — using defaults)"))
 
     # ── physical properties from manifest (or hardcoded defaults) ─────────────
-    scale    = float(entry.get("scale",   1.0))
+    _scale_raw = entry.get("scale", 1.0)
+    if isinstance(_scale_raw, (list, tuple)):
+        scale_str = " ".join(str(float(v)) for v in _scale_raw)
+    else:
+        _s = float(_scale_raw)
+        scale_str = f"{_s} {_s} {_s}"
     mass     = float(entry.get("mass",    0.1))
     friction = entry.get("friction", [2.0, 0.05, 0.01])
+    # geom_z_offset shifts both geoms relative to body origin — use when the mesh
+    # origin is far from the CoM (e.g. scissors: mesh Z in [0.087, 0.107] → offset -0.097)
+    geom_z_offset = float(entry.get("geom_z_offset", 0.0))
 
-    scale_str    = f"{scale} {scale} {scale}"
     friction_str = " ".join(str(v) for v in friction)
 
     # ── texture / material ────────────────────────────────────────────────────
@@ -330,14 +337,15 @@ def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
 
     # Initial body pos matches _park_pos(obj_idx): above floor, far from workspace
     park_x = 2.0 + obj_idx * 0.5
+    geom_pos_attr = f' pos="0 0 {geom_z_offset:.6f}"' if geom_z_offset != 0.0 else ""
     body = f"""
     <body name="obj_{obj_idx}" pos="{park_x} 0 0.15">
       <freejoint name="obj_joint_{obj_idx}"/>
       <geom name="ycb_vis_geom_{obj_idx}" type="mesh" mesh="ycb_vis_{obj_idx}"
-            material="ycb_mat_{obj_idx}" contype="0" conaffinity="0" group="2"/>
+            material="ycb_mat_{obj_idx}" contype="0" conaffinity="0" group="2"{geom_pos_attr}/>
       <geom name="ycb_col_geom_{obj_idx}" type="mesh" mesh="ycb_col_{obj_idx}"
             mass="{mass}" friction="{friction_str}"
-            contype="1" conaffinity="1"/>
+            contype="1" conaffinity="1"{geom_pos_attr}/>
     </body>
 """
     return asset, body
@@ -1507,7 +1515,12 @@ class EnvironmentSoArm:
         Aliases available on the returned dict:
           obs['image']  ↔  obs['rgb']
           obs['seg']    ↔  obs['segmentation']
+
+        Also adds camera intrinsics and extrinsics for projection:
+          obs['K']            — (3,3) pinhole intrinsics (from compute_intrinsics)
+          obs['cam_to_world'] — (4,4) camera-to-robot-base transform
         """
+        from owg_robot.pointcloud import compute_intrinsics
         rgb, depth, seg = self._render_rgb_depth_seg()
 
         # filter seg to known obj_ids only (matches PyBullet env.get_obs behaviour)
@@ -1521,6 +1534,9 @@ class EnvironmentSoArm:
             'seg':   seg,
             'obj_ids': np.array(self.obj_ids),
             'object_pose': self.get_object_pose(),
+            # camera projection helpers (used by LGGSNVision per-candidate vis)
+            'K':            compute_intrinsics(IMG_SIZE, IMG_SIZE, FOVY),
+            'cam_to_world': self.cam_to_robot_base,
             # aliases
             'rgb':          rgb,
             'segmentation': seg,
