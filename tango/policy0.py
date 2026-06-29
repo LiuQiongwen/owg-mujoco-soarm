@@ -1,15 +1,15 @@
 from typing import List, Dict, Any, Optional
-from owg.visual_prompt import VisualPrompterPlanning, VisualPrompterGrounding, VisualPrompterGraspRanking
-from owg.utils.image import display_image
-from owg.utils.grasp import Grasp2D
-from owg.utils.pointcloud import to_o3d
+from tango.visual_prompt import VisualPrompterPlanning, VisualPrompterGrounding, VisualPrompterGraspRanking
+from tango.utils.image import display_image
+from tango.utils.grasp import Grasp2D
+from tango.utils.pointcloud import to_o3d
 import numpy as np
 from PIL import Image
 
 
 class OwgPolicy:
     """
-    Implement OWG algorithm to predict next gripper action given user query and observation
+    Implement TANGO algorithm to predict next gripper action given user query and observation
     """
 
     def __init__(self,

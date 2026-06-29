@@ -2,14 +2,15 @@ import os
 import numpy as np
 import torch
 
-from lggsn_model import LGGSN, GC_LGGSN
+from lggsn_model import LGGSN, GC_LGGSN, LGGSNVision
 from grasp_6dof.grasp_sampler import (
     rpy_to_R, local_point_density, normal_consistency, contact_width_ratio,
 )
 
 _USE_DIST = os.environ.get("FEAT_DIST", "1") == "1"   # module-level default, overridden per instance
 _USE_ZREL = os.environ.get("FEAT_ZREL", "1") == "1"
-_FLAT_GATE = float(os.environ.get("FLAT_GATE_H_STD", "0.005"))
+_EPISODE_WHITEN = os.environ.get("LGGSN_WHITEN", "0") == "1"   # per-episode z-score whitening (off by default; needs retrain to take effect)
+_OBJ_FRAME_NORM = os.environ.get("OBJ_FRAME_NORM", "0") == "1"  # subtract object centroid from (x,y); needs v10+ checkpoint
 _RERANK_WHITELIST = set(
     s.strip() for s in os.environ.get("RERANK_WHITELIST", "").split(",") if s.strip()
 )
@@ -97,6 +98,22 @@ class LggsnGraspRanker:
             )
 
         # ── Step 3: derive per-instance feature flags from geom_dim ──────────
+        # LGGSNVision checkpoints have ckpt_dim = geom_dim + vis_dim (e.g. 18+256=274).
+        _VIS_DIM = 256
+        _KNOWN_GEOM = {12, 14, 17, 18}
+        if ckpt_dim in _KNOWN_GEOM:
+            self._vis_dim = 0
+            _actual_geom  = ckpt_dim
+        elif (ckpt_dim - _VIS_DIM) in _KNOWN_GEOM:
+            self._vis_dim = _VIS_DIM
+            _actual_geom  = ckpt_dim - _VIS_DIM
+            ckpt_dim      = _actual_geom   # reuse existing branch below
+        else:
+            raise ValueError(
+                f"Unsupported checkpoint geom_dim={ckpt_dim} (mlp_in={mlp_in_dim}) "
+                f"in {model_path}; expected 12, 14, 17, 18 or 18+256=274"
+            )
+
         if ckpt_dim == 12:
             self._use_dist = False
             self._use_zrel = False
@@ -123,14 +140,10 @@ class LggsnGraspRanker:
             self._use_pc_feats = True
             self._use_pe_ik = True
             self._feature_cols = FEATURE_COLS_EXT2[:]
-        else:
-            raise ValueError(
-                f"Unsupported checkpoint geom_dim={ckpt_dim} (mlp_in={mlp_in_dim}) "
-                f"in {model_path}; expected 12, 14, 17, or 18"
-            )
 
-        q_tag = f" + query_emb({_n_queries}×{_query_dim})" if _has_query_emb else ""
-        print(f"[LggsnGraspRanker] geom_dim={ckpt_dim}{q_tag}  "
+        vis_tag = f" + vis({self._vis_dim})" if self._vis_dim else ""
+        q_tag   = f" + query_emb({_n_queries}×{_query_dim})" if _has_query_emb else ""
+        print(f"[LggsnGraspRanker] geom_dim={ckpt_dim}{vis_tag}{q_tag}  "
               f"features={self._feature_cols}")
 
         # ── Step 4: build model with the right dims ───────────────────────────
@@ -143,6 +156,15 @@ class LggsnGraspRanker:
                 context_dim=3,
             )
             print(f"[LggsnGraspRanker] GC-LGGSN mode | loading: {model_path}")
+        elif self._vis_dim > 0:
+            self.model = LGGSNVision(
+                n_queries=_n_queries,
+                geom_dim=ckpt_dim,
+                vis_dim=self._vis_dim,
+                query_dim=_query_dim,
+                hidden_dim=64,
+            )
+            print(f"[LggsnGraspRanker] LGGSNVision mode | loading: {model_path}")
         else:
             self.model = LGGSN(
                 n_queries=_n_queries,
@@ -157,7 +179,122 @@ class LggsnGraspRanker:
         self.model.to(self.device)
         self.model.eval()
 
+        # ── Step 5: load SAM segmentor for visual features (LGGSNVision only) ─
+        self._segmentor = None
+        if self._vis_dim > 0:
+            try:
+                from tango.markers.segmentor import SegmentAnythingMarkGenerator
+                _sam_dev   = os.environ.get("LGGSN_SAM_DEVICE",
+                                            "cuda" if torch.cuda.is_available() else "cpu")
+                _sam_model = os.environ.get("LGGSN_SAM_MODEL", "facebook/sam-vit-base")
+                print(f"[LggsnGraspRanker] Loading SAM ({_sam_model}) on {_sam_dev} ...")
+                self._segmentor = SegmentAnythingMarkGenerator(
+                    device=_sam_dev, model_name=_sam_model
+                )
+                print(f"[LggsnGraspRanker] SAM ready.")
+            except Exception as e:
+                print(f"[LggsnGraspRanker] SAM unavailable ({e}); vis will be zeros.")
+
         self.use_3d_prompt = True
+        self._episode_whiten = _EPISODE_WHITEN
+
+    # --------- Episode-level feature whitening ---------
+
+    def _whiten(self, X: np.ndarray) -> np.ndarray:
+        """Per-episode z-score whitening: zero-mean, unit-std across candidates.
+
+        Constant features (std=0 within this scene) become 0 — their influence
+        is removed. Features with true within-episode variance are amplified.
+        No-op when N<=1 (nothing to compare against).
+        """
+        if X.shape[0] <= 1:
+            return X
+        mu  = X.mean(axis=0, keepdims=True)
+        sig = X.std(axis=0, keepdims=True)
+        return (X - mu) / (sig + 1e-6)
+
+    # --------- SAM visual feature extraction (per-candidate) ---------
+
+    def _get_per_candidate_vis_feats(
+        self,
+        grasps: list,
+        obs: dict | None,
+    ) -> np.ndarray:
+        """Return [N, vis_dim] per-candidate SAM features.
+
+        Each candidate's grasp position (x,y,z) is projected into the image,
+        and a 3×3 region of the SAM [1,256,64,64] feature map centred on that
+        pixel is mean-pooled into a 256-dim vector.
+
+        Coordinate convention (matches tango_robot/pointcloud.py):
+          camera frame: +X right, +Y up, -Z into scene
+          depth  = -z_cam  (positive for visible points)
+          u (col) = fx * x_cam / depth + cx
+          v (row) = -fy * y_cam / depth + cy
+          feature cell: fu = u * 64 / img_w,  fv = v * 64 / img_h
+        """
+        N = len(grasps)
+        zeros = np.zeros((N, self._vis_dim), dtype=np.float32)
+        if self._segmentor is None or obs is None:
+            return zeros
+
+        image        = obs.get("image")
+        K            = obs.get("K")
+        cam_to_world = obs.get("cam_to_world")
+        if image is None or K is None or cam_to_world is None:
+            return zeros
+
+        # ── encode image once (populate SAM cache) ────────────────────────────
+        try:
+            from PIL import Image as PILImage
+            self._segmentor._cached_embeddings = None       # invalidate old scene
+            pil_img = PILImage.fromarray(image)
+            self._segmentor.get_roi_feature((0, 0, 1, 1), image=pil_img)
+        except Exception as e:
+            print(f"[LggsnGraspRanker] SAM encode failed: {e}")
+            return zeros
+
+        feat_map = self._segmentor._cached_embeddings       # [1, 256, 64, 64]
+        if feat_map is None:
+            return zeros
+
+        _, C, H_f, W_f = feat_map.shape                    # 256, 64, 64
+        H_img, W_img   = image.shape[:2]                   # 224, 224
+
+        fx = float(K[0, 0]); fy = float(K[1, 1])
+        cx = float(K[0, 2]); cy = float(K[1, 2])
+        world_to_cam = np.linalg.inv(cam_to_world)         # 4×4
+
+        result = np.zeros((N, C), dtype=np.float32)
+        for i, g_raw in enumerate(grasps):
+            g   = self._unwrap_grasp(g_raw)
+            pos = g.get("position", [0.0, 0.0, 0.0])
+            xyz_w = np.array([float(pos[0]), float(pos[1]), float(pos[2]), 1.0])
+
+            xyz_c = world_to_cam @ xyz_w                   # camera frame
+            depth = float(-xyz_c[2])
+            if depth <= 1e-4:
+                continue
+
+            u = fx * float(xyz_c[0]) / depth + cx         # column
+            v = -fy * float(xyz_c[1]) / depth + cy        # row
+
+            fu = u * W_f / W_img
+            fv = v * H_f / H_img
+
+            fu_i = int(round(fu))
+            fv_i = int(round(fv))
+
+            u0 = max(0, fu_i - 1); u1 = min(W_f, fu_i + 2)
+            v0 = max(0, fv_i - 1); v1 = min(H_f, fv_i + 2)
+
+            if u0 >= u1 or v0 >= v1:
+                continue
+
+            roi = feat_map[0, :, v0:v1, u0:u1]            # [256, h, w]
+            result[i] = roi.mean(dim=(-2, -1)).cpu().numpy()
+
+        return result
 
     # --------- 输入格式适配 ---------
 
@@ -277,6 +414,17 @@ class LggsnGraspRanker:
     def _featurize(self, grasps, episode_pc=None):
         feats = [self._featurize_one(g) for g in grasps]
         arr   = np.asarray(feats, dtype=np.float32)   # [N, 12]
+
+        if _OBJ_FRAME_NORM:
+            # Shift XY to centroid of the grasp candidate set.  Must match the
+            # training-time centering (v10 trains on mean of episode's ~5 candidates),
+            # so we use arr[:,:2].mean() here — NOT the point-cloud centroid, which
+            # would introduce a systematic train/inference mismatch.
+            cent_xy = arr[:, :2].mean(axis=0)
+            arr = arr.copy()
+            arr[:, 0] -= cent_xy[0]
+            arr[:, 1] -= cent_xy[1]
+
         extra = []
 
         if self._use_dist or self._use_zrel:
@@ -324,7 +472,8 @@ class LggsnGraspRanker:
     # --------- 排序接口 ---------
 
     def rank(self, grasps, query_text: str | None = None, obj_type: str | None = None,
-             verbose: bool = False, episode_pc: np.ndarray | None = None):
+             verbose: bool = False, episode_pc: np.ndarray | None = None,
+             obs: dict | None = None, target_obj_id: int | None = None):
         """
         输入:
           grasps: list[dict 或 tuple]
@@ -347,12 +496,8 @@ class LggsnGraspRanker:
             return identity, np.full(len(grasps), 0.5, dtype=float)
 
         X = self._featurize(grasps, episode_pc=episode_pc)
-
-        # Flat-object gate: if H_std < threshold, keep original (Stage-3) order
-        H_col = 11  # index of H in FEATURE_COLS
-        if _FLAT_GATE > 0 and X.shape[0] > 1 and float(np.std(X[:, H_col])) < _FLAT_GATE:
-            identity = np.arange(len(grasps))
-            return identity, np.full(len(grasps), 0.5, dtype=float)
+        if self._episode_whiten:
+            X = self._whiten(X)
 
         geom = torch.from_numpy(X).to(self.device)
 
@@ -383,6 +528,11 @@ class LggsnGraspRanker:
                                      dtype=np.float32)
                 ctx = torch.from_numpy(ctx_vec).to(self.device)
                 logit = self.model(geom, q_id, ctx)   # GC_LGGSN forward
+            elif self._vis_dim > 0:
+                # LGGSNVision: per-candidate SAM features via grasp position projection.
+                vis_np = self._get_per_candidate_vis_feats(grasps, obs)    # (N, 256)
+                vis_t  = torch.from_numpy(vis_np).to(self.device)
+                logit  = self.model(geom, vis_t, q_id)  # LGGSNVision forward
             elif _q_emb is not None:
                 # Unknown object fallback: bypass embedding lookup, use mean emb directly.
                 x = torch.cat([geom, _q_emb.to(self.device)], dim=-1)
@@ -393,7 +543,8 @@ class LggsnGraspRanker:
 
         if verbose:
             logit_np = logit.cpu().numpy()
-            print("[LGGSN diag] per-candidate features + scores:")
+            whiten_tag = " [whitened]" if self._episode_whiten else ""
+            print(f"[LGGSN diag] per-candidate features + scores{whiten_tag}:")
             header = f"  {'idx':>3}  " + "  ".join(f"{c:>8}" for c in self._feature_cols) + \
                      f"  {'logit':>7}  {'score':>6}  {'spread_from_c0':>14}"
             print(header)
@@ -404,7 +555,8 @@ class LggsnGraspRanker:
             print(f"  score spread (max-min): {score.max() - score.min():.6f}")
             zero_cols = [self._feature_cols[j] for j in range(len(self._feature_cols))
                          if np.all(X[:, j] == X[0, j])]
-            print(f"  constant features (no within-episode variance): {zero_cols}")
+            if zero_cols:
+                print(f"  constant features (no within-episode variance): {zero_cols}")
 
         order = np.argsort(-score)                # 从大到小排序
         return order, score
@@ -415,14 +567,20 @@ class LggsnGraspRanker:
         query_text: str | None = None,
         T: int = 20,
         episode_pc: np.ndarray | None = None,
+        obs: dict | None = None,
+        target_obj_id: int | None = None,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Like rank() but uses MC Dropout. Returns (order, mean_score, std_score).
-        Falls back to rank() for GC-LGGSN (no uncertainty support there)."""
-        if self._gc_mode or len(grasps) == 0:
-            order, scores = self.rank(grasps, query_text=query_text, episode_pc=episode_pc)
+        Falls back to rank() for GC-LGGSN and LGGSNVision (vis path has no MC)."""
+        if self._gc_mode or self._vis_dim > 0 or len(grasps) == 0:
+            order, scores = self.rank(grasps, query_text=query_text,
+                                      episode_pc=episode_pc,
+                                      obs=obs, target_obj_id=target_obj_id)
             return order, scores, np.zeros_like(scores)
 
         X = self._featurize(grasps, episode_pc=episode_pc)
+        if self._episode_whiten:
+            X = self._whiten(X)
         geom = torch.from_numpy(X).to(self.device)
         if self._use_query_emb and query_text is not None:
             _key = query_text.lower().replace(" ", "").replace("ycb", "")

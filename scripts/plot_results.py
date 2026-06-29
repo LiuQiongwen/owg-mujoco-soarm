@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate publication figures for the OWG paper (RAS/Robotica submission).
+Generate publication figures for the TANGO paper (RAS/Robotica submission).
 Outputs:
   figures/fig_fiveway.pdf   — five-way overall SR bar chart with 95% CI
   figures/fig_perobject.pdf — per-object grouped bar chart

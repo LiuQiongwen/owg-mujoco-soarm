@@ -54,7 +54,7 @@ def record_scene(
     height:      int = 480,
 ) -> Optional[Path]:
     """Re-execute a scene and record it.  Returns path to saved video, or None."""
-    from owg_robot.env_soarm import (
+    from tango_robot.env_soarm import (
         EnvironmentSoArm, GRASP_MODE_PHYSICS_WELD,
         TABLE_TOP_Z, GRASP_Z_TABLE_MARGIN,
     )

@@ -15,7 +15,7 @@ import numpy as np
 import open3d as o3d
 from scipy.stats import spearmanr
 
-ASSETS = "owg_robot/assets/ycb_objects"
+ASSETS = "tango_robot/assets/ycb_objects"
 
 OBJECTS = {
     "Banana":        ("YcbBanana",        "textured_simple_reoriented.obj"),

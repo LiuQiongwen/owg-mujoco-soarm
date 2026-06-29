@@ -27,6 +27,7 @@ CFM_CKPT_ARG=${7:-}     # optional OT-CFM checkpoint path for candidate generati
 NO_SEMANTIC=${8:-0}     # set to 1 to skip GPT grounding (OWG_NO_SEMANTIC=1)
 NO_RANKER=${9:-0}       # set to 1 to disable LGGSN ranking (OWG_NO_RANKER=1)
 GRC6DOF=${10:-0}        # set to 1 to use GR-ConvNet 2D→6-DoF lifting (OWG_GRC6DOF=1)
+OBJ_FRAME_NORM=${11:-0} # set to 1 to enable object-frame position normalization (v10+ ckpt)
 SUCCESS=0
 TOTAL=0
 GATE_FIRED=0
@@ -44,7 +45,10 @@ for obj in "${OBJECTS[@]}"; do
     # Build env overrides and extra args
     ENV_VARS=""
     EXTRA_ARGS=""
-    [ -n "$LGGSN_CKPT_ARG" ] && ENV_VARS="LGGSN_CKPT=$LGGSN_CKPT_ARG"
+    [ -n "$LGGSN_CKPT_ARG"    ] && ENV_VARS="LGGSN_CKPT=$LGGSN_CKPT_ARG"
+    [ "$OBJ_FRAME_NORM" = "1" ] && ENV_VARS="$ENV_VARS OBJ_FRAME_NORM=1"
+    [ -n "$DDIM_STEPS"        ] && ENV_VARS="$ENV_VARS DDIM_STEPS=$DDIM_STEPS"
+    ENV_VARS="${ENV_VARS# }"  # strip leading space
     [ -n "$CFM_CKPT_ARG"   ] && EXTRA_ARGS="--cfm-ckpt $CFM_CKPT_ARG"
     [ "$NO_SEMANTIC" = "1" ] && EXTRA_ARGS="$EXTRA_ARGS --no-semantic"
     [ "$NO_RANKER"   = "1" ] && EXTRA_ARGS="$EXTRA_ARGS --no-ranker"

@@ -141,7 +141,7 @@ def compare_geo_vs_wm(
     Load an object, sample N random grasps with synthetic geo scores,
     then print a side-by-side WM-rank vs geo-rank table.
     """
-    from owg_robot.env_soarm import TABLE_TOP_Z
+    from tango_robot.env_soarm import TABLE_TOP_Z
     from scripts.collect_mujoco_transitions import (
         OBJECTS, _CENTRE_Y, _SETTLE_STEPS, sample_grasp,
     )
@@ -232,7 +232,7 @@ def main():
         sys.exit(1)
 
     os.environ.setdefault("MUJOCO_GL", "egl")
-    from owg_robot.env_soarm import EnvironmentSoArm
+    from tango_robot.env_soarm import EnvironmentSoArm
 
     model = load_model(model_path)
     rng   = np.random.default_rng(args.seed)

@@ -2,10 +2,10 @@
 """
 MuJoCo SO-ARM101 environment — PyBullet-compatible API layer.
 
-Drop-in replacement for owg_robot/env.py so that demo.py / ui.py / batch
+Drop-in replacement for tango_robot/env.py so that demo.py / ui.py / batch
 scripts work unchanged by swapping the backend import.
 
-Public API mirrors Environment (owg_robot/env.py):
+Public API mirrors Environment (tango_robot/env.py):
   reset(), get_obs(), get_points(), step()
   pick_obj_by_id(), get_obj_pose(), get_obj_pos(), get_obj_orn()
   put_obj_in_tray(), put_obj_in_free_space(), put_obj_in_loc()
@@ -37,7 +37,7 @@ import mujoco.viewer
 
 # ── paths ────────────────────────────────────────────────────────────────────
 _DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJ_ROOT = os.path.dirname(_DIR)             # project root (parent of owg_robot/)
+_PROJ_ROOT = os.path.dirname(_DIR)             # project root (parent of tango_robot/)
 SO101_XML  = os.path.join(_DIR, "assets", "so101", "so101.xml")
 SO101_MESH = os.path.join(_DIR, "assets", "so101", "assets")
 YCB_ROOT   = os.path.join(_DIR, "assets", "ycb_objects")
@@ -440,7 +440,7 @@ def _get_transform_matrix(x, y, z, rot):
 class EnvironmentSoArm:
     """MuJoCo SO-ARM101 environment with PyBullet-compatible public API."""
 
-    # class-level constants matching Environment (owg_robot/env.py)
+    # class-level constants matching Environment (tango_robot/env.py)
     OBJECT_INIT_HEIGHT          = TABLE_TOP_Z + 0.10
     GRIPPER_MOVING_HEIGHT       = TABLE_TOP_Z + 0.20
     GRIPPER_GRASPED_LIFT_HEIGHT = TABLE_TOP_Z + 0.35
@@ -1500,10 +1500,10 @@ class EnvironmentSoArm:
     def _depth_to_pointcloud(self, depth: np.ndarray) -> np.ndarray:
         """Project metric depth image to 3D pointcloud in robot-base frame.
 
-        Delegates to owg_robot.pointcloud.mujoco_depth_to_world_points so
+        Delegates to tango_robot.pointcloud.mujoco_depth_to_world_points so
         the projection logic lives in one place.
         """
-        from owg_robot.pointcloud import mujoco_depth_to_world_points
+        from tango_robot.pointcloud import mujoco_depth_to_world_points
         return mujoco_depth_to_world_points(
             depth, seg=None,
             cam_to_world=self.cam_to_robot_base,
@@ -1520,7 +1520,7 @@ class EnvironmentSoArm:
           obs['K']            — (3,3) pinhole intrinsics (from compute_intrinsics)
           obs['cam_to_world'] — (4,4) camera-to-robot-base transform
         """
-        from owg_robot.pointcloud import compute_intrinsics
+        from tango_robot.pointcloud import compute_intrinsics
         rgb, depth, seg = self._render_rgb_depth_seg()
 
         # filter seg to known obj_ids only (matches PyBullet env.get_obs behaviour)

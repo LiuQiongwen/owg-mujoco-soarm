@@ -291,7 +291,7 @@ class BenchmarkPlotter:
                      format=plt.FuncFormatter(lambda v, _: f"{v:.0%}"))
         ax3.set_title("Per-Object Success Rate")
 
-        fig.suptitle("OWG Grasp Benchmark — Method Comparison", fontsize=13, y=1.01)
+        fig.suptitle("TANGO Grasp Benchmark — Method Comparison", fontsize=13, y=1.01)
         paths = self._save(fig, "overview")
         plt.close(fig)
         return paths

@@ -54,7 +54,7 @@ os.environ.setdefault("MUJOCO_GL", "egl")
 
 import mujoco
 
-from owg_robot.env_soarm import (
+from tango_robot.env_soarm import (
     EnvironmentSoArm,
     GRASP_MODE_PHYSICS,
     GRIP_CLOSED,

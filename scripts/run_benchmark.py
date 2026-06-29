@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-OWG Grasp Benchmark — mj-grasp-sim style evaluation.
+TANGO Grasp Benchmark — mj-grasp-sim style evaluation.
 
 Runs a clean embodied grasp benchmark across all (object × seed × method)
 combinations in the MuJoCo SO-ARM101 simulation.

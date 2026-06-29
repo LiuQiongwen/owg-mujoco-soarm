@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 os.environ.setdefault("MUJOCO_GL", "egl")
 
-from owg_robot.env_soarm import (
+from tango_robot.env_soarm import (
     EnvironmentSoArm,
     TABLE_TOP_Z,
     GRASP_Z_TABLE_MARGIN,

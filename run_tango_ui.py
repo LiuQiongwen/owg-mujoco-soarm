@@ -1,5 +1,5 @@
-# run_owg_ui.py
-from owg_robot.ui import RobotEnvUI
+# run_tango_ui.py
+from tango_robot.ui import RobotEnvUI
 
 if __name__ == "__main__":
     # 这里换成你 config 目录里实际存在的 yaml 文件

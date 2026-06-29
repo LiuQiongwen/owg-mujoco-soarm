@@ -10,7 +10,7 @@ This class does NOT retrain policies, redesign the benchmark, or replace the
 existing MuJoCo pipeline.  It is a thin adapter on top of env_soarm.py.
 
 Usage (simulation):
-    from owg_robot.env_soarm import EnvironmentSoArm
+    from tango_robot.env_soarm import EnvironmentSoArm
     from robots.soarm101.robot import SOARM101Robot
 
     env    = EnvironmentSoArm(obj_names=["YcbBanana"], vis=False)
@@ -39,7 +39,7 @@ from cameras.base import CameraBase, RGBDFrame
 from cameras.simulated import SimulatedCamera
 
 # env_soarm constants we re-export for convenience
-from owg_robot.env_soarm import (
+from tango_robot.env_soarm import (
     ARM_JOINTS,
     GRIP_OPEN,
     GRIP_CLOSED,

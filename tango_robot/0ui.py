@@ -6,12 +6,12 @@ import tkinter as tk
 from tkinter import simpledialog, messagebox, scrolledtext
 from typing import *
 
-from owg_robot.env import *
-from owg_robot.camera import Camera
-from owg_robot.objects import YcbObjects
-from owg.policy import OwgPolicy
-from owg.utils.config import load_config
-from owg.utils.grasp import Grasp2D
+from tango_robot.env import *
+from tango_robot.camera import Camera
+from tango_robot.objects import YcbObjects
+from tango.policy import OwgPolicy
+from tango.utils.config import load_config
+from tango.utils.grasp import Grasp2D
 from third_party.grconvnet import load_grasp_generator
 
 
@@ -45,21 +45,21 @@ class RobotEnvUI:
         self.n_grasp_attempts = self.cfg.n_grasp_attempts
         self.env = Environment(self.camera,
                                vis=True,
-                               asset_root='./owg_robot/assets',
+                               asset_root='./tango_robot/assets',
                                debug=False,
                                finger_length=self.cfg.finger_length,
                                n_grasp_attempts=self.cfg.n_grasp_attempts)
 
         # load objects
         self.objects = YcbObjects(
-            './owg_robot/assets/ycb_objects',
+            './tango_robot/assets/ycb_objects',
             mod_orn=['ChipsCan', 'MustardBottle', 'TomatoSoupCan'],
             mod_stiffness=['Strawberry'],
             seed=self.seed)
         self.objects.shuffle_objects()
         self.env.dummy_simulation_steps(10)
 
-        # init OWG policy
+        # init TANGO policy
         self.policy = OwgPolicy(
             self.cfg.policy.config_path,
             verbose=self.cfg.policy.verbose,
@@ -107,7 +107,7 @@ class RobotEnvUI:
             self.env.remove_all_obj()
             for _ in range(30):
                 self.env.step_simulation()
-            # self.objects = YcbObjects('./owg_robot/assets/ycb_objects',
+            # self.objects = YcbObjects('./tango_robot/assets/ycb_objects',
             #         mod_orn=['ChipsCan', 'MustardBottle', 'TomatoSoupCan'],
             #         mod_stiffness=['Strawberry'],
             #         seed=self.seed
@@ -187,10 +187,10 @@ class RobotEnvUI:
 
     def step(self, action):
         '''
-        Wrapper around OWG action predictions and implemented robot primitives.
+        Wrapper around TANGO action predictions and implemented robot primitives.
 
         Args:
-          action: Predicted action by OWG 
+          action: Predicted action by TANGO 
             - `action`: Either `remove` to place blocking object in free space, or `pick` to put target in tray.
             - `input`: The object ID of object to manipulate.
         '''
@@ -246,7 +246,7 @@ class RobotEnvUI:
 
             # actual query
             else:
-                # call OWG Policy to predict next action
+                # call TANGO Policy to predict next action
                 attempt = 0
                 while True:
                     self.env.reset_robot()

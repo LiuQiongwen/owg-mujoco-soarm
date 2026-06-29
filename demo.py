@@ -1,10 +1,10 @@
 import os, sys, argparse
 from copy import deepcopy
 
-sys.path.append(os.path.dirname(__file__))  # ensure owg_robot import works
+sys.path.append(os.path.dirname(__file__))  # ensure tango_robot import works
 
-from owg_robot.ui import RobotEnvUI
-from owg.utils.config import load_config
+from tango_robot.ui import RobotEnvUI
+from tango.utils.config import load_config
 
 # ---- FIX 1: grasp sampler real API ----
 from grasp_6dof.grasp_sampler import sample_grasps_from_mesh, pack_for_json
@@ -88,7 +88,7 @@ def sample_grasps(mesh_path, n_samples=100, table_z=0.0, seed=19,
 
 def main():
     # ---- Parse args (ALL add_argument BEFORE parse_args) ----
-    parser = argparse.ArgumentParser(description="OWG demo with staged pipeline.")
+    parser = argparse.ArgumentParser(description="TANGO demo with staged pipeline.")
     parser.add_argument("--stage", type=int, default=1, choices=[1, 2, 3, 4])
     parser.add_argument("--config", type=str, default="./config/mujoco/env.yaml")
     parser.add_argument("--backend", type=str, default="mujoco",

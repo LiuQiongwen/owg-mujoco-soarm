@@ -53,7 +53,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("MUJOCO_GL", "egl")
 
-from owg_robot.env_soarm import EnvironmentSoArm, TABLE_TOP_Z, ARM_JOINTS
+from tango_robot.env_soarm import EnvironmentSoArm, TABLE_TOP_Z, ARM_JOINTS
 from data.transition_logger import compute_pc_stats
 from world_model.train_mlp_predictor import load_model, MODEL_PATH
 from world_model.rerank_grasps import score_grasps

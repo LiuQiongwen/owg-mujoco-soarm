@@ -69,7 +69,7 @@ class SceneReplayer:
         -------
         success : bool
         """
-        from owg_robot.env_soarm import (
+        from tango_robot.env_soarm import (
             EnvironmentSoArm, GRASP_MODE_PHYSICS, TABLE_TOP_Z,
         )
 

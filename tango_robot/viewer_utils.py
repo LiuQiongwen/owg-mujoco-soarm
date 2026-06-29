@@ -1,7 +1,7 @@
 """
-owg_robot/viewer_utils.py
+tango_robot/viewer_utils.py
 
-Interactive MuJoCo viewer for the OWG / SO-ARM101 pipeline.
+Interactive MuJoCo viewer for the TANGO / SO-ARM101 pipeline.
 
 Linux/X11/NVIDIA compatibility
 -------------------------------
@@ -20,7 +20,7 @@ patches that make both ``launch_passive`` and ``MujocoViewer`` work correctly:
 
 After importing this module the standard pattern works unchanged:
 
-    import owg_robot.viewer_utils          # apply patches
+    import tango_robot.viewer_utils          # apply patches
     import mujoco.viewer
 
     with mujoco.viewer.launch_passive(m, d) as v:
@@ -34,7 +34,7 @@ overlay labels and markers, and a clean callback-based API.
 
 Quick start (MujocoViewer)
 --------------------------
-    from owg_robot.viewer_utils import MujocoViewer
+    from tango_robot.viewer_utils import MujocoViewer
 
     v = MujocoViewer(env.model, env.data, slowdown=2.0)
     v.overlay.set_phase("approach")
@@ -500,7 +500,7 @@ def passive_viewer(
     Example
     -------
     ::
-        from owg_robot.viewer_utils import passive_viewer
+        from tango_robot.viewer_utils import passive_viewer
 
         def run(v):
             while v.is_alive():

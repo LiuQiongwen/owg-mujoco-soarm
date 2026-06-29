@@ -1,14 +1,14 @@
 from typing import List, Dict, Any, Optional
-from owg.visual_prompt import VisualPrompterPlanning, VisualPrompterGrounding, VisualPrompterGraspRanking
-from owg.utils.image import display_image
-from owg.utils.grasp import Grasp2D
-from owg.utils.pointcloud import to_o3d
+from tango.visual_prompt import VisualPrompterPlanning, VisualPrompterGrounding, VisualPrompterGraspRanking
+from tango.utils.image import display_image
+from tango.utils.grasp import Grasp2D
+from tango.utils.pointcloud import to_o3d
 import numpy as np
 from PIL import Image
 import json, ast, re
-from owg_robot.grasp_ranker_lggsn import LggsnGraspRanker
+from tango_robot.grasp_ranker_lggsn import LggsnGraspRanker
 import os, time
-from owg.gpt_utils import parse_llm_payload
+from tango.gpt_utils import parse_llm_payload
 
 GROUND_LOG_DIR = "logs/grounding_examples"
 os.makedirs(GROUND_LOG_DIR, exist_ok=True)
@@ -66,7 +66,7 @@ def safe_json_parse(raw_resp):
 
 class OwgPolicy:
     """
-    Debug version of OWG policy with detailed logging and robust JSON parsing.
+    Debug version of TANGO policy with detailed logging and robust JSON parsing.
     """
 
     def __init__(self, config_path: str, verbose: bool = True, vis: bool = False, use_grasp_ranker: bool = True):

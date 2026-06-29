@@ -44,7 +44,7 @@ def _make_spawn_quat(yaw: float, tilt: float) -> List[float]:
     cy, sy = math.cos(yaw  / 2), math.sin(yaw  / 2)
     return [cy * ct, cy * st, sy * st, sy * ct]
 
-from owg_robot.env_soarm import (
+from tango_robot.env_soarm import (
     EnvironmentSoArm,
     TABLE_TOP_Z,
     GRASP_MODE_PHYSICS_WELD,

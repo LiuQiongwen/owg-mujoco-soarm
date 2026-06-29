@@ -16,7 +16,7 @@ import cv2
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from owg_robot.env_soarm import (
+from tango_robot.env_soarm import (
     EnvironmentSoArm, TABLE_TOP_Z, GRIP_OPEN, GRIP_CLOSED,
     IK_MODE_JAW_POS, IK_MODE_XYZ_ONLY,
     GRASP_MODE_PHYSICS,
@@ -54,7 +54,7 @@ def _overlay(frame: np.ndarray, phase: str, obj_z: float) -> np.ndarray:
 
 # ── Object name resolution ───────────────────────────────────────────────────
 
-_YCB_ROOT = PROJECT_ROOT / "owg_robot" / "assets" / "ycb_objects"
+_YCB_ROOT = PROJECT_ROOT / "tango_robot" / "assets" / "ycb_objects"
 
 def _resolve_obj_name(name: str) -> str:
     """Accept case-insensitive YCB names like 'banana' → 'Banana' (for load_obj)."""

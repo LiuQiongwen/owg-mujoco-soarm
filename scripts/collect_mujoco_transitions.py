@@ -33,7 +33,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ.setdefault("MUJOCO_GL", "egl")
 
-from owg_robot.env_soarm import (
+from tango_robot.env_soarm import (
     EnvironmentSoArm,
     TABLE_TOP_Z,
     ARM_JOINTS,

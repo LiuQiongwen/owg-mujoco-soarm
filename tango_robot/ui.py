@@ -8,10 +8,10 @@ from tkinter import simpledialog, messagebox, scrolledtext
 from typing import *
 import os, json
 try:
-    from owg_robot.env import *                      # PyBullet Environment (default)
+    from tango_robot.env import *                      # PyBullet Environment (default)
 except ImportError:
     pass                                             # pybullet not available (MuJoCo-only env)
-from owg_robot.env_soarm import (EnvironmentSoArm,      # MuJoCo backend
+from tango_robot.env_soarm import (EnvironmentSoArm,      # MuJoCo backend
                                   GRASP_MODE_PHYSICS,
                                   GRASP_MODE_DEMO_ATTACH,
                                   GRASP_Z_TABLE_MARGIN,
@@ -27,7 +27,7 @@ _LGGSN_SPREAD_XY = 0.06
 _CFM_CKPT = os.environ.get("CFM_CKPT", "")
 
 def _load_cfm_model(ckpt_path: str):
-    """Load OT-CFM VelocityNet and inference stats.  Returns (model, stats) or (None, None)."""
+    """Load OT-CFM or DDPM generative model and inference stats.  Returns (model, stats) or (None, None)."""
     if not ckpt_path or not os.path.isfile(ckpt_path):
         return None, None
     stats_path = ckpt_path.replace(".pt", "_stats.json")
@@ -36,15 +36,21 @@ def _load_cfm_model(ckpt_path: str):
         return None, None
     try:
         import torch, json as _json
-        from train_cfm_grasp import VelocityNet
-        stats = _json.load(open(stats_path))
-        model = VelocityNet(hidden=512)
-        sd    = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        stats      = _json.load(open(stats_path))
+        model_type = stats.get("model_type", "cfm")
+        if model_type == "ddpm":
+            from train_diffusion_grasp import NoiseNet
+            model = NoiseNet(hidden=512)
+        else:
+            from train_cfm_grasp import VelocityNet
+            model = VelocityNet(hidden=512)
+        sd  = torch.load(ckpt_path, map_location="cpu", weights_only=False)
         model.load_state_dict(sd)
         model.eval()
         dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model = model.to(dev)
-        print(f"[CFM] Loaded {ckpt_path} — objects: {list(stats['mean_vis_per_obj'].keys())}")
+        tag = f"[{model_type.upper()}]"
+        print(f"{tag} Loaded {ckpt_path} — objects: {list(stats['mean_vis_per_obj'].keys())}")
         return model, stats
     except Exception as e:
         print(f"[CFM] Failed to load: {e}")
@@ -64,7 +70,7 @@ def _cfm_sample_candidates(model, stats, obj_name: str, n: int,
     Returns list of grasp dicts, or None if obj_name not in stats.
     """
     import torch
-    from train_cfm_grasp import sample_poses
+    model_type  = stats.get("model_type", "cfm")
     key = obj_name.lower().replace("ycb", "").replace(" ", "")
     # fuzzy match: "MustardBottle" → "mustard"
     vis_map = stats["mean_vis_per_obj"]
@@ -84,7 +90,13 @@ def _cfm_sample_candidates(model, stats, obj_name: str, n: int,
     pmean  = np.array(stats["pose_mean"], dtype=np.float32)   # global training mean
     pstd   = np.array(stats["pose_std"],  dtype=np.float32)
 
-    poses_norm = sample_poses(model, cond_t, n=n, steps=20)   # (n, 6) normalised
+    if model_type == "ddpm":
+        from train_diffusion_grasp import sample_poses_ddpm
+        infer_steps = int(os.environ.get("DDIM_STEPS", stats.get("infer_steps", 100)))
+        poses_norm = sample_poses_ddpm(model, cond_t, n=n, steps=infer_steps)
+    else:
+        from train_cfm_grasp import sample_poses
+        poses_norm = sample_poses(model, cond_t, n=n, steps=20)   # (n, 6) normalised
     poses      = poses_norm * pstd + pmean                     # denormalise → absolute
 
     grasps = []
@@ -103,13 +115,13 @@ def _cfm_sample_candidates(model, stats, obj_name: str, n: int,
         })
     return grasps
 try:
-    from owg_robot.camera import Camera
+    from tango_robot.camera import Camera
 except ImportError:
     Camera = None                                    # pybullet not available
-from owg_robot.objects import YcbObjects
-from owg.policy import OwgPolicy
-from owg.utils.config import load_config
-from owg.utils.grasp import Grasp2D
+from tango_robot.objects import YcbObjects
+from tango.policy import OwgPolicy
+from tango.utils.config import load_config
+from tango.utils.grasp import Grasp2D
 from third_party.grconvnet import load_grasp_generator
 from datetime import datetime
 
@@ -187,7 +199,7 @@ class RobotEnvUI:
 
         # load objects
         self.objects = YcbObjects(
-            './owg_robot/assets/ycb_objects',
+            './tango_robot/assets/ycb_objects',
             mod_orn=['ChipsCan', 'MustardBottle', 'TomatoSoupCan'],
             mod_stiffness=['Strawberry'],
             seed=self.seed)
@@ -208,7 +220,7 @@ class RobotEnvUI:
 
         self.env.dummy_simulation_steps(10)
 
-        # init OWG policy
+        # init TANGO policy
         self.policy = OwgPolicy(
             self.cfg.policy.config_path,
             verbose=self.cfg.policy.verbose,
@@ -315,7 +327,7 @@ class RobotEnvUI:
             self.env.remove_all_obj()
             for _ in range(30):
                 self.env.step_simulation()
-            # self.objects = YcbObjects('./owg_robot/assets/ycb_objects',
+            # self.objects = YcbObjects('./tango_robot/assets/ycb_objects',
             #         mod_orn=['ChipsCan', 'MustardBottle', 'TomatoSoupCan'],
             #         mod_stiffness=['Strawberry'],
             #         seed=self.seed
@@ -445,7 +457,7 @@ class RobotEnvUI:
         derived from FOVY=55°/224px.  Yaw = -image_angle (Y-flip, CAM_ROT=0).
         Fallback: random CoM candidate when GR-ConvNet returns fewer than needed.
         """
-        from owg_robot.pointcloud import compute_intrinsics
+        from tango_robot.pointcloud import compute_intrinsics
 
         IK_PE_THRESHOLD = float(os.environ.get("IK_PE_THRESH", "0.005"))
         rng = np.random.default_rng(self.seed)
@@ -609,10 +621,10 @@ class RobotEnvUI:
 
     def step(self, action):
         '''
-        Wrapper around OWG action predictions and implemented robot primitives.
+        Wrapper around TANGO action predictions and implemented robot primitives.
 
         Args:
-          action: Predicted action by OWG 
+          action: Predicted action by TANGO 
             - `action`: Either `remove` to place blocking object in free space, or `pick` to put target in tray.
             - `input`: The object ID of object to manipulate.
         '''

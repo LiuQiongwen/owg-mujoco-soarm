@@ -105,7 +105,7 @@ def generate_md(all_records: List[dict], run_label: str) -> str:
     n_total   = len(valid)
 
     lines = []
-    lines.append(f"# OWG SO-ARM101 Grasp Benchmark — Results Summary")
+    lines.append(f"# TANGO SO-ARM101 Grasp Benchmark — Results Summary")
     lines.append(f"")
     lines.append(f"**Execution mode**: `physics_weld_after_bilateral`  ")
     lines.append(f"**Methods**: {', '.join(f'`{m}`' for m in methods)}  ")

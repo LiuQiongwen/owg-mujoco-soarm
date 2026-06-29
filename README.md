@@ -1,61 +1,113 @@
-# OWG: Towards Open-World Grasping with Large Vision-Language Models
-This is the official implementation for the paper "Towards Open-World Grasping with Large Vision-Language Models" (CoRL 2024).
+# TANGO — Transport-Aligned Next-Grasp Optimizer
 
-<p align="center"> <img src='media/fdsfad.drawio.png' align="center" > </p>
-The ability to grasp objects in-the-wild from open-ended language instructions constitutes a fundamental challenge in robotics. An open-world grasping system should be able to combine high-level contextual with low-level physical-geometric reasoning in order to be applicable in arbitrary scenarios. Recent works exploit the web-scale knowledge inherent in large language models (LLMs) to plan and reason in robotic context, but rely on external vision and action models to ground such knowledge into the environment and parameterize actuation. This setup suffers from two major bottlenecks: a) the LLM’s reasoning capacity is constrained by the quality of visual grounding, and b) LLMs do not contain low-level spatial understanding of the world, which is essential for grasping in contact-rich scenarios. In this work we demonstrate that modern vision-language models (VLMs) are capable of tackling such limitations, as they are implicitly grounded and can jointly reason about semantics and geometry. We propose OWG, an open-world grasping pipeline that combines VLMs with segmentation and grasp synthesis models to unlock grounded world understanding in three stages: open-ended referring segmentation, grounded grasp planning and grasp ranking via contact reasoning, all of which can be applied zero-shot via suitable visual prompting mechanisms. We conduct extensive evaluation in
-cluttered indoor scene datasets to showcase OWG’s robustness in grounding from open-ended language, as well as open-world robotic grasping experiments in both simulation and hardware that demonstrate superior performance compared to previous supervised and zero-shot LLM-based methods. 
+**TANGO** is a 6-DoF robotic grasping system that combines optimal-transport conditional flow matching (OT-CFM) with language-grounded VLM planning and a pairwise geometric reranker (LGGSN).
 
+> **Key finding:** Optimal-transport coupling is the *load-bearing* component of the generator.
+> Removing it causes the flow model to collapse below random-candidate selection (78.9% vs 80.6%)
+> with complete mode failure on geometrically challenging objects.
+> OT-CFM achieves **94.3%** success across 7 YCB objects (+14.3 pp over unranked, p < 0.001).
 
-[[project page]](https://gtziafas.github.io/OWG_project/) | [[arxiv]](https://arxiv.org/abs/2406.18722v2) | [[bibtex]](#citation)
+---
 
-## Release
+## Pipeline
 
-- >[Coming Next]  Stay tuned for: Improved referring segmentation, Multi-cam grounding, 6-DoF Grasp Synthesis Model Integration, Task-Oriented Queries
-- [2025/03/17] 🔥 Release a Pybullet environment that integrates OWG for online open-world grasping demos.
-- [2024/11/04] 🔥 Release the source code and prompts for implementing all OWG components, as well as visualizations / evaluations in the OCID-VLG sub-set.
+```
+RGB Image ──► SAM Encoder ──► object descriptor c ∈ R²⁵⁶
+                                        │ (conditioning)
+Training Poses ──► OT-CFM Generator ──► 5 × 6-DoF candidates
+                                        │
+                              LGGSN Reranker (BPR, 17 geo. feats)
+                                        │
+                                  top-1 grasp ──► Execute
+```
+
+| Stage | Description | Flag |
+|-------|-------------|------|
+| 1 | GR-ConvNet baseline (top-1 only) | `--stage 1` |
+| 2 | 6-DoF random sampling, no ranking | `--stage 2` |
+| 3 | VLM semantic grounding + sampling | `--stage 3` |
+| **4** | **Stage 3 + OT-CFM + LGGSN reranker (best)** | `--stage 4` |
+
+---
+
+## Results (175 trials, 7 YCB objects, MuJoCo)
+
+| Method | Success Rate |
+|--------|-------------|
+| Random CoM | 80.6% |
+| GR-ConvNet 6-DoF | 82.3% |
+| CFM (no OT) | 78.9% |
+| DDPM DDIM-50 | 81.7% |
+| **OT-CFM + LGGSN (ours)** | **94.3%** |
+
+Inference: OT-CFM 3.47 ms/batch (20-step Euler) vs DDIM-50 14.32 ms — 4× faster.
+
+---
 
 ## Installation
-The code has been tested with `python3.9` with `torch` version 2.0 and CUDA driver 11.8. Create a virtual environment and install `torch` for your own CUDA driver from [here](https://pytorch.org/get-started/locally/). 
 
-Install local dependencies with 
-```
+```bash
+conda create -n owg-mujoco python=3.9
+conda activate owg-mujoco
 pip install -r requirements.txt
 ```
 
-You will have to download the pretrained Gr-ConvNet model from the original repo, (e.g. [here](https://github.com/skumra/robotic-grasping/tree/master/trained-models/cornell-randsplit-rgbd-grconvnet3-drop1-ch32) for RGB-D model pretrained in Cornell). Create a folder `third_party/grconvnet/checkpoints` in the repo's root directory and place it there.
-
-Before you run OWG, remember to set the following environment variables for your OpenAI access token:
-
-```
-export OPENAI_API_KEY=your_openai_key
+Set your OpenAI key for VLM grounding:
+```bash
+export OPENAI_API_KEY=your_key
 ```
 
+---
 
-## Open-Ended Grounding in OCID
-See [this example notebook](https://github.com/gtziafas/OWG/blob/main/notebooks/ocid_grounding.ipynb) for instructions on how to run inference and dataset evaluation in OCID-VLG scenes with the OWG grounder.
+## Quick Start
 
+```bash
+# Single demo (Stage 4, Banana, seed 1)
+conda run -n owg-mujoco python demo.py \
+  --stage 4 --prompt Banana --seed 1 --once --verbose 1
 
-## Pybullet Environment 
-We release a Pybullet-based environment for testing the OWG pipeline in grasping [YCB](https://www.ycbbenchmarks.com/) objects from open-ended language. Check [this notebook](https://github.com/gtziafas/OWG/blob/main/notebooks/setup_pyb_env_and_primitives.ipynb) for more context in setting up the robot environment and motion primitives, and [this notebook](https://github.com/gtziafas/OWG/blob/main/notebooks/pyb_owg_policy.ipynb) for a step-by-step example of how to use OWG to control the robot in Pybullet. We develop a version of OWG as a closed-loop grasping policy and integrate everything together in `owg.ui`, which can be configured from `config/pyb/env.yaml`, while the OWG Policy settings can be configured from `config/pyb/OWG.yaml`. 
+# Full evaluation (7 objects × 25 seeds = 175 trials)
+bash scripts/quick_eval.sh full
 
-To run a demo language-grasping trial, simply:
+# Stage 3 baseline comparison
+bash scripts/quick_eval.sh full 3
 ```
-python demo.py --n_objects=10 --seed=42 --verbose=1 --vis=1
-```
-use the `vis` flag to visualize intermediate visual prompts to the VLM and `verbose` to print the VLM response in console. 
 
-## Acknowledgements
-Our project is made possible due to following works:
-1. [GR-ConvNet](https://github.com/skumra/robotic-grasping) implementation
-2. Visualizer utilities from robotflow's [supervision](https://github.com/roboflow/supervision) and [maestro](https://github.com/roboflow/maestro).
-3. Set-of-mark prompting from [SoM](https://github.com/microsoft/SoM).
+---
+
+## Training
+
+```bash
+# Train OT-CFM grasp generator
+conda run -n owg-mujoco python train_cfm_grasp.py
+
+# Train LGGSN reranker
+conda run -n owg-mujoco python train_lggsn_pairwise.py
+```
+
+---
+
+## Project Structure
+
+```
+tango/              VLM policy and visual prompting
+tango_robot/        MuJoCo SO-ARM101 environment
+robots/             Sim-to-real backend abstraction
+grasp_6dof/         6-DoF grasp generation and LGGSN models
+benchmark/          BenchmarkRunner and trial logging
+scripts/            Evaluation, data collection, analysis
+figures/            Publication figures (fig_results.pdf, pipeline.pdf)
+```
+
+---
 
 ## Citation
-If you find our work inspiring or use our codebase in your research, please consider giving a star ⭐ and a citation.
-```
-@article{tziafas2024openworldgraspinglargevisionlanguage,
-      title={Towards Open-World Grasping with Large Vision-Language Models}, 
-      author={Georgios Tziafas and Hamidreza Kasaei},
-      year={2024},
-      journal={8th Conference on Robot Learning (CoRL 2024)}
+
+```bibtex
+@article{tango2026,
+  title   = {Optimal Transport is the Load-Bearing Ingredient:
+             Conditional Flow Matching for 6-DoF Grasp Generation},
+  author  = {Qiongwen},
+  year    = {2026},
+}
 ```

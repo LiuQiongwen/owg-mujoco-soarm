@@ -87,7 +87,7 @@ class GeometryMethod(MethodBase):
 class LggsnMethod(MethodBase):
     """LGGSN pairwise BPR reranker.
 
-    Loads the LggsnGraspRanker from owg_robot/grasp_ranker_lggsn.py.
+    Loads the LggsnGraspRanker from tango_robot/grasp_ranker_lggsn.py.
     Falls back to geometry ranking if the checkpoint is unavailable.
 
     Parameters
@@ -112,7 +112,7 @@ class LggsnMethod(MethodBase):
 
     def _init_ranker(self):
         try:
-            from owg_robot.grasp_ranker_lggsn import LggsnGraspRanker
+            from tango_robot.grasp_ranker_lggsn import LggsnGraspRanker
             self._ranker = LggsnGraspRanker(model_path=self._ckpt_path)
         except Exception as e:
             self._load_error = str(e)

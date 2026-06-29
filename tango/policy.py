@@ -1,14 +1,14 @@
 from typing import List, Dict, Any, Optional
-from owg.visual_prompt import VisualPrompterPlanning, VisualPrompterGrounding, VisualPrompterGraspRanking
-from owg.utils.image import display_image
-from owg.utils.grasp import Grasp2D
-from owg.utils.pointcloud import to_o3d
+from tango.visual_prompt import VisualPrompterPlanning, VisualPrompterGrounding, VisualPrompterGraspRanking
+from tango.utils.image import display_image
+from tango.utils.grasp import Grasp2D
+from tango.utils.pointcloud import to_o3d
 import numpy as np
 from PIL import Image
 import json, ast, re
-from owg_robot.grasp_ranker_lggsn import LggsnGraspRanker
+from tango_robot.grasp_ranker_lggsn import LggsnGraspRanker
 import os, time
-from owg.gpt_utils import parse_llm_payload
+from tango.gpt_utils import parse_llm_payload
 
 GROUND_LOG_DIR = "logs/grounding_examples"
 os.makedirs(GROUND_LOG_DIR, exist_ok=True)
@@ -97,7 +97,7 @@ def safe_json_parse(raw_resp):
 
 class OwgPolicy:
     """
-    Debug version of OWG policy with detailed logging and robust JSON parsing.
+    Debug version of TANGO policy with detailed logging and robust JSON parsing.
     """
 
     def __init__(self, config_path: str, verbose: bool = True, vis: bool = False,
@@ -139,6 +139,7 @@ class OwgPolicy:
         depth = obs.get('depth') if isinstance(obs, dict) else None
         K = obs.get('K') if isinstance(obs, dict) else None
         pose_cam = obs.get('cam_pose') if isinstance(obs, dict) else None
+        episode_pc = obs.get('points') if isinstance(obs, dict) else None
 
         # ---------------- Object masks ----------------
         # 先拿到所有 ID，然后去掉背景 0
@@ -186,7 +187,8 @@ class OwgPolicy:
             if self.use_grasp_ranker and action["grasps"] is not None:
                 try:
                     order, scores = self.grasp_ranker.rank(
-                        action["grasps"], query_text=f"id {tid}"
+                        action["grasps"], query_text=f"id {tid}",
+                        episode_pc=episode_pc,
                     )
                     action["grasps"] = order.tolist()
                 except Exception as e:
@@ -212,6 +214,63 @@ class OwgPolicy:
 
             # 下面继续沿用你原来的 grasp_ranker / top-k 逻辑（不要 return）
             # （也就是让它走到你现在已有的 “LGGSN grasp scores/top5 + action['grasps']=...” 那段）
+
+        # ── No-semantic fast-path (OWG_NO_SEMANTIC=1) ────────────────────────────
+        # Matches user_input to obj_name directly, skips GPT grounding entirely.
+        # Used when the API is unavailable or for offline benchmarking.
+        if os.environ.get("OWG_NO_SEMANTIC") == "1":
+            _norm_in = _norm_label(user_input) if isinstance(user_input, str) else str(user_input)
+            _target_id = None
+            for _oid, _name in id_to_name.items():
+                _nm = _norm_label(_name) if isinstance(_name, str) else str(_name)
+                if _nm == _norm_in or _norm_in in _nm or _nm in _norm_in:
+                    _target_id = int(_oid)
+                    break
+            if _target_id is None and len(obj_ids) > 0:
+                _target_id = int(obj_ids[0])   # single-object fallback
+            if _target_id is not None:
+                action = {
+                    "action":    "pick",
+                    "input":     _target_id,
+                    "target_id": _target_id,
+                    "grasps":    list(range(len(
+                        grasps.get(_target_id, []) if isinstance(grasps, dict) else []
+                    ))),
+                }
+                print(f"[no-semantic] target={id_to_name.get(_target_id, _target_id)}"
+                      f"  obj_id={_target_id}")
+                # LGGSN ranking (mirrors Grasp Ranking section below)
+                _obj_grasps = (grasps.get(_target_id, []) if isinstance(grasps, dict)
+                               else [])
+                _ranker_disabled = os.environ.get("OWG_NO_RANKER") == "1"
+                if (not _ranker_disabled and self.use_grasp_ranker and _obj_grasps
+                        and getattr(self, "grasp_ranker", None) is not None):
+                    try:
+                        _mc_delta = float(os.environ.get("OWG_MC_GATE_DELTA", "0.0"))
+                        if _mc_delta > 0.0:
+                            _ord, _sc, _ = self.grasp_ranker.rank_mc(
+                                _obj_grasps, query_text=user_input,
+                                episode_pc=episode_pc, obs=obs,
+                                target_obj_id=_target_id,
+                            )
+                        else:
+                            _ord, _sc = self.grasp_ranker.rank(
+                                _obj_grasps, query_text=user_input,
+                                episode_pc=episode_pc, obs=obs,
+                                target_obj_id=_target_id,
+                            )
+                        _spread = float(_sc.max() - _sc.min()) if len(_sc) > 1 else 0.0
+                        _gate = float(os.environ.get("OWG_GATE_DELTA", "0.0"))
+                        if _gate <= 0.0 or _spread >= _gate:
+                            action["grasps"] = _ord.tolist()
+                        if getattr(self, "verbose", False):
+                            print(f"🟢 LGGSN grasp scores (top 5): {_sc[_ord[:5]]}")
+                    except Exception as _e:
+                        print(f"[WARN] LGGSN ranking failed: {_e}")
+                if getattr(self, "verbose", False):
+                    print("🟢 Final action:", action)
+                return action
+            return {"action": "fail"}
 
         norm_query = _norm_label(user_input) if isinstance(user_input, str) else user_input
         raw_resp = self.grounder.request(
@@ -401,7 +460,8 @@ class OwgPolicy:
                 mc_delta = float(os.environ.get("OWG_MC_GATE_DELTA", "0.0"))
                 if mc_delta > 0.0 and not getattr(self.grasp_ranker, '_gc_mode', False):
                     order, scores, std_scores = self.grasp_ranker.rank_mc(
-                        obj_grasps, query_text=user_input
+                        obj_grasps, query_text=user_input, episode_pc=episode_pc,
+                        obs=obs, target_obj_id=action.get("input"),
                     )
                     uncertainty = float(std_scores.mean())
                     if uncertainty > mc_delta:
@@ -414,6 +474,9 @@ class OwgPolicy:
                         obj_grasps,
                         query_text=user_input,
                         obj_type=None,
+                        episode_pc=episode_pc,
+                        obs=obs,
+                        target_obj_id=action.get("input"),
                     )
                     score_spread = float(scores.max() - scores.min()) if len(scores) > 1 else 0.0
                     gate_delta = float(os.environ.get("OWG_GATE_DELTA", "0.0"))

@@ -27,7 +27,7 @@ import yaml
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ.setdefault("MUJOCO_GL", "egl")
 
-from owg_robot.env_soarm import (
+from tango_robot.env_soarm import (
     EnvironmentSoArm,
     TABLE_TOP_Z, IMG_SIZE, FOVY, CAM_POS,
     ARM_JOINTS, GRIP_OPEN, GRIP_CLOSED,

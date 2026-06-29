@@ -1,7 +1,7 @@
-"""Simulator-independent point cloud generation for OWG.
+"""Simulator-independent point cloud generation for TANGO.
 
 Replaces the scattered PyBullet-specific depth conversion in
-owg_robot/camera.py (Camera.get_pointcloud) and owg_robot/env.py
+tango_robot/camera.py (Camera.get_pointcloud) and tango_robot/env.py
 with a single tested module.
 
 Key difference from the legacy camera.py implementation
@@ -69,7 +69,7 @@ def depth_to_camera_points(depth: np.ndarray,
 
     Coordinate convention: +X right, +Y up, -Z into scene.
     Image rows increase downward, so this function negates Y and Z to match
-    the robotics camera convention used by OWG.
+    the robotics camera convention used by TANGO.
 
     Args:
         depth     : (H, W) float32, metric depth in metres.
@@ -179,8 +179,8 @@ def pybullet_depth_to_world_points(
     inverse formula, then delegates to the same camera-frame back-projection
     as the MuJoCo path.
 
-    Matches the existing behaviour of owg_robot/camera.py::Camera.get_pointcloud
-    followed by owg_robot/env.py's pc[:,1] = -pc[:,1]; pc[:,2] = -pc[:,2]
+    Matches the existing behaviour of tango_robot/camera.py::Camera.get_pointcloud
+    followed by tango_robot/env.py's pc[:,1] = -pc[:,1]; pc[:,2] = -pc[:,2]
     coordinate flip.
 
     Args:

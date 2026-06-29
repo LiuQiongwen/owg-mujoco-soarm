@@ -17,7 +17,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from owg_robot.env_soarm import TABLE_TOP_Z
+from tango_robot.env_soarm import TABLE_TOP_Z
 
 
 # ── difficulty presets ────────────────────────────────────────────────────────

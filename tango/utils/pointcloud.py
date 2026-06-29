@@ -61,7 +61,7 @@ def o3d_geometry_to_trimesh(geometry):
         raise ValueError("Unsupported geometry type: {}".format(type(geometry)))
 
 
-# gripper_mesh = create_robotiq_mesg('owg_robot/assets/robotiq_2f_140/robotiq_arg2f_140.obj')
+# gripper_mesh = create_robotiq_mesg('tango_robot/assets/robotiq_2f_140/robotiq_arg2f_140.obj')
 def create_robotiq_mesh(path):
     mesh = trimesh.load(path)
     mesh = trimesh_to_o3d(mesh).paint_uniform_color([0,0,0])

@@ -1,4 +1,4 @@
-# YCB object manifest for OWG MuJoCo simulation.
+# YCB object manifest for TANGO MuJoCo simulation.
 #
 # Inspired by MuJoCo Menagerie: centralises every per-object physical property
 # and mesh reference in one place.  env_soarm.py reads this file at model-build

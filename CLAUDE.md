@@ -1,9 +1,10 @@
-# OWG-main — Claude Code project context
+# TANGO — Claude Code project context
 
 ## Project overview
 
-Open-World Grasping (OWG): SO-ARM101 6-DoF robotic grasping with VLM semantic grounding
-and LGGSN pairwise ranking. All evaluation runs in MuJoCo simulation (`owg-mujoco` conda env).
+**TANGO** (Transport-Aligned Next-Grasp Optimizer): SO-ARM101 6-DoF robotic grasping with
+OT-CFM grasp generation, VLM semantic grounding, and LGGSN pairwise reranking.
+All evaluation runs in MuJoCo simulation (`owg-mujoco` conda env).
 The physical robot path goes through `robots/` (sim-to-real trajectory replay).
 
 ## Pipeline stages
@@ -18,8 +19,8 @@ The physical robot path goes through `robots/` (sim-to-real trajectory replay).
 ## Directory layout
 
 ```
-owg_robot/          MuJoCo SO-ARM101 environment (env_soarm.py is the core)
-owg/                VLM policy (policy.py, gpt_utils.py, visual_prompt.py)
+tango_robot/        MuJoCo SO-ARM101 environment (env_soarm.py is the core)
+tango/              VLM policy (policy.py, gpt_utils.py, visual_prompt.py)
 robots/             Robot backend abstraction layer (sim-to-real)
   base.py           RobotBackend ABC + GraspResult dataclass
   mujoco_backend.py MujocoBackend wrapping EnvironmentSoArm
@@ -102,7 +103,7 @@ conda run -n owg-mujoco python scripts/replay_trajectory.py \
   --max-delta 30   # safety clamp: max 30° per joint per command
 ```
 
-## Key constants (owg_robot/env_soarm.py)
+## Key constants (tango_robot/env_soarm.py)
 
 ```python
 TABLE_TOP_Z         = 0.785          # metres
@@ -162,7 +163,7 @@ TrajectoryRecorder  → begin() / snap(backend) / end() — called from _step_ho
 TrajectoryReplayer  → wall-clock timing from .t offsets; speed multiplier
 ```
 
-Do NOT import `robots/` from `owg_robot/` or `benchmark/` — the planner and benchmark
+Do NOT import `robots/` from `tango_robot/` or `benchmark/` — the planner and benchmark
 use `EnvironmentSoArm` directly and are intentionally unaffected by this layer.
 
 ## Success metric
@@ -175,7 +176,7 @@ Parsed from demo.py stdout. The benchmark logger writes per-trial JSONL to `resu
 
 - Do not modify `legacy/pybullet_panda/` — archived, not used.
 - Do not use `GRASP_MODE_DEMO_ATTACH` in any evaluation — results are invalid.
-- Do not `import robots` from inside `owg_robot/` or `owg/` — circular imports.
+- Do not `import robots` from inside `tango_robot/` or `tango/` — circular imports.
 - Do not call `env._step_hook` directly; only `MujocoBackend.execute_grasp()` sets it.
 - Do not edit `paper_final.tex` without checking `paper_final.pdf` diff — it is the live submission draft.
   - Target venue: RA-L. Hard limit: **8 pages** (references excluded). Currently at exactly 8 pages (commit 397158f). Do not add content without a corresponding cut.

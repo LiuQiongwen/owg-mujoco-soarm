@@ -29,7 +29,7 @@ os.environ.setdefault("MUJOCO_GL", "egl")
 import numpy as np
 import mujoco
 
-from owg_robot.env_soarm import (
+from tango_robot.env_soarm import (
     EnvironmentSoArm,
     GRASP_MODE_PHYSICS,
     TABLE_TOP_Z,

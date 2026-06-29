@@ -9,23 +9,23 @@ import open3d as o3d
 import time
 from PIL import Image
 from typing import List, Union, Dict, Any, Optional, Tuple
-from owg.gpt_utils import request_gpt
-from owg.utils.config import load_config
-from owg.utils.grasp import Grasp2D, grasp_to_mat
-from owg.utils.image import (
+from tango.gpt_utils import request_gpt
+from tango.utils.config import load_config
+from tango.utils.grasp import Grasp2D, grasp_to_mat
+from tango.utils.image import (
     compute_mask_bounding_box,
     crop_square_box,
     create_subplot_image,
     mask2box,
 )
-from owg.markers.postprocessing import (
+from tango.markers.postprocessing import (
     masks_to_marks,
     refine_marks,
     extract_relevant_masks,
 )
-from owg.utils.pointcloud import to_o3d, create_robotiq_mesh, render_o3d_image
-from owg.markers.visualizer import load_mark_visualizer, load_grasp_visualizer
-from owg.gpt_utils import parse_llm_payload
+from tango.utils.pointcloud import to_o3d, create_robotiq_mesh, render_o3d_image
+from tango.markers.visualizer import load_mark_visualizer, load_grasp_visualizer
+from tango.gpt_utils import parse_llm_payload
 
 #o3d.visualization.rendering.OffscreenRenderer.enable_headless(True)
 
@@ -148,20 +148,14 @@ class VisualPrompter:
         else:
             text_prompt = self.prompt_template  # no text query
 
-        # Prepare images based on markers
+        # Prepare images based on markers (list of numpy arrays / PIL images)
         image_prompt, image_prompt_utils = self.prepare_image_prompt(
             image, data)
 
         # Extract relevant settings from the config dictionary
         temperature: float = self.request_config.get("temperature", 0.0)
-        max_tokens: int = self.request_config.get("n_tokens", 256)
-        n: int = self.request_config.get("n", 1)
-        model_name: str = self.request_config.get("model_name", "gpt-4o")
-
-        # Call the request_gpt function to get the response
-        # Extract relevant settings from the config dictionary
-        temperature: float = self.request_config.get("temperature", 0.0)
-        max_tokens: int = self.request_config.get("n_tokens", 256)
+        max_tokens: int = self.request_config.get("max_tokens",
+                          self.request_config.get("n_tokens", 256))
         n: int = self.request_config.get("n", 1)
         model_name: str = self.request_config.get("model_name", "gpt-4o")
 
@@ -176,7 +170,7 @@ class VisualPrompter:
         """
 
         response = request_gpt(
-            images=[image],
+            images=image_prompt,
             prompt=text_prompt,
             system_prompt=system_prompt,
             detail="auto",

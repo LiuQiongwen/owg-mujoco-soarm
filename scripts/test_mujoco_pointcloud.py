@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validation script for owg_robot.pointcloud — MuJoCo depth → world point cloud.
+"""Validation script for tango_robot.pointcloud — MuJoCo depth → world point cloud.
 
 Spawns a red box and a blue cylinder on a table inside a minimal MuJoCo scene
 (no arm, no YCB assets needed).  Renders depth and segmentation from the same
@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import mujoco
 
-from owg_robot.pointcloud import (
+from tango_robot.pointcloud import (
     compute_intrinsics,
     depth_to_camera_points,
     transform_points,

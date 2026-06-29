@@ -15,7 +15,7 @@ from typing import Optional
 
 import numpy as np
 
-from owg_robot.env_soarm import TABLE_TOP_Z
+from tango_robot.env_soarm import TABLE_TOP_Z
 
 
 @dataclass

@@ -31,7 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from owg_robot.env_soarm import (
+from tango_robot.env_soarm import (
     EnvironmentSoArm,
     TABLE_TOP_Z,
     GRASP_MODE_PHYSICS,

@@ -26,19 +26,19 @@ sys.path.insert(0, ROOT)
 os.environ.setdefault("DISPLAY", ":1")
 os.environ.setdefault("MUJOCO_GL", "glfw")
 
-from owg_robot.env_soarm import (
+from tango_robot.env_soarm import (
     EnvironmentSoArm, TABLE_TOP_Z,
     GRIP_OPEN, GRIP_CLOSED,
     IK_MODE_JAW_POS, IK_MODE_XYZ_ONLY,
     GRASP_MODE_PHYSICS, GRASP_Z_TABLE_MARGIN,
 )
-from owg_robot.viewer_utils import MujocoViewer, Overlay
+from tango_robot.viewer_utils import MujocoViewer, Overlay
 
 
 def _resolve(name: str) -> str:
     """Accept 'banana' → 'Banana' (load_obj handles 'Ycb' prefix)."""
     from pathlib import Path
-    ycb = Path(ROOT) / "owg_robot" / "assets" / "ycb_objects"
+    ycb = Path(ROOT) / "tango_robot" / "assets" / "ycb_objects"
     nl = name.lower()
     for d in ycb.iterdir():
         if d.is_dir() and not d.name.startswith("__"):

@@ -45,7 +45,7 @@ def generate_summary(run_dir: Path | str, out_path: Optional[Path | str] = None)
 
     # ── header ────────────────────────────────────────────────────────────────
     lines += [
-        "# OWG Grasp Benchmark Summary",
+        "# TANGO Grasp Benchmark Summary",
         "",
         f"**Run directory**: `{run_dir}`  ",
         f"**Generated**: {time.strftime('%Y-%m-%d %H:%M:%S')}  ",

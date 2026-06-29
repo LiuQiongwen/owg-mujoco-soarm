@@ -40,10 +40,10 @@ from supervision.draw.color import Color, ColorPalette
 from supervision.draw.utils import draw_polygon
 from supervision.geometry.core import Position
 
-from owg.markers.postprocessing import masks_to_marks
-from owg.utils.config import load_config
-from owg.utils.image import compute_mask_center_of_mass, compute_mask_bounding_box, compute_mask_contour
-from owg.utils.grasp import Grasp2D
+from tango.markers.postprocessing import masks_to_marks
+from tango.utils.config import load_config
+from tango.utils.image import compute_mask_center_of_mass, compute_mask_bounding_box, compute_mask_contour
+from tango.utils.grasp import Grasp2D
 
 
 # helper function

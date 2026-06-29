@@ -33,7 +33,7 @@ def _load_dataset(results_dirs: list[Path]) -> tuple[np.ndarray, np.ndarray]:
     seed as the benchmark runner (seed + 9999).
     """
     from benchmark.runner import SamplingConfig, _sample_candidates
-    from owg_robot.env_soarm import TABLE_TOP_Z
+    from tango_robot.env_soarm import TABLE_TOP_Z
 
     # default sampling config — matches diverse_*.yaml
     cfg_samp = SamplingConfig(
