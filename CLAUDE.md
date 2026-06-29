@@ -4,7 +4,7 @@
 
 **TANGO** (Transport-Aligned Next-Grasp Optimizer): SO-ARM101 6-DoF robotic grasping with
 OT-CFM grasp generation, VLM semantic grounding, and LGGSN pairwise reranking.
-All evaluation runs in MuJoCo simulation (`owg-mujoco` conda env).
+All evaluation runs in MuJoCo simulation (`tango` conda env).
 The physical robot path goes through `robots/` (sim-to-real trajectory replay).
 
 ## Pipeline stages
@@ -45,7 +45,7 @@ legacy/pybullet_panda/  Archived Panda+PyBullet baseline (do not modify)
 
 ## Conda environment
 
-All commands: `conda run -n owg-mujoco <cmd>`
+All commands: `conda run -n tango <cmd>`
 
 Headless rendering: `MUJOCO_GL=egl` (set automatically in all scripts via
 `os.environ.setdefault("MUJOCO_GL", "egl")`).
@@ -54,7 +54,7 @@ Headless rendering: `MUJOCO_GL=egl` (set automatically in all scripts via
 
 ### Single demo (Stage 4)
 ```bash
-conda run -n owg-mujoco python demo.py \
+conda run -n tango python demo.py \
   --stage 4 --prompt Banana --seed 1 --once --verbose 1 2>&1 | \
   grep -E 'LGGSN grasp scores|Final action|Done pick'
 ```
@@ -68,25 +68,25 @@ bash scripts/quick_eval.sh fast 3    # stage 3 baseline
 
 ### Benchmark runner
 ```bash
-conda run -n owg-mujoco python scripts/run_benchmark.py \
+conda run -n tango python scripts/run_benchmark.py \
   --config configs/benchmark/default.yaml
 ```
 
 ### Train LGGSN (pairwise BPR)
 ```bash
-conda run -n owg-mujoco python train_lggsn_pairwise.py
+conda run -n tango python train_lggsn_pairwise.py
 ```
 
 ### 6-DoF grasp generation
 ```bash
-conda run -n owg-mujoco python grasp_6dof/grasp_generator_6dof.py \
+conda run -n tango python grasp_6dof/grasp_generator_6dof.py \
   --obj <mesh.ply> --out grasp_6dof/dataset/<name>.json \
   --world-pos 0.38,0.0,0.027
 ```
 
 ### Trajectory recording (sim → JSON)
 ```bash
-conda run -n owg-mujoco python scripts/record_trajectory.py \
+conda run -n tango python scripts/record_trajectory.py \
   --obj banana --seed 42 --n-tries 5 --out trajs/banana_42.json
 # --save-all  : save even on failure (for debugging)
 ```
@@ -94,11 +94,11 @@ conda run -n owg-mujoco python scripts/record_trajectory.py \
 ### Trajectory replay (sim verification or hardware)
 ```bash
 # Sim verification
-conda run -n owg-mujoco python scripts/replay_trajectory.py \
+conda run -n tango python scripts/replay_trajectory.py \
   --traj trajs/banana_42.json --speed 0.5 --vis
 
 # Physical SO-ARM101
-conda run -n owg-mujoco python scripts/replay_trajectory.py \
+conda run -n tango python scripts/replay_trajectory.py \
   --traj trajs/banana_42.json --backend real --port /dev/ttyUSB0 \
   --max-delta 30   # safety clamp: max 30° per joint per command
 ```
