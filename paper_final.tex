@@ -472,7 +472,9 @@ to each condition and does not differentiate methods.
 \begin{table}[t]
 \caption{Ablation: contribution of each pipeline component.
   ``vs.\ full'' compares to OT-CFM + LGGSN (94.3\%).
-  175 trials per condition. $^\dagger$Corrected for Scissors physics-config fix.}
+  175 trials per condition. $^\dagger$Corrected for Scissors physics-config fix.
+  $^\ddagger$Same MLP architecture and training data as OT-CFM; DDPM
+  $\varepsilon$-prediction, cosine schedule $T{=}1000$, DDIM-50 inference.}
 \label{tab:ablation}
 \centering
 \resizebox{\columnwidth}{!}{%
@@ -485,6 +487,7 @@ Baseline (random + LGGSN)            & 82.3\% & —          & $-12.0$\,pp & ${<
 GRC-6DoF + LGGSN                     & 82.9\% & $+0.6$\,pp & $-11.4$\,pp & ${<}0.001$$^{**}$ \\
 \midrule
 \textit{Remove OT (std CFM + LGGSN)} & 78.9\% & $-3.4$\,pp & $-15.4$\,pp & ${<}0.001$$^{**}$ \\
+\textit{DDPM baseline$^\ddagger$ (DDIM-50)} & 81.7\% & $-0.6$\,pp & $-12.6$\,pp & ${<}0.001$$^{**}$ \\
 \textit{Remove LGGSN (OT-CFM only)}  & 84.6\%$^\dagger$ & $+2.3$\,pp & $-9.7$\,pp & 0.003$^{**}$ \\
 \textit{Remove SAM vis (zero $c$)}   & 96.0\%$^\dagger$ & $+13.7$\,pp & $+1.7$\,pp & 0.456 \\
 \midrule
@@ -505,16 +508,22 @@ Both methods supply similarly diverse candidate sets to LGGSN, leaving
 no evidence that geometric candidate generation alone drives success.
 
 \noindent\textbf{OT coupling is essential ($-15.4$\,pp, $p{<}0.001$).}
-Replacing the OT sampler with standard random source--target pairing
-reduces SR from 94.3\% to 78.9\%, which is \emph{below} the random-CoM
-baseline (82.3\%).
-This is the most striking finding: naive CFM without OT coupling
-\emph{harms} performance relative to random sampling.
-We attribute this to the flow learning non-optimal crossing paths when
-source and target are randomly paired---the velocity field becomes a
-blurred average of conflicting directions rather than a clean transport map.
-OT coupling removes this ambiguity and concentrates learning signal on
-coherent object-scale transport.
+Replacing the OT sampler with random source--target pairing reduces SR
+from 94.3\% to 78.9\%---\emph{below} the random-CoM baseline (82.3\%).
+Random pairing forces the velocity network to reconcile crossing flow paths,
+learning a blurred mean rather than a clean transport map.
+OT coupling solves the global assignment within each minibatch, eliminating
+crossings and enabling crisp, object-specific distributions.
+
+\noindent\textbf{DDPM as a generative baseline ($-12.6$\,pp, $p{<}0.001$).}
+To verify that OT coupling---not the flow-matching paradigm---drives
+performance, we train an identical MLP with DDPM $\varepsilon$-prediction
+(cosine schedule, $T{=}1000$, DDIM-50) on the same 2,853 successes.
+DDPM achieves 81.7\% ($z{=}3.62$, $p{<}0.001$ vs.\ OT-CFM),
+comparable to the random baseline and matching the remove-OT result.
+The gap concentrates on CrackerBox ($36\%$ vs.\ $80\%$) and Pear ($68\%$
+vs.\ $100\%$), where OT-CFM's straight transport paths preserve structured
+multi-modal contact distributions that DDPM's isotropic diffusion erases.
 
 \noindent\textbf{LGGSN reranking contributes $-9.7$\,pp ($p{=}0.003$).}
 Without reranking (OT-CFM candidates executed in generation order),
@@ -538,17 +547,15 @@ The recommended deployment therefore omits the SAM dependency
 
 \subsection{Why OT Coupling Matters}
 
-The failure of standard CFM below baseline ($78.9\% < 82.3\%$) reveals a
-fundamental issue with random source--target pairing in low-data regimes.
+The failure of standard CFM below baseline ($78.9\% < 82.3\%$), and
+the matching performance of DDPM ($81.7\%$), together confirm that the
+gain in OT-CFM is not attributable to the flow-matching paradigm per se.
+The critical ingredient is the optimal-transport coupling.
 With only $\sim\!400$ training examples per object, random pairing produces
-a high fraction of $(x_0, x_1)$ pairs in which the optimal path crosses
-other pairs' paths.
-The velocity network must simultaneously represent contradictory flow
-directions, ultimately learning a blurred mean that places candidates in
-mediocre positions.
-OT coupling, by solving for the global optimal assignment within each
-minibatch, eliminates this contradiction and allows the model to learn
-crisp, object-specific candidate distributions even with limited data.
+crossing flow paths; the velocity network learns a blurred mean rather
+than a clean transport map.
+OT coupling, by solving the global assignment within each minibatch,
+eliminates these crossings and enables crisp, object-specific distributions.
 
 \subsection{Why Visual Conditioning Does Not Help}
 
@@ -565,18 +572,12 @@ We leave this for future work.
 
 \subsection{Scissors: Physics-Configuration Correction}
 
-Scissors was 0/25 in all initial conditions due to a simulation bug:
-the VHACD collision mesh (14 merged convex hulls, $\approx$2\,cm effective
-thickness) tunnelled through the table under MuJoCo's contact detection.
-After correcting the manifest entry (bounding-box proxy, $4$\,cm thickness
-via non-uniform scale, geom offset to align body origin with mesh CoM),
-all methods reach 25/25 = 100\%.
-The fix affects all 7 conditions uniformly, so the per-method $\Delta$pp
-values are unchanged.
-For reference, excluding Scissors from the per-object comparison, the
-six remaining objects give $140/150 = 93.3\%$ (OT-CFM + LGGSN)
-vs.\ $119/150 = 79.3\%$ (baseline), identical to the corrected
-per-condition estimate.
+Scissors was 0/25 across all conditions due to a VHACD mesh tunnelling bug:
+14 merged convex hulls at $\approx$2\,cm thickness allowed the object to
+pass through the table under MuJoCo contact detection.
+Replacing the geometry with a bounding-box proxy at 4\,cm restores
+25/25 = 100\% for all methods, leaving per-condition $\Delta$pp values
+unchanged.
 
 \subsection{Limitations}
 
