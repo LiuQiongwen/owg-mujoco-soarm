@@ -146,3 +146,89 @@ class GC_LGGSN(nn.Module):
         gated_geom  = gate * geom                 # element-wise mask
         return self.scorer(gated_geom, query_id)
 
+
+class LGGSNVision(nn.Module):
+    """
+    LGGSN + SAM visual feature (simple concatenation).
+
+    Two inputs are concatenated before the scoring MLP:
+      - geom    [B, geom_dim]  — 18 geometric/physics features
+      - vis     [B, vis_dim]   — 256-dim SAM ROI embedding (episode-level)
+    A learned query embedding is also concatenated (same design as LGGSN).
+
+    MLP input dim = geom_dim + vis_dim + query_dim  (278 with defaults).
+    hidden_dim is set larger than LGGSN's 40 because the input is much wider.
+
+    State-dict key names (query_emb.weight, mlp.0/2.weight/bias) are
+    intentionally kept identical to LGGSN so grasp_ranker_lggsn.py can
+    auto-detect the architecture from checkpoint shape.
+    """
+
+    def __init__(
+        self,
+        n_queries:  int,
+        geom_dim:   int   = 18,
+        vis_dim:    int   = 256,
+        query_dim:  int   = 4,
+        hidden_dim: int   = 64,
+        dropout:    float = 0.0,
+    ):
+        super().__init__()
+        self.geom_dim  = geom_dim
+        self.vis_dim   = vis_dim
+        self.use_query = query_dim > 0
+
+        if self.use_query:
+            self.query_emb = nn.Embedding(n_queries, query_dim)
+        else:
+            self.query_emb = None
+
+        in_dim = geom_dim + vis_dim + (query_dim if self.use_query else 0)
+
+        self.mlp = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.ReLU(inplace=True),
+            nn.Linear(hidden_dim, 1),
+        )
+        self._drop: nn.Dropout | None = nn.Dropout(p=dropout) if dropout > 0.0 else None
+
+    def forward(
+        self,
+        geom:     torch.Tensor,  # [B, geom_dim]
+        vis:      torch.Tensor,  # [B, vis_dim]
+        query_id: torch.Tensor,  # [B]
+    ) -> torch.Tensor:           # [B]
+        parts = [geom, vis]
+        if self.use_query:
+            parts.append(self.query_emb(query_id))  # [B, query_dim]
+        x = torch.cat(parts, dim=-1)                # [B, in_dim]
+
+        h = self.mlp[1](self.mlp[0](x))
+        if self._drop is not None:
+            h = self._drop(h)
+        return self.mlp[2](h).squeeze(-1)           # [B]
+
+    def predict_with_uncertainty(
+        self,
+        geom:     torch.Tensor,
+        vis:      torch.Tensor,
+        query_id: torch.Tensor,
+        T:        int   = 20,
+        p:        float = 0.1,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """MC Dropout uncertainty estimate. Returns (mean_score, std_score)."""
+        drop = self._drop if self._drop is not None else nn.Dropout(p=p)
+        drop.train()
+        stacked = []
+        with torch.no_grad():
+            for _ in range(T):
+                parts = [geom, vis]
+                if self.use_query:
+                    parts.append(self.query_emb(query_id))
+                x = torch.cat(parts, dim=-1)
+                h = self.mlp[1](self.mlp[0](x))
+                h = drop(h)
+                stacked.append(torch.sigmoid(self.mlp[2](h).squeeze(-1)))
+        scores = torch.stack(stacked, dim=0)        # [T, N]
+        return scores.mean(dim=0), scores.std(dim=0)
+

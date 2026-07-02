@@ -35,6 +35,83 @@ def euler_from_R(R: np.ndarray) -> Tuple[float, float, float]:
         yaw   = 0.0
     return float(roll), float(pitch), float(yaw)
 
+def rpy_to_R(roll: float, pitch: float, yaw: float) -> np.ndarray:
+    """ZYX Euler → rotation matrix (inverse of euler_from_R)."""
+    cr, sr = np.cos(roll),  np.sin(roll)
+    cp, sp = np.cos(pitch), np.sin(pitch)
+    cy, sy = np.cos(yaw),   np.sin(yaw)
+    Rx = np.array([[1, 0, 0], [0, cr, -sr], [0, sr, cr]])
+    Ry = np.array([[cp, 0, sp], [0, 1, 0], [-sp, 0, cp]])
+    Rz = np.array([[cy, -sy, 0], [sy, cy, 0], [0, 0, 1]])
+    return Rz @ Ry @ Rx
+
+def local_point_density(
+    grasp_xyz: np.ndarray, grasp_R: np.ndarray, gripper_width: float,
+    episode_pcd: np.ndarray, depth: float = 0.04,
+) -> float:
+    """Fraction of episode points inside gripper bbox (width×width×depth)."""
+    if episode_pcd is None or len(episode_pcd) == 0:
+        return 0.0
+    local = (episode_pcd - grasp_xyz) @ grasp_R
+    hw, hd = gripper_width / 2.0, depth / 2.0
+    inside = (
+        (np.abs(local[:, 0]) <= hw) &
+        (np.abs(local[:, 1]) <= hw) &
+        (np.abs(local[:, 2]) <= hd)
+    )
+    return float(inside.sum()) / max(1, len(episode_pcd))
+
+def normal_consistency(
+    grasp_xyz: np.ndarray, grasp_R: np.ndarray, gripper_width: float,
+    episode_pcd: np.ndarray, depth: float = 0.04, min_pts: int = 5,
+) -> float:
+    """Std of z-component of surface normals in gripper bbox. Low → flat surface (scissors failure)."""
+    if episode_pcd is None or len(episode_pcd) < min_pts:
+        return 0.0
+    local = (episode_pcd - grasp_xyz) @ grasp_R
+    hw, hd = gripper_width / 2.0, depth / 2.0
+    mask = (
+        (np.abs(local[:, 0]) <= hw) &
+        (np.abs(local[:, 1]) <= hw) &
+        (np.abs(local[:, 2]) <= hd)
+    )
+    local_pts = episode_pcd[mask]
+    if len(local_pts) < min_pts:
+        return 0.0
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(local_pts)
+    pcd.estimate_normals(
+        search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=30)
+    )
+    try:
+        pcd.orient_normals_consistent_tangent_plane(k=min(30, len(local_pts) - 1))
+    except RuntimeError:
+        # Coplanar points (e.g. table surface only) → degenerate hull.
+        # Flat surface implies std ≈ 0, so 0.0 is the correct return value.
+        return 0.0
+    return float(np.std(np.asarray(pcd.normals)[:, 2]))
+
+def contact_width_ratio(
+    grasp_xyz: np.ndarray, grasp_R: np.ndarray, gripper_width: float,
+    episode_pcd: np.ndarray, depth: float = 0.04, min_pts: int = 10,
+) -> float:
+    """Inter-decile span of local points on gripper x-axis / gripper_width.
+    <0.3 → thin object with poor jaw engagement. Uses p90-p10 to reject outlier bg points."""
+    if episode_pcd is None or len(episode_pcd) < min_pts or gripper_width <= 0:
+        return 0.0
+    local = (episode_pcd - grasp_xyz) @ grasp_R
+    hw, hd = gripper_width / 2.0, depth / 2.0
+    mask = (
+        (np.abs(local[:, 0]) <= hw) &
+        (np.abs(local[:, 1]) <= hw) &
+        (np.abs(local[:, 2]) <= hd)
+    )
+    local_pts = local[mask]
+    if len(local_pts) < min_pts:
+        return 0.0
+    span = float(np.percentile(local_pts[:, 0], 90) - np.percentile(local_pts[:, 0], 10))
+    return span / max(1e-6, gripper_width)
+
 def rodrigues(axis: np.ndarray, theta: float) -> np.ndarray:
     """轴角到旋转矩阵"""
     axis = axis / (np.linalg.norm(axis) + 1e-12)
@@ -120,9 +197,11 @@ def score_grasp(
     # 线性衰减到 0
     align_score = max(0.0, 1.0 - (ang / (friction_rad + 1e-6)))
 
-    # 4) 离边缘的“留量”（简单起见：用 p投影到平面后与包围盒边界的距离，越远越好）
-    #   这里不计算真实几何边缘，给一个恒定值作为占位
-    boundary_score = 0.7
+    # 4) 离工作空间边界的距离（越远越安全，饱和于 5 cm）
+    dx = min(p[0] - xr[0], xr[1] - p[0])
+    dy = min(p[1] - yr[0], yr[1] - p[1])
+    dz = min(p[2] - zr[0], zr[1] - p[2])
+    boundary_score = float(np.clip(min(dx, dy, dz) / 0.05, 0.0, 1.0))
 
     # 5) 汇总（可调权重）
     w_align, w_clear, w_bound = 0.5, 0.3, 0.2
