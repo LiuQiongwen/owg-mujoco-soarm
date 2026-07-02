@@ -33,3 +33,36 @@ autoresearch.log
 data/transitions/
 *.npz
 *.pkl
+
+# ---- Claude Code worktrees (do NOT commit) ----
+# Nested git worktree checkouts created by the harness for isolated session
+# work (each one is a full repo copy, easily 100s of MB) — session-local,
+# never meant to be committed.
+.claude/worktrees/
+
+# ---- Model checkpoints (do NOT commit) ----
+# Large binary weights. Intentionally does NOT match *_stats.json sidecar
+# metadata files (normalization stats etc.) — those stay committable.
+*.pt
+*.pth
+*.ckpt
+
+# ---- Recorded hardware/sim data (do NOT commit) ----
+# Grows with every trial/episode collected; not source, not a small result.
+data/lerobot/
+trajs/
+
+# ---- Build byproducts: LaTeX / console logs (do NOT commit) ----
+# Regenerated on every compile/run; not meant to be diffed or reviewed.
+*.aux
+*.log
+*.out
+MUJOCO_LOG.TXT
+
+# ---- Pose-visualization renders (do NOT commit) ----
+# Scoped to these exact filenames rather than a blanket *.png — 45 PNGs are
+# already tracked under plots/ and media/ and must stay committable.
+/cfm_all_poses.png
+/cfm_all_poses_ot.png
+/cfm_banana_poses.png
+/ddpm_all_poses.png
