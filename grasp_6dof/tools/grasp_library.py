@@ -4,7 +4,7 @@
 - 默认的 grasp 候选文件（已用 validator + rerank 处理）
 - 默认的抓取控制参数（descend_clear / descent_step / vel_close / pos_close / squeeze ...）
 
-后续 OWG 在执行时，可以统一通过这里取配置。
+后续 TANGO 在执行时，可以统一通过这里取配置。
 """
 
 import os

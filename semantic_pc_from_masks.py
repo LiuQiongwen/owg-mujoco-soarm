@@ -7,7 +7,7 @@ semantic_pc_from_masks.py
 把选中的 2D 语义 mask 回投成 3D 语义点云，保存到 semantic_pc/ 目录。
 
 用法示例：
-    cd ~/OWG-main
+    cd ~/TANGO-main
     python tools/semantic_pc_from_masks.py \
         --log-dir logs/grounding_examples \
         --out-dir semantic_pc \

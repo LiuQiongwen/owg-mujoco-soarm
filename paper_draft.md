@@ -16,7 +16,7 @@ Language-conditioned robot manipulation requires not only identifying *which* ob
 
 Prior work on grasp quality estimation largely operates offline, on fixed object sets with known geometry [2, 3]. In open-world settings, where object identity is specified at runtime via natural language, the reranker must generalise across a diverse object distribution without access to CAD models or object-specific supervision. This setting introduces a fundamental challenge: the features that discriminate good from bad grasps depend heavily on object geometry, yet the reranker must be trained on a shared feature space.
 
-We design and evaluate LGGSN in this context, operating inside the OWG (Open-World Grasping) pipeline [4], which uses a Vision-Language Model (VLM) grounder to localise objects and GR-ConvNet to generate grasp candidates. Our contributions are:
+We design and evaluate LGGSN in this context, operating inside the TANGO (Transport-Aligned Next-Grasp Optimizer) pipeline [4], which uses a Vision-Language Model (VLM) grounder to localise objects and GR-ConvNet to generate grasp candidates. Our contributions are:
 
 1. **A pairwise BPR training procedure** for grasp reranking from live robot data, which avoids the within-episode label degeneracy that causes BCE training to collapse.
 2. **Two episode-relative context features** (`dist_to_centroid`, `z_rel`) that address feature collapse in top-down scenarios and improve offline pair accuracy by 49%.
@@ -43,7 +43,7 @@ DexGraspNet 2.0 [7] and RoboAgent [8] demonstrate learning grasp policies direct
 
 ### D. Open-World and Language-Conditioned Grasping
 
-OWG [4] and CLIPort [10] address language-conditioned manipulation without object-specific models. Our work augments OWG's Stage 4 reranker, which is the only component that uses learned geometric reasoning beyond the VLM grounder and GR-ConvNet generator. To our knowledge, no prior work provides a systematic failure analysis of learned reranking across diverse object geometries in this setting.
+TANGO [4] and CLIPort [10] address language-conditioned manipulation without object-specific models. Our work augments TANGO's Stage 4 reranker, which is the only component that uses learned geometric reasoning beyond the VLM grounder and GR-ConvNet generator. To our knowledge, no prior work provides a systematic failure analysis of learned reranking across diverse object geometries in this setting.
 
 ---
 
@@ -51,7 +51,7 @@ OWG [4] and CLIPort [10] address language-conditioned manipulation without objec
 
 ### A. System Overview
 
-The OWG pipeline has two stages relevant to this work:
+The TANGO pipeline has two stages relevant to this work:
 
 - **Stage 3 (baseline):** VLM grounder localises the target object; GR-ConvNet generates N grasp candidates; the top-ranked candidate by GR-ConvNet score is executed.
 - **Stage 4 (proposed):** Same candidate generation; LGGSN reranks the N candidates; the top-ranked candidate by LGGSN score is executed.
@@ -94,7 +94,7 @@ where `x ∈ R^14`, `W_1 ∈ R^{40×14}`, `W_2 ∈ R^{1×40}`. Total parameters:
 
 ### D. BPR Training
 
-**Dataset construction.** Episodes are collected by running the OWG pipeline in simulation (PyBullet). Each episode produces N grasp candidates for a given (object, scene) pair. The episode receives a binary label based on whether the executed grasp succeeded. Grounding-failed episodes (VLM API timeout or 403 error) are identified by cross-referencing the batch log and excluded from training, as their negative labels reflect network failures rather than geometric failures.
+**Dataset construction.** Episodes are collected by running the TANGO pipeline in simulation (PyBullet). Each episode produces N grasp candidates for a given (object, scene) pair. The episode receives a binary label based on whether the executed grasp succeeded. Grounding-failed episodes (VLM API timeout or 403 error) are identified by cross-referencing the batch log and excluded from training, as their negative labels reflect network failures rather than geometric failures.
 
 **Pairwise label.** For a pair of episodes (p, n) with the same query object, where p succeeded and n failed, each candidate in p is treated as a *positive* and each candidate in n as a *negative*. This cross-episode pairwise signal is the only supervision available: within a single episode, all candidates share the same label, so no within-episode gradient exists.
 
@@ -287,7 +287,7 @@ Our work demonstrates that improving offline pair accuracy is necessary but not 
 
 [3] H.-S. Fang et al., "GraspNet-1Billion: A Large-Scale Benchmark for General Object Grasping," in *Proc. CVPR*, 2020.
 
-[4] [OWG reference — omitted for blind review]
+[4] [TANGO reference — omitted for blind review]
 
 [5] S. Rendle, C. Freudenthaler, Z. Gantner, and L. Schmidt-Thieme, "BPR: Bayesian Personalized Ranking from Implicit Feedback," in *Proc. UAI*, 2009.
 

@@ -19,7 +19,7 @@ title: 'Stage 02: Problem Decompose'
 
 ### Source
 
-**Project**: OWG-main (Open-World Grasping)
+**Project**: TANGO-main (Open-World Grasping)
 **Current best**: BPR pairwise + margin_0.00 (LGGSN stage 4)
 **Challenge**: High evaluation noise from PyBullet/VLM non-determinism; unclear ceiling for BPR-based ranking
 

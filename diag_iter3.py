@@ -19,12 +19,12 @@ import cv2, json, os, time
 import numpy as np
 from PIL import Image
 
-from owg.policy import OwgPolicy
-from owg.utils.config import load_config
-from owg.utils.grasp import Grasp2D
-from owg_robot.camera import Camera
-from owg_robot.env import Environment
-from owg_robot.objects import YcbObjects
+from tango.policy import OwgPolicy
+from tango.utils.config import load_config
+from tango.utils.grasp import Grasp2D
+from tango_robot.camera import Camera
+from tango_robot.env import Environment
+from tango_robot.objects import YcbObjects
 from third_party.grconvnet import load_grasp_generator
 
 # ── config ────────────────────────────────────────────────────────────────────
@@ -51,10 +51,10 @@ def make_camera(cfg):
 
 def make_scene(cfg, seed):
     camera = make_camera(cfg)
-    env = Environment(camera, vis=False, asset_root="./owg_robot/assets",
+    env = Environment(camera, vis=False, asset_root="./tango_robot/assets",
                       finger_length=cfg.finger_length,
                       n_grasp_attempts=cfg.n_grasp_attempts)
-    objects = YcbObjects("./owg_robot/assets/ycb_objects",
+    objects = YcbObjects("./tango_robot/assets/ycb_objects",
                          mod_orn=["ChipsCan", "MustardBottle", "TomatoSoupCan"],
                          mod_stiffness=["Strawberry"], seed=seed)
     objects.shuffle_objects()

@@ -14,7 +14,7 @@ class CamCfg:
     fov: float = 40.0
     znear: float = 0.2
     zfar: float = 2.0
-    # 相机位姿（看 OWG demo 的配置，可按需改）
+    # 相机位姿（看 TANGO demo 的配置，可按需改）
     center = np.array([0.05, -0.52, 1.9], dtype=float)
     target = np.array([0.05, -0.52, 0.785], dtype=float)
     up     = np.array([0.0,   1.0,   0.0  ], dtype=float)

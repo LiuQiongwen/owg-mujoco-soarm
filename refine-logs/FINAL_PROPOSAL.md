@@ -1,4 +1,4 @@
-# Final Proposal — OWG World-Model Alignment & SO-ARM Real-Robot Transfer
+# Final Proposal — TANGO World-Model Alignment & SO-ARM Real-Robot Transfer
 
 **Version**: V3-FINAL  
 **Date**: 2026-05-15  

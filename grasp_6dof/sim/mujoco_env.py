@@ -10,9 +10,9 @@ import mujoco
 import numpy as np
 
 _ASSETS = os.path.join(os.path.dirname(__file__), "..", "..",
-                       "owg_robot", "assets", "so101", "assets")
+                       "tango_robot", "assets", "so101", "assets")
 _SO101  = os.path.join(os.path.dirname(__file__), "..", "..",
-                       "owg_robot", "assets", "so101", "so101.xml")
+                       "tango_robot", "assets", "so101", "so101.xml")
 
 TABLE_Z   = 0.0          # table surface in world frame
 TABLE_SZ  = "0.35 0.35 0.02"

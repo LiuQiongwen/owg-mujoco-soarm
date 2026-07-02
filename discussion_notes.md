@@ -1,4 +1,4 @@
-# Discussion Notes — OWG Stage-4 LGGSN Experiments
+# Discussion Notes — TANGO Stage-4 LGGSN Experiments
 
 > Notes for the Experiments / Discussion section of the paper.
 > All numbers verified against `logs/` via `scripts/paired_stats.py` and

@@ -22,8 +22,8 @@
 | EEF site name & position | ✅ Exact match (`gripperframe`) | See §4 |
 | Gripper body / jaw names | ✅ Exact match | |
 | Backlash default class | ⚠️ Defined in XML but no joints use it | Class exists; zero active backlash joints |
-| Cameras | ⚠️ Custom (official defines none) | OWG overhead camera |
-| Scene / table geometry | ⚠️ Custom OWG additions | Dynamic XML assembly |
+| Cameras | ⚠️ Custom (official defines none) | TANGO overhead camera |
+| Scene / table geometry | ⚠️ Custom TANGO additions | Dynamic XML assembly |
 | Home pose | ⚠️ Custom (official defines none) | Empirically tuned |
 | IK solver | ✅ Custom — official defines none | DLS, jaw-midpoint, 6-DoF variants |
 | Collision simplification | ✅ Custom — required, keep | See §3.2 |
@@ -35,7 +35,7 @@
 
 ### 2.1 Joint Names
 
-| OWG (`env_soarm.py`) | Official (`so101_new_calib.xml`) | Match |
+| TANGO (`env_soarm.py`) | Official (`so101_new_calib.xml`) | Match |
 |---|---|---|
 | `shoulder_pan` | `shoulder_pan` | ✅ |
 | `shoulder_lift` | `shoulder_lift` | ✅ |
@@ -46,7 +46,7 @@
 
 ### 2.2 Joint Limits
 
-| Joint | Official range (rad) | OWG ctrlrange | Match |
+| Joint | Official range (rad) | TANGO ctrlrange | Match |
 |---|---|---|---|
 | `shoulder_pan` | −1.9198621... / +1.9198621... | ±1.91986 | ✅ |
 | `shoulder_lift` | −1.7453292... / +1.7453292... | ±1.74533 | ✅ |
@@ -72,7 +72,7 @@ The per-actuator `forcerange` **overrides** the class default. All six actuators
 
 ### 2.4 Joint Dynamics (class `sts3215`)
 
-| Parameter | Official `so101_new_calib.xml` | OWG `so101.xml` | Match |
+| Parameter | Official `so101_new_calib.xml` | TANGO `so101.xml` | Match |
 |---|---|---|---|
 | `damping` | 0.60 | 0.60 | ✅ |
 | `frictionloss` | 0.052 | 0.052 | ✅ |
@@ -88,7 +88,7 @@ The XML defines a `backlash` default class (±0.5° = ±0.00873 rad, `damping=0.
 
 ### 3.1 Body and Joint Structure
 
-| Element | Official | OWG | Match |
+| Element | Official | TANGO | Match |
 |---|---|---|---|
 | Fixed jaw body | `gripper` | `"gripper"` in `_cache_ids()` | ✅ |
 | Moving jaw body | `moving_jaw_so101_v1` | `"moving_jaw_so101_v1"` | ✅ |
@@ -99,11 +99,11 @@ The XML defines a `backlash` default class (±0.5° = ±0.00873 rad, `damping=0.
 
 Note on open range: `GRIP_OPEN=1.0` rad is 57% of the physical maximum (1.74533). This is a deliberate tuning choice for grasping clearance. Wider objects may need `GRIP_OPEN` increased to ~1.4–1.5.
 
-### 3.2 Collision Geometry — OWG Custom Modification
+### 3.2 Collision Geometry — TANGO Custom Modification
 
 **Official:** Jaw collision geometry uses full STL mesh convex hulls spanning ~10 cm along the jaw arm.
 
-**OWG (`_simplify_jaw_collision()`):** Replaces the two jaw tip mesh collision geoms with 6 mm radius spheres at the same local positions, and disables the sts3215 motor collision geom on the gripper body:
+**TANGO (`_simplify_jaw_collision()`):** Replaces the two jaw tip mesh collision geoms with 6 mm radius spheres at the same local positions, and disables the sts3215 motor collision geom on the gripper body:
 
 ```python
 _R = 0.006  # 6 mm radius
@@ -119,13 +119,13 @@ self.model.geom_size[gid, 0] = _R
 
 ## 4. End-Effector Site
 
-| Property | Official | OWG | Match |
+| Property | Official | TANGO | Match |
 |---|---|---|---|
 | Site name | `gripperframe` | `EEF_SITE = "gripperframe"` | ✅ |
 | Position in gripper body | `(-0.0079, -0.000218121, -0.0981274)` | inherited from `so101.xml` | ✅ |
 | Orientation quat | `0.707107 0 0.707107 0` (Z→X forward) | used via `site_xmat` and `site_xpos` | ✅ |
 
-**OWG site orientation convention:**
+**TANGO site orientation convention:**
 The `gripperframe` site Z-axis is the approach/closing direction. `make_topdown_rotation(yaw)` constructs a rotation so that site Z → world −Z (straight down) with jaw yaw:
 
 ```python
@@ -159,11 +159,11 @@ wrist_roll_pitch_so101_v2.stl
 
 ---
 
-## 6. Scene and Camera (OWG Custom)
+## 6. Scene and Camera (TANGO Custom)
 
 ### 6.1 Scene Assembly
 
-The official repo provides a minimal `scene.xml` (floor + light + skybox). OWG uses `_build_scene_xml()` in `env_soarm.py` to dynamically assemble a full scene combining:
+The official repo provides a minimal `scene.xml` (floor + light + skybox). TANGO uses `_build_scene_xml()` in `env_soarm.py` to dynamically assemble a full scene combining:
 - `so101.xml` robot model (parsed and inlined as XML string fragments)
 - Table geometry (`TABLE_TOP_Z = 0.785`)
 - Object pool bodies with freejoints (pool size ≥ number of active objects)
@@ -203,7 +203,7 @@ TARGET_ZONE_POS      = [0.20, 0.25, 0.785]
 
 ---
 
-## 7. Custom OWG Pipeline Modules
+## 7. Custom TANGO Pipeline Modules
 
 ### 7.1 `physics_weld_after_bilateral` Grasp Mode
 
@@ -329,7 +329,7 @@ When pulling upstream SO-101 changes into `owg_robot/assets/so101/`:
 - `owg_robot/assets/so101/so101.xml` — robot model (identical to upstream)
 - `owg_robot/assets/so101/assets/*.stl` — all 13 mesh files
 
-### Custom OWG (not in official)
+### Custom TANGO (not in official)
 - `owg_robot/env_soarm.py` — full simulation environment, IK suite, grasp modes
 - `owg_robot/grasp_ranker_lggsn.py` — pairwise BPR reranker
 - `grasp_6dof/grasp_sampler.py` — 6-DoF grasp generation

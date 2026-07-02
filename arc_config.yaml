@@ -27,13 +27,13 @@ notifications:
   channel: "none"
 
 knowledge_base:
-  root: "/home/lina/OWG-main/arc_kb"
+  root: "/home/lina/TANGO-main/arc_kb"
 
 llm:
   provider: "acp"
   acp:
     agent: "claude"
-    cwd: "/home/lina/OWG-main"
+    cwd: "/home/lina/TANGO-main"
 
 output:
   format: "latex"

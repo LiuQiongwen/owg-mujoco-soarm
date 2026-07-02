@@ -1,4 +1,4 @@
-# OWG Stage-4 LGGSN Experiments — Reference Document
+# TANGO Stage-4 LGGSN Experiments — Reference Document
 
 > Generated 2026-03-26. All numbers come directly from log files in `logs/`.
 

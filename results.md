@@ -1,5 +1,5 @@
 Preliminary Results.
-We evaluated our geometry-based LGGSN grasp ranker in the OWG language-conditioned grasping pipeline by comparing it against the default OWG grasp selection strategy (baseline). On a total of 485 natural-language-guided manipulation trials, the baseline achieved a grasp success rate of 58% (133/231), whereas enabling LGGSN ranking improved the overall success rate to 65% (166/254).
+We evaluated our geometry-based LGGSN grasp ranker in the TANGO language-conditioned grasping pipeline by comparing it against the default TANGO grasp selection strategy (baseline). On a total of 485 natural-language-guided manipulation trials, the baseline achieved a grasp success rate of 58% (133/231), whereas enabling LGGSN ranking improved the overall success rate to 65% (166/254).
 
 We further analyzed performance per object category. For the Campbell's soup can, a relatively challenging cylindrical object, the success rate increased from 40% (36/90) to 52% (50/96) with LGGSN. For scissors, which are thin and orientation-sensitive, LGGSN improved the success rate from 64% (39/61) to 77% (43/56). On the simpler hammer object, performance remained stable at 72% (58/80 vs. 73/102), suggesting that LGGSN does not significantly harm already confident grasps while providing tangible benefits for more geometrically challenging objects.
 

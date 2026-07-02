@@ -1,7 +1,7 @@
-# /autoresearch — OWG Grasp Success Rate 自动优化循环
+# /autoresearch — TANGO Grasp Success Rate 自动优化循环
 
 ## GOAL
-提高 OWG Stage 4 grasp success rate。
+提高 TANGO Stage 4 grasp success rate。
 当前最优：BPR pairwise + margin_0.00。
 
 ## METRIC

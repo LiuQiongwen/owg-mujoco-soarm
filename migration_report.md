@@ -80,7 +80,7 @@
 
 ## Environment Dependency Gap
 
-The full OWG pipeline requires `open3d`, `clip`, `pybullet`, and related packages.
+The full TANGO pipeline requires `open3d`, `clip`, `pybullet`, and related packages.
 These are missing from the `bridge` conda env (which has MuJoCo 3.8.1 but not open3d/clip).
 The original `owg2` env referenced in CLAUDE.md no longer exists.
 
@@ -91,12 +91,12 @@ The original `owg2` env referenced in CLAUDE.md no longer exists.
 
 **Workaround options**:
 1. Create new env from `requirements.txt` with both MuJoCo and open3d/clip
-2. Install mujoco in an existing env that already has the full OWG stack
+2. Install mujoco in an existing env that already has the full TANGO stack
 3. Make `owg/visual_prompt.py` open3d import optional (deferred until grounding needed)
 
 ## Next Steps
 
-1. **Unblock demo**: Set up a conda env with both `mujoco>=3.x` and the OWG policy stack.
+1. **Unblock demo**: Set up a conda env with both `mujoco>=3.x` and the TANGO policy stack.
    Minimal additions to `bridge`: `open3d`, `clip`, `pybullet`
    Or install mujoco into whichever env has `open3d + clip + pybullet`.
 2. **Implement 6-DoF IK** at `TODO(6dof-ik)` markers in `env_soarm.py`.

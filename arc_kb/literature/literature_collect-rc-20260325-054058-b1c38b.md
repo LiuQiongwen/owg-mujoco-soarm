@@ -48,7 +48,7 @@ Our open-source framework includes code to train and tune state-of-the-art pairw
 
 ### [6] arXiv:2406.18722v4 [cs.RO] 13 Oct 2024
 URL: https://arxiv.org/pdf/2406.18722
-We propose OWG, an open-world grasping pipeline that combines VLMs with segmentation and grasp synthesis models to unlock grounded world understand- ing in three stages: open-ended referring segmentation, grounded grasp planning and grasp ranking via contact reasoning, all of which can be applied zero-shot via suitable visual prompting mechanisms.
+We propose TANGO, an open-world grasping pipeline that combines VLMs with segmentation and grasp synthesis models to unlock grounded world understand- ing in three stages: open-ended referring segmentation, grounded grasp planning and grasp ranking via contact reasoning, all of which can be applied zero-shot via suitable visual prompting mechanisms.
 
 ### [7] A framework for unbiased explainable pairwise ranking for recommendation
 URL: https://par.nsf.gov/servlets/purl/10354785
@@ -125,7 +125,7 @@ For addressing the &quot;One-Class Collaborative Filtering&quot; (OCCF) problem 
     {
       "title": "arXiv:2406.18722v4 [cs.RO] 13 Oct 2024",
       "url": "https://arxiv.org/pdf/2406.18722",
-      "snippet": "We propose OWG, an open-world grasping pipeline that combines VLMs with segmentation and grasp synthesis models to unlock grounded world understand- ing in three stages: open-ended referring segmentation, grounded grasp planning and grasp ranking via contact reasoning, all of which can be applied zero-shot via suitable visual prompting mechanisms.",
+      "snippet": "We propose TANGO, an open-world grasping pipeline that combines VLMs with segmentation and grasp synthesis models to unlock grounded world understand- ing in three stages: open-ended referring segmentation, grounded grasp planning and grasp ranking via contact reasoning, all of which can be applied zero-shot via suitable visual prompting mechanisms.",
       "content": "",
       "score": 0.0,
       "source": "duckduckgo"
