@@ -5,6 +5,150 @@ Copied verbatim (md5 verified) from the Claude Code job scratchpad
 is not part of any git repo and is subject to cleanup. This is a straight
 copy — no files were regenerated or edited.
 
+## ⚠️ CRITICAL: every "Scissors" data point in this repo is not OT-CFM/CFM-noOT/DDPM data (found 2026-07-08)
+
+`tango_robot/ui.py`'s `_cfm_sample_candidates()` matches an object name to a checkpoint's trained
+conditioning key via `key = obj_name.lower()...`; `for k in vis_map: if k in key or key.startswith(k)`.
+All three checkpoints (`cfm_allobj_ot`, `cfm_allobj`, `ddpm_allobj`) were trained on the identical 7-key
+set `{banana, pear, mustard, cracker, drill, can, cylinder}`. `"scissors"` does not match any of these
+keys (no substring/prefix relationship) — **confirmed by direct execution of the exact matching code**,
+not inferred. When the match fails, `_cfm_sample_candidates` returns `None`, and `ui.py` silently falls
+back to **uniform-random CoM-based candidate sampling** — the pre-CFM baseline, not any of the three
+generative methods. Elsewhere in this same codebase (`scripts/collect_lggsn_data.py:443`) there IS an
+explicit `"scissors": "cylinder"` alias for a different pipeline (LGGSN training-data collection) — the
+runtime path used for every experiment in this repo (`demo.py` → `ui.py`) never implements that alias,
+so the intended fallback (map scissors to the "cylinder"/`YcbMediumClamp` conditioning class) never
+happens here.
+
+**Evidence this actually occurred, not just a theoretical risk**: in `exp1_variance/`, Scissors' success
+rate is *exactly* 40/50 (80.0%) for OT-CFM, CFM-noOT, **and** DDPM — identical to the decimal, whereas
+every other object's rate varies across methods. The paired McNemar test in
+`formal_results/exp1_variance_significance.csv` finds **zero discordant trials** between any pair of
+methods on Scissors (`mcnemar_p=nan`, 0/0 in the discordant-count columns) — i.e., all three methods
+produced the identical trial-by-trial outcome across all 50 trials, which is only possible if they were
+all secretly running the same non-CFM fallback mechanism (indifferent to which checkpoint was loaded),
+not three different generative models.
+
+**Practical consequence**: exclude Scissors from any claim comparing OT-CFM/CFM-noOT/DDPM — its rows in
+`exp1_variance_significance.csv` are internally correct arithmetic but describe "the random-sampling
+fallback vs. itself under three labels," not a method comparison. The `phase0_diag_extended/` Scissors
+contact-feature diagnostic data (added 2026-07-08, see below) is likewise **not characterizing OT-CFM's
+behavior** — it characterizes the random-CoM fallback's behavior. This is a *different and more
+fundamental* problem than the "thin/flat object, structural floor effect" note already on that data
+(that note is still true as an independent observation, but secondary to this one). No other object
+in this repo is affected — Banana/TomatoSoupCan/Pear/MustardBottle/CrackerBox/PowerDrill all match
+their checkpoint's trained keys correctly (verified by running the exact matching logic against all 7).
+
+## Methods reference — precise, code-grounded definitions (compiled 2026-07-08)
+
+Answers to specific methods-section questions, each traced to the exact source line, not paraphrased
+from memory. Worktree paths below are relative to
+`/lena/projects/OWG-main/.claude/worktrees/fix-eval-seeding` unless stated otherwise.
+
+**1. "Generation-isolated" setup — GT identity or GT segmentation?**
+Neither exactly, but closer to GT identity, and stronger than either: every trial spawns **exactly one
+object** in the scene (`n_objects: 1` in the loaded config, confirmed via `[DEBUG] loaded objects:
+[(1, 'Pear')]`-style prints in every run). All generation scripts also pass `--no-semantic`, which sets
+`OWG_NO_SEMANTIC=1`; `tango/policy.py`'s no-semantic fast-path matches the text prompt directly against
+the simulator's own `id_to_name` registry (`tango/policy.py:218-240`) — no vision model, no segmentation
+mask, no GPT-4o grounding call. So there is no segmentation step to bypass: with one object in the scene
+and its identity known from spawn time, "which object is the target" is never actually a vision problem
+in this dataset.
+
+**2. Exact success criterion**
+The recorded `"success"` field = **`success_grasp`**, not `success_target` (whether it landed correctly
+in the tray) — these are different and the data uses the former. Chain: `env_soarm.py`'s physics_weld
+grasp routine (~line 1778) computes `success = bool(grasped_ids) and lifted`, where `grasped_ids` is
+non-empty only if bilateral jaw contact was detected (`check_grasped_id()`) **and** a kinematic weld was
+triggered (MuJoCo sphere colliders alone can't generate enough friction to lift against gravity, so the
+sim rigidly attaches the object to the gripper once bilateral contact confirms a valid grasp), and
+`lifted = obj_z > Z_TABLE_TOP + 0.07` (object center must rise >7cm after the lift move). **`table_contact`
+is computed and printed but does NOT gate success** — confirmed by an actual trial with
+`table_contact=False, success=True`. This `success_grasp` bool propagates up through
+`put_obj_in_tray()` → `ui.py:step()`, which prints `"Done {action} {input}"` (i.e. `"Done pick 1"`) only
+when `success_grasp` is true (`ui.py:756-762`) — this exact string is what every shell script's
+`grep -q "Done pick"` checks. `success_target` (whether the object also ended up correctly in the tray)
+is computed and logged alongside but is **not** what any script in this repo checks.
+
+**3. Object selection rationale**
+- `exp1_variance/`'s 7 objects = the full trained-object roster of the CFM/DDPM checkpoints (see #9's
+  answer — `{banana, pear, mustard, cracker, drill, can, cylinder}`, mapped to
+  Banana/Pear/MustardBottle/CrackerBox/PowerDrill/TomatoSoupCan/**"Scissors" incorrectly** — see the
+  CRITICAL note above; there is no evidence this was a deliberate representative sample, it's simply
+  "every object the checkpoints were conditioned on" (modulo the Scissors bug).
+- The original 3-object diagnostic set (Pear/MustardBottle/CrackerBox) has **no documented rationale**
+  found anywhere in the copied scripts or job history — it predates this archive and appears to be an
+  earlier, unrecorded choice.
+- The 3 objects added 2026-07-08 (TomatoSoupCan/PowerDrill/Scissors) were chosen explicitly because
+  they're the only remaining `exp1_variance` objects with a real success/fail split under OT-CFM (Banana
+  is 100% success, degenerate for a success-vs-fail comparison) — this rationale **is** documented
+  (`phase0_diag_extended/` section below) and was correct at the time, but Scissors is now known to be
+  invalid for an unrelated reason (the CFM name-matching bug), leaving 2 valid additions, not 3.
+
+**4. OT-CFM sampling configuration**
+`train_cfm_grasp.py:41`: `ODE_STEPS = int(os.environ.get("CFM_ODE_STEPS", "20"))` — **20 steps**, default
+value, never overridden by any script in this repo (no script sets `CFM_ODE_STEPS`). Integrator: explicit
+forward Euler (`train_cfm_grasp.py`'s `sample_poses`: `dt = 1.0/steps`; `x = x + model(t, x, cond) * dt`
+per step) — not RK4 or an adaptive-step method.
+
+**5. DDIM eta / DDPM_STOCHASTIC**
+`train_diffusion_grasp.py:176`: `eta = 1.0 if os.environ.get("DDPM_STOCHASTIC") == "1" else 0.0`. No
+script in this repo sets `DDPM_STOCHASTIC`, so **eta=0.0 — fully deterministic DDIM reverse sampling**
+was used throughout, despite the checkpoint being called "ddpm_allobj.pt" and the data files being named
+"DDPM". Step count: `DDIM_STEPS` defaults to 100 (`train_diffusion_grasp.py:42`) but
+`experiment1_other_methods.sh` explicitly passes `DDIM_STEPS=50` — **50 steps were used**, not the
+default 100. (The initial noise `x_T` is still drawn from a `--gen-seed`-seeded generator, so different
+seeds still produce different candidates even though the reverse process itself is deterministic given
+that noise.)
+
+**6. Tests reported in `exp1_variance_significance.csv`**
+Three tests per (scope, method-pair) row: unpaired two-sided **Mann-Whitney U** (`scipy.stats.mannwhitneyu`),
+unpaired two-sided **Welch's t-test** (`scipy.stats.ttest_ind(equal_var=False)`), and paired two-sided
+**McNemar's exact test** (`scipy.stats.binomtest` on the discordant-pair count, matched by identical
+`(object, orient_seed, gen_seed)` triples across methods). Reported at 8 scopes (pooled "ALL", n=350/method,
+plus each of the 7 objects, n=50/method) × 3 method pairs = **24 rows total**.
+
+**7. IK-margin / reachability metric — exact definition**
+`tango_robot/headless_ik.py`'s `solve_ik_jaw_pos_only(target_jaw_mid, iters=800, pos_tol=5e-3, n_outer=8)`:
+runs numerical IK (800 total iterations split across 8 outer re-anchoring passes) to move the gripper
+jaw-midpoint geometry to `target_jaw_mid` (world-frame xyz, **position only, no orientation term**).
+`pe = ||achieved_jaw_midpoint - target_jaw_mid||` (Euclidean, metres; reported as `ik_pe_mm` = `pe*1000`
+elsewhere). **`ik_ok` = `pe < pos_tol` = `pe < 5mm`.** The "IK-margin" candidate-selection strategy picks
+the candidate with the **smallest `pe`** among its ensemble, regardless of whether that `pe` clears the
+5mm threshold.
+
+**8. Complete contact-feature list**
+Exactly 3, all defined in `grasp_6dof/grasp_sampler.py`, all operating on points transformed into the
+gripper frame and filtered to a `gripper_width × gripper_width × 4cm` box centered at the candidate pose:
+- `local_point_density`: fraction of the episode point cloud inside that box.
+- `normal_consistency`: std-dev of the z-component of Open3D-estimated surface normals of the points
+  inside that box (`radius=0.02, max_nn=30`, consistently oriented; returns 0.0 if <5 points or the
+  normal-orientation step is degenerate, e.g. a flat/coplanar patch).
+- `contact_width_ratio`: inter-decile span (p90−p10) of the in-box points along the gripper's x-axis,
+  divided by `gripper_width`; returns 0.0 if <10 points or `gripper_width<=0`. `<0.3` is documented in
+  the source as indicating "thin object with poor jaw engagement."
+
+`local_point_density`/`normal_consistency`/`contact_width_ratio` are exactly the 3 features that go
+  into `formal_results/contact_features_bonferroni_bh*.csv`. `ik_pe_mm` (from #7) is used as a *4th*,
+  separate variable in `scripts/phase1_step2_causal.py`'s causal analysis, but is **not** one of the
+  3 "contact features" and is not part of the 9/18-test Bonferroni family.
+
+**9. Number of tests corrected for**
+**9** in `contact_features_bonferroni_bh.csv` (3 features × 3 objects: Pear/MustardBottle/CrackerBox).
+**18** in `contact_features_bonferroni_bh_6obj.csv` (3 features × 6 objects) — but per the CRITICAL note
+above, Scissors' 3 rows there are not valid data, so **15 is the effective, citable test count** for
+that file (3 features × 5 valid objects), even though the on-disk Bonferroni α (0.05/18=0.00278) was
+computed treating it as 18. If citing the 6-object file, recompute α at n=15 (0.00333) rather than
+reusing the stored 0.00278, or just cite the 3-object file's 9-test family plus TomatoSoupCan/PowerDrill
+as a separate, smaller family.
+
+**10. Is the "consensus" comparison pool-aligned (n=10)?**
+Yes, **in the authoritative file only**: `formal_results/ikmargin_vs_consensus_matched_n10.csv` uses
+`phase1_matched_n10/consensus_n10_*.jsonl` (`--consensus-n 10`) against `phase1_v2/ikmargin_*.jsonl`
+(`--ikmargin-n 10`) — both pool size 10. The **original** `formal_results/ikmargin_vs_consensus.csv`
+(pool 10 vs pool 5) is still on disk but explicitly marked superseded/do-not-cite in this README. If
+citing "the consensus vs ikmargin result," always mean the `_matched_n10` file.
+
 ## exp1_variance/ — sampler variance experiment (7 objects x 5 orient_seed x 10 gen_seed = 350 trials/file)
 
 - `raw_results.jsonl` = **OT-CFM** (ckpt `cfm_allobj_ot.pt`), produced by `scripts/experiment1_otcfm_variance.sh`
@@ -104,13 +248,18 @@ comparison, so it was excluded).
 Generated by `scripts/run_phase0_extended.sh` (trials) + `scripts/run_phase0_2_extended_analysis.py`
 (IK + contact features). Uses the same `LD_PRELOAD` environment workaround documented above.
 
-**Data quality note — Scissors' contact features are exactly 0.0 for all 50 trials, for all 3
-features.** This is confirmed **not a bug**: `grasp_6dof/grasp_sampler.py`'s own docstring on
-`normal_consistency` says *"Low → flat surface (scissors failure)"* — the metric is defined as
-points-inside-a-narrow-gripper-bbox, which is close to zero by construction for thin/flat objects.
-Treat Scissors' all-zero rows in `formal_results/contact_features_bonferroni_bh_6obj.csv` as "this
-feature set structurally cannot discriminate for this object's geometry", not as "no signal exists
-for Scissors by any method" — those are different claims and only the first is supported.
+**⚠️ Scissors here is not OT-CFM data at all — see the CRITICAL note at the top of this file.** All 50
+Scissors trials silently used the random-CoM-sampling fallback (name-matching bug in
+`_cfm_sample_candidates`), not the OT-CFM checkpoint used for the other 5 objects in this dataset.
+
+**Separately, and secondary to the above**: Scissors' contact features are exactly 0.0 for all 50
+trials, for all 3 features, which would be true regardless of which sampler produced the candidates —
+`grasp_6dof/grasp_sampler.py`'s own docstring on `normal_consistency` says *"Low → flat surface
+(scissors failure)"*: the metric is points-inside-a-narrow-gripper-bbox, close to zero by construction
+for thin/flat objects. Treat Scissors' all-zero rows in `formal_results/contact_features_bonferroni_bh_6obj.csv`
+as doubly compromised: (1) not OT-CFM candidates, and (2) this feature set can't discriminate for this
+object's geometry regardless. Not usable as evidence about OT-CFM's contact-feature signal for any
+thin/flat object — would need a rerun with the `scissors`→`cylinder` alias fixed to mean anything.
 
 ## scripts/
 
@@ -150,8 +299,12 @@ since all three methods share the identical (object, orient_seed, gen_seed) tria
   OT-CFM vs CFM-noOT p=0.036, OT-CFM vs DDPM p=0.008; CFM-noOT vs DDPM remains non-significant (p=0.63).
 - **Per-object breakdown** shows this pooled effect is driven almost entirely by **Pear** (OT-CFM 56%
   vs CFM-noOT/DDPM 76%, McNemar p=0.041 / p=0.021) and **TomatoSoupCan** (OT-CFM 80% vs CFM-noOT 98% /
-  DDPM 100%, McNemar p=0.012 / p=0.002). CrackerBox, MustardBottle, PowerDrill, Scissors show no
-  significant pairwise difference; Banana is 100% for all three methods (test undefined, see `note` column).
+  DDPM 100%, McNemar p=0.012 / p=0.002). CrackerBox, MustardBottle, PowerDrill show no significant
+  pairwise difference; Banana is 100% for all three methods (test undefined, see `note` column).
+  **Scissors' `mcnemar_p=nan` (0 discordant trials across every pair) is not "no difference between
+  methods" — see the CRITICAL note at the top of this file: all three "methods" silently ran the same
+  non-CFM random-sampling fallback for this object, so there was nothing to differ between. Exclude
+  Scissors when citing this table for a method comparison.**
 - **Can support**: "OT-CFM is significantly less reliable than CFM-noOT and DDPM(DDIM-50) specifically
   on Pear and TomatoSoupCan (paired test); CFM-noOT and DDPM(DDIM-50) are statistically indistinguishable
   from each other on every object tested."
@@ -183,8 +336,12 @@ Same procedure as the 3-object table above, extended to 18 tests (3 features x 6
 above is not wrong and can still be cited on its own, but this is the fuller picture — includes a
 `degenerate_all_zero` column flagging Scissors' structural floor-effect rows (see the data-quality
 note above; these show `p_raw=1.0` by construction, not because nothing distinguishes success/fail).
+**Scissors' rows are additionally not OT-CFM data at all — see the CRITICAL note at the top of this
+file — so exclude them from the object count entirely rather than reading them as a 4th category;
+this is effectively a 5-object result (Pear/MustardBottle/CrackerBox/TomatoSoupCan/PowerDrill) plus
+one object (Scissors) that needs a rerun before it says anything.**
 
-Reading the 6 objects by outcome, not just individually:
+Reading the (valid) 5 objects by outcome, not just individually:
 - **Bonferroni-surviving signal (large effect)**: MustardBottle (`normal_consistency` p=0.00029,
   `local_point_density` p=0.00030), Pear (`normal_consistency` p=0.00068), and now **TomatoSoupCan**
   (`local_point_density` p=0.00123, rank-biserial=−0.625) — a new object joining this group.
@@ -192,13 +349,12 @@ Reading the 6 objects by outcome, not just individually:
   TomatoSoupCan's `normal_consistency` (p_BH=0.039).
 - **No signal under either correction**: **PowerDrill** — all 3 features non-significant even under
   BH (p≥0.17). This is the first object with a clean, unqualified null result on this feature set.
-- **Metric structurally inapplicable**: **Scissors** — all values exactly 0.0, cannot be tested at all
-  (see data-quality note above).
+- **Excluded — not a real data point**: Scissors (see above).
 
 - **Can support**: the "object-dependent" pattern is not a binary (signal / no-signal) split — across
-  6 objects it's a spectrum: robust signal (Pear, MustardBottle, TomatoSoupCan) → correction-dependent
-  signal (CrackerBox) → clean null (PowerDrill) → metric-inapplicable (Scissors). Any paper claim about
-  object-dependence should describe this spectrum, not collapse it to "some objects work, some don't".
+  5 valid objects it's a spectrum: robust signal (Pear, MustardBottle, TomatoSoupCan) → correction-dependent
+  signal (CrackerBox) → clean null (PowerDrill). Any paper claim about object-dependence should describe
+  this spectrum, not collapse it to "some objects work, some don't", and should count this as n=5, not n=6.
 - **Cannot support**: a specific geometric/physical property (e.g. "compliance", "size", "symmetry")
   as *the* explanatory variable for where signal exists — no such property was measured or tested here;
   the grouping above is purely empirical (which p-values came out significant), not mechanistically
