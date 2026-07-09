@@ -491,6 +491,17 @@ seed-limited headroom, whereas PowerDrill is the only object with a
 clean null across all three contact features under either correction
 ($p{\geq}0.17$)---consistent with its gain being smaller and directionally
 weaker in \cref{tab:perobject}.
+A post-hoc follow-up (single exploratory test, not part of the
+pre-specified 15-test family above) checks a fourth, elongation-specific
+feature for PowerDrill---gripper-axis alignment relative to the object's
+principal axis---and finds only a marginal trend (Mann--Whitney
+$p{=}0.062$, moderate effect): failed grasps skew toward the gripper
+aligned perpendicular to this axis, successes toward parallel. We read
+this as inconclusive rather than explanatory: PowerDrill's point cloud is
+only weakly elongated (major/minor eigenvalue ratio $1.075$), so PCA's
+``principal axis'' is not a strongly stable direction here, unlike for a
+clearly elongated object. PowerDrill's null therefore remains the most
+plausible reading of the original three features.
 
 \noindent\textbf{Scissors (100\%, all conditions).}
 Scissors achieves 25/25 across all methods after correcting a
@@ -596,6 +607,19 @@ We report this as a limitation rather than a contradiction of
 comparable, but the seed-resampled result indicates OT-CFM's per-object
 advantage is not uniform across generator draws and should not be assumed
 to generalize to every resampling of the generator.
+An ensemble candidate-selection strategy substantially mitigates this for
+both flagged objects: drawing 10 independent OT-CFM candidates (same
+generation-isolated harness) and executing the one closest to their
+pose-space consensus (median), rather than the one with the lowest
+predicted IK error, raises Pear's success rate from 6\% to 68\% (Fisher's
+exact $p{=}5.8{\times}10^{-11}$) and TomatoSoupCan's from 34\% to 64\%
+($p{=}0.0048$), at matched ensemble size (10 vs.\ 10, so the effect is
+attributable to the selection rule and not pool size). MustardBottle and
+CrackerBox---which show no significant seed-reliability gap above---show a
+correspondingly weaker (MustardBottle, $50\%{\to}68\%$, $p{=}0.10$) or
+absent (CrackerBox, $44\%$ vs.\ $44\%$, exact tie) benefit from the same
+strategy, consistent with the mitigation targeting specifically the
+objects where single-draw reliability is worst.
 
 % =============================================================================
 \section{Discussion}
