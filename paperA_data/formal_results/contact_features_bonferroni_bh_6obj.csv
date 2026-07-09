@@ -1,19 +1,19 @@
-object,feature,n_succ,n_fail,succ_mean,succ_std,fail_mean,fail_std,mannwhitney_U,p_raw,rank_biserial_effect_size,degenerate_all_zero,bonferroni_alpha,sig_bonferroni,p_bh_adjusted,sig_bh_0.05
-MustardBottle,normal_consistency,35,15,0.10051,0.1315,0.00056,0.00209,420.0,0.00029381354985824577,-0.6,False,0.002778,SIG,0.002744,SIG
-MustardBottle,local_point_density,35,15,0.00016,0.00015,2e-05,5e-05,425.0,0.0003049025493356076,-0.619,False,0.002778,SIG,0.002744,SIG
-Pear,normal_consistency,28,22,0.05809,0.08376,0.01436,0.06581,452.5,0.0006772003385627356,-0.4692,False,0.002778,SIG,0.004063,SIG
-TomatoSoupCan,local_point_density,40,10,9e-05,9e-05,0.0,0.0,325.0,0.0012302600024170648,-0.625,False,0.002778,SIG,0.005536,SIG
-MustardBottle,contact_width_ratio,35,15,0.15649,0.25778,0.0,0.0,352.5,0.011427485523592554,-0.3429,False,0.002778,ns,0.035592,SIG
-CrackerBox,local_point_density,22,28,0.00031,0.00029,0.0001,0.00012,433.0,0.011864121531976567,-0.4058,False,0.002778,ns,0.035592,SIG
-TomatoSoupCan,normal_consistency,40,10,0.11521,0.17498,0.0,0.0,285.0,0.015178210956953831,-0.425,False,0.002778,ns,0.03903,SIG
-CrackerBox,contact_width_ratio,22,28,0.1946,0.22408,0.10309,0.22652,401.0,0.03223383564388797,-0.3019,False,0.002778,ns,0.072526,ns
-Pear,local_point_density,28,22,0.00168,0.00119,0.00245,0.00156,219.0,0.08364070252689075,0.289,False,0.002778,ns,0.167281,ns
-PowerDrill,contact_width_ratio,41,9,0.129,0.2176,0.03012,0.08519,229.0,0.17049534690792112,-0.2412,False,0.002778,ns,0.306892,ns
-PowerDrill,local_point_density,41,9,0.00022,0.00037,4e-05,7e-05,231.0,0.2055330511881689,-0.252,False,0.002778,ns,0.336327,ns
-TomatoSoupCan,contact_width_ratio,40,10,0.04367,0.13797,0.0,0.0,220.0,0.31480087487844965,-0.1,False,0.002778,ns,0.472201,ns
-PowerDrill,normal_consistency,41,9,0.03376,0.06851,0.00874,0.01635,212.5,0.40169534012472186,-0.1518,False,0.002778,ns,0.556194,ns
-CrackerBox,normal_consistency,22,28,0.0729,0.09746,0.14835,0.20245,318.5,0.8380978832455417,-0.0341,False,0.002778,ns,1.0,ns
-Pear,contact_width_ratio,28,22,0.62318,0.28158,0.7142,0.20276,309.5,0.9844033302170384,-0.0049,False,0.002778,ns,1.0,ns
-Scissors,local_point_density,40,10,0.0,0.0,0.0,0.0,nan,1.0,0.0,True,0.002778,ns,1.0,ns
-Scissors,normal_consistency,40,10,0.0,0.0,0.0,0.0,nan,1.0,0.0,True,0.002778,ns,1.0,ns
-Scissors,contact_width_ratio,40,10,0.0,0.0,0.0,0.0,nan,1.0,0.0,True,0.002778,ns,1.0,ns
+object,feature,n_succ,n_fail,succ_mean,succ_std,fail_mean,fail_std,mannwhitney_U,p_raw,rank_biserial_effect_size,degenerate_all_zero,excluded_reason,bonferroni_alpha,sig_bonferroni,p_bh_adjusted,sig_bh_0.05
+MustardBottle,normal_consistency,35,15,0.10051,0.1315,0.00056,0.00209,420.0,0.00029381354985824577,-0.6,False,,0.002778,SIG,0.002744,SIG
+MustardBottle,local_point_density,35,15,0.00016,0.00015,2e-05,5e-05,425.0,0.0003049025493356076,-0.619,False,,0.002778,SIG,0.002744,SIG
+Pear,normal_consistency,28,22,0.05809,0.08376,0.01436,0.06581,452.5,0.0006772003385627356,-0.4692,False,,0.002778,SIG,0.004063,SIG
+TomatoSoupCan,local_point_density,40,10,9e-05,9e-05,0.0,0.0,325.0,0.0012302600024170648,-0.625,False,,0.002778,SIG,0.005536,SIG
+MustardBottle,contact_width_ratio,35,15,0.15649,0.25778,0.0,0.0,352.5,0.011427485523592554,-0.3429,False,,0.002778,ns,0.035592,SIG
+CrackerBox,local_point_density,22,28,0.00031,0.00029,0.0001,0.00012,433.0,0.011864121531976567,-0.4058,False,,0.002778,ns,0.035592,SIG
+TomatoSoupCan,normal_consistency,40,10,0.11521,0.17498,0.0,0.0,285.0,0.015178210956953831,-0.425,False,,0.002778,ns,0.03903,SIG
+CrackerBox,contact_width_ratio,22,28,0.1946,0.22408,0.10309,0.22652,401.0,0.03223383564388797,-0.3019,False,,0.002778,ns,0.072526,ns
+Pear,local_point_density,28,22,0.00168,0.00119,0.00245,0.00156,219.0,0.08364070252689075,0.289,False,,0.002778,ns,0.167281,ns
+PowerDrill,contact_width_ratio,41,9,0.129,0.2176,0.03012,0.08519,229.0,0.17049534690792112,-0.2412,False,,0.002778,ns,0.306892,ns
+PowerDrill,local_point_density,41,9,0.00022,0.00037,4e-05,7e-05,231.0,0.2055330511881689,-0.252,False,,0.002778,ns,0.336327,ns
+TomatoSoupCan,contact_width_ratio,40,10,0.04367,0.13797,0.0,0.0,220.0,0.31480087487844965,-0.1,False,,0.002778,ns,0.472201,ns
+PowerDrill,normal_consistency,41,9,0.03376,0.06851,0.00874,0.01635,212.5,0.40169534012472186,-0.1518,False,,0.002778,ns,0.556194,ns
+CrackerBox,normal_consistency,22,28,0.0729,0.09746,0.14835,0.20245,318.5,0.8380978832455417,-0.0341,False,,0.002778,ns,1.0,ns
+Pear,contact_width_ratio,28,22,0.62318,0.28158,0.7142,0.20276,309.5,0.9844033302170384,-0.0049,False,,0.002778,ns,1.0,ns
+Scissors,local_point_density,40,10,0.0,0.0,0.0,0.0,nan,1.0,0.0,True,"FALLBACK_BUG_INVALID (excluded 2026-07-09) -- ui.py's _cfm_sample_candidates() never matches 'scissors' against the trained 'cylinder' key, so all 50 trials silently used the random-CoM fallback sampler, not OT-CFM. See paperA_data/README.md CRITICAL section. Use contact_features_bonferroni_bh_5obj_clean.csv instead.",0.002778,ns,1.0,ns
+Scissors,normal_consistency,40,10,0.0,0.0,0.0,0.0,nan,1.0,0.0,True,"FALLBACK_BUG_INVALID (excluded 2026-07-09) -- ui.py's _cfm_sample_candidates() never matches 'scissors' against the trained 'cylinder' key, so all 50 trials silently used the random-CoM fallback sampler, not OT-CFM. See paperA_data/README.md CRITICAL section. Use contact_features_bonferroni_bh_5obj_clean.csv instead.",0.002778,ns,1.0,ns
+Scissors,contact_width_ratio,40,10,0.0,0.0,0.0,0.0,nan,1.0,0.0,True,"FALLBACK_BUG_INVALID (excluded 2026-07-09) -- ui.py's _cfm_sample_candidates() never matches 'scissors' against the trained 'cylinder' key, so all 50 trials silently used the random-CoM fallback sampler, not OT-CFM. See paperA_data/README.md CRITICAL section. Use contact_features_bonferroni_bh_5obj_clean.csv instead.",0.002778,ns,1.0,ns

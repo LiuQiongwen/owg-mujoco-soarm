@@ -17,7 +17,22 @@ model". Conclusions here are about three *sampling procedures*, not an
 ODE-vs-SDE comparison -- no ODE/SDE or AUC analysis exists in this repo.
 
 Output: paperA_data/formal_results/exp1_variance_significance.csv
+
+**2026-07-09 update**: Scissors rows are annotated `excluded_reason` =
+fallback-bug-invalid (see paperA_data/README.md CRITICAL section) -- kept for
+record/provenance, not for citation. An additional pooled scope,
+"ALL_excl_scissors" (6 valid objects: Banana/Pear/MustardBottle/CrackerBox/
+PowerDrill/TomatoSoupCan, n=300/method), is added alongside the original
+"ALL" (7 objects incl. the invalid Scissors, n=350/method, kept for
+comparison) -- cite ALL_excl_scissors, not ALL, in Paper A.
 """
+SCISSORS_EXCLUDED_REASON = (
+    "FALLBACK_BUG_INVALID (excluded 2026-07-09) -- ui.py's _cfm_sample_"
+    "candidates() never matches 'scissors' against the trained 'cylinder' "
+    "key, so all 50 trials for every method silently used the same "
+    "random-CoM fallback sampler, not OT-CFM/CFM-noOT/DDPM. See "
+    "paperA_data/README.md CRITICAL section. Do not cite this scope's rows."
+)
 import csv
 import itertools
 import json
@@ -96,10 +111,13 @@ def main():
     pairs = list(itertools.combinations(FILES.keys(), 2))
 
     out_rows = []
-    for scope in ["ALL"] + objects:
+    for scope in ["ALL", "ALL_excl_scissors"] + objects:
         for m1, m2 in pairs:
             if scope == "ALL":
                 rows1, rows2 = data[m1], data[m2]
+            elif scope == "ALL_excl_scissors":
+                rows1 = [r for r in data[m1] if r["object"] != "Scissors"]
+                rows2 = [r for r in data[m2] if r["object"] != "Scissors"]
             else:
                 rows1 = [r for r in data[m1] if r["object"] == scope]
                 rows2 = [r for r in data[m2] if r["object"] == scope]
@@ -117,6 +135,7 @@ def main():
                 "mcnemar_discordant_Asucc_Bfail": res["mcnemar_b_Asucc_Bfail"],
                 "mcnemar_discordant_Afail_Bsucc": res["mcnemar_c_Afail_Bsucc"],
                 "note": res["note"],
+                "excluded_reason": SCISSORS_EXCLUDED_REASON if scope == "Scissors" else "",
             })
 
     out_path = BASE / "formal_results/exp1_variance_significance.csv"
