@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  9 JUL 2026 21:34
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  9 JUL 2026 22:07
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -650,18 +650,25 @@ LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <10> on input line 136.
 LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <7> on input line 136.
- [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}
+
+Underfull \hbox (badness 2460) in paragraph at lines 141--145
+[]\T1/lmr/bx/n/10 (+20) Failure anal-y-sis: \T1/lmr/m/n/10 (+20) Cracker-Box fa
+il-ures are at-
+ []
+
+[1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}
 
 
 ]
 <figures/pipeline.pdf, id=155, 565.59708pt x 142.5315pt>
 File: figures/pipeline.pdf Graphic file (type pdf)
 <use figures/pipeline.pdf>
-Package pdftex.def Info: figures/pipeline.pdf  used on input line 218.
+Package pdftex.def Info: figures/pipeline.pdf  used on input line 220.
 (pdftex.def)             Requested size: 252.0pt x 63.50351pt.
 LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 2
-40.
- (/usr/share/texmf/tex/latex/lm/t1lmtt.fd
+42.
+
+(/usr/share/texmf/tex/latex/lm/t1lmtt.fd
 File: t1lmtt.fd 2009/10/30 v1.6 Font defs for Latin Modern
 )
 Package microtype Info: Loading generic protrusion settings for font family
@@ -673,28 +680,25 @@ Package microtype Info: Character `029' is missing
 (microtype)             in font `T1/lmr/m/sc/8'.
 (microtype)             Ignoring protrusion settings for this character.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <8> on input line 379.
+(Font)              <8> on input line 381.
  [3]
-Underfull \hbox (badness 1442) in paragraph at lines 565--574
-\T1/lmr/m/n/10 (+20) To ver-ify that OT coupling---not the flow-matching
- []
+[4] [5]
 
-[4]
-Underfull \vbox (badness 10000) has occurred while \output is active []
+Package balance Warning: You have called \balance in second column
+(balance)                Columns might not be balanced.
 
- [5]
-[6] (./paper_final.aux)
+[6] [7] (./paper_final.aux)
 Package rerunfilecheck Info: File `paper_final.out' has not changed.
 (rerunfilecheck)             Checksum: A27B1843B473BF449245889659151E10;3758.
  ) 
 Here is how much of TeX's memory you used:
- 15459 strings out of 478287
- 257424 string characters out of 5849289
+ 15454 strings out of 478287
+ 257379 string characters out of 5849289
  608286 words of memory out of 5000000
- 33054 multiletter control sequences out of 15000+600000
- 698781 words of font info for 301 fonts, out of 8000000 for 9000
+ 33056 multiletter control sequences out of 15000+600000
+ 698427 words of font info for 297 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 60i,11n,63p,1008b,342s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 60i,11n,63p,1008b,493s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texmf/fonts/enc/dvips/lm/lm-ec.enc}{/usr/share/texmf/fonts/enc/dv
 ips/lm/lm-mathsy.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/s
 hare/texmf/fonts/enc/dvips/lm/lm-rm.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm
@@ -722,10 +726,10 @@ s/type1/public/lm/lmsy10.pfb></usr/share/texmf/fonts/type1/public/lm/lmsy6.pfb>
 are/texmf/fonts/type1/public/lm/lmtt10.pfb></usr/share/texlive/texmf-dist/fonts
 /type1/public/amsfonts/symbols/msbm10.pfb></usr/share/texlive/texmf-dist/fonts/
 type1/public/amsfonts/symbols/msbm5.pfb>
-Output written on paper_final.pdf (6 pages, 563754 bytes).
+Output written on paper_final.pdf (7 pages, 566432 bytes).
 PDF statistics:
- 415 PDF objects out of 1000 (max. 8388607)
- 332 compressed objects within 4 object streams
- 61 named destinations out of 1000 (max. 500000)
+ 425 PDF objects out of 1000 (max. 8388607)
+ 341 compressed objects within 4 object streams
+ 62 named destinations out of 1000 (max. 500000)
  56014 words of extra memory for PDF output out of 61914 (max. 10000000)
 

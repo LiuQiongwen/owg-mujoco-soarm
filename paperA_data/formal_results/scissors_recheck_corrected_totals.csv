@@ -1,0 +1,8 @@
+metric,value,pct
+Scissors baseline (2026-07-09 recheck),22/25,88.0
+Scissors OT-CFM (2026-07-09 recheck),22/25,88.0
+"Table I/II/III Baseline (random CoM + LGGSN), corrected",141/175,80.6
+"Table I/II/III OT-CFM + LGGSN (full), corrected",162/175,92.6
+"Baseline vs OT-CFM: z, p",z=3.29,0.000994
+Baseline Wilson 95% CI,"[74.1, 85.8]",
+OT-CFM Wilson 95% CI,"[87.7, 95.6]",

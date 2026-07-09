@@ -1,5 +1,67 @@
 # Paper A raw data archive
 
+## ⚠️ Separate issue, same object: `paper_final.tex`'s own Scissors number was also unreplicated (found + fixed 2026-07-09)
+
+This is unrelated to the CFM name-matching fallback bug below -- it affects `paper_final.tex`'s
+*own* 175-trial main evaluation (Table I/II/III), which is a completely different dataset from
+everything else in this directory (175 trials = 7 objects x 25 seeds, no `--gen-seed` variation,
+run via `scripts/quick_eval.sh` in the `tango` conda env, which was `owg-mujoco` until a
+`conda rename -n owg-mujoco tango` -- confirmed via `~/miniforge3/envs/tango/conda-meta/history`).
+
+**What happened**: `paper_final.tex`'s Baseline (82.3%) and OT-CFM+LGGSN (94.3%) numbers were
+built by adding a separately-measured 25-trial Scissors block to an existing 150-trial (6-object)
+total, after `a04a62c`'s VHACD-tunnelling physics fix (see `logs/eval_scissors_fix_summary.log`).
+That Scissors block was measured **25/25 = 100%** on 2026-06-26, with a real per-seed log
+(`logs/eval_scissors_baseline.log`, `logs/eval_scissors_cfm.log` -- genuine `[✓]` per seed, not an
+estimate). A later commit (`cf58a7d`, 2026-06-28) claimed a re-run found **23/25 = 92%** and
+labeled the 06-26 figure "imputed" -- inaccurate framing (it wasn't imputed), but the underlying
+discrepancy is real: two actual measurements of the same nominal condition gave different counts,
+and `cf58a7d`'s corrected number was never propagated back into `paper_final.tex` (it doesn't
+touch that file at all, and no later commit does either -- confirmed by `git log -- paper_final.tex`).
+
+**Resolution (2026-07-09)**: rather than trust either historical number, re-ran the identical
+condition from scratch (`scripts/run_scissors_recheck_2026-07-09.sh`, 25 seeds each,
+baseline + OT-CFM, `tango` env, smoke-tested first). Result: a **third** different number,
+**22/25 = 88%** for both conditions (same 3 failing seeds -- 1, 7, 10 -- in both, consistent
+with Scissors falling back to the same random-CoM sampler in both conditions, per the CFM
+name-matching issue below). The smoke-test itself already disagreed with the 06-26 log at the
+exact same seed (seed=1: success there, failure here), which is why neither historical number was
+trusted blindly. No configuration drift was found -- `configs/objects/ycb_mujoco_manifest.yaml`'s
+Scissors entry is byte-identical to what `eval_scissors_fix_summary.log` describes. The most
+likely explanation is that the 4cm box-proxy fix is only marginally above the gripper's 4cm
+minimum opening, making this specific object's outcome sensitive to small run-to-run numerical
+differences (contact-solver iteration order, floating-point accumulation) -- a property of this
+object's geometry, not evidence that the pipeline itself is broken.
+
+**Adopted the freshest measurement (22/25 = 88%) per explicit user decision**, and propagated it
+through every dependent number in `paper_final.tex`: Table I (Baseline 82.3%→80.6%, OT-CFM
+94.3%→92.6%, z 3.49→3.29), Table II (Scissors row 100%/100%→88%/88%, All row updated to match),
+Table III (every "vs. Baseline" and "vs. Full" delta and p-value recomputed -- see below for which
+ones changed qualitatively), abstract, intro contributions list, Related Work, Discussion ("Why OT
+Coupling Matters" rewritten -- see below), and Conclusion. Formalized in
+`scripts/run_scissors_recheck_stats.py` -> `formal_results/scissors_recheck_corrected_totals.csv`;
+raw per-seed data in `phase0_diag_extended/scissors_recheck_{baseline,otcfm}.jsonl`.
+
+**Every ablation-table significance classification (SIG/ns) is unchanged** -- only the absolute
+percentages and precise p-values shifted, because the 6-object (non-Scissors) totals were held
+fixed and Scissors' identical-across-conditions count (22/25 both) shifts every row's absolute
+value by the same constant, preserving relative comparisons almost exactly. **One qualitative
+claim did have to be softened**: the original text argued "standard CFM without OT coupling drops
+*below* baseline (78.9% < 82.3%)" as supporting evidence that OT coupling matters. With the
+corrected baseline (80.6%), that specific pairwise comparison is no longer statistically
+significant (78.9% vs 80.6%, $p=0.69$) -- rewritten to rest the argument on the comparison that
+remains robust throughout (Remove-OT vs. the full pipeline: $-13.7$pp, $p<0.001$), rather than the
+now-weaker vs.-Baseline framing. Similarly, DDPM's relationship to baseline flips sign (was
+$-0.6$pp, now $+1.1$pp) but stays non-significant either way, so no claim needed to change there
+beyond the number.
+
+**Not in scope for this pass**: the other 6 objects' Baseline/OT-CFM/GRC-6DoF/DDPM counts were
+*not* independently re-verified (only Scissors was, per the specific discrepancy found) -- if a
+similar cross-date drift exists for any other object, it has not been checked. GRC-6DoF's own
+82.9% and Remove-OT/DDPM's own 78.9%/81.7% are carried forward unchanged from the existing record;
+only their *deltas relative to Baseline/Full* were recomputed, since those two reference points
+moved.
+
 ## ✅ RESOLVED (2026-07-09): Scissors excluded from Paper A, clean 5/6-object results published
 
 The Scissors fallback bug described in the CRITICAL section below was confirmed by
