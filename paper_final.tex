@@ -72,13 +72,13 @@ training signal from random source--target pairings.
 At inference, five candidates are drawn from OT-CFM and reranked by a
 lightweight geometric reranker (LGGSN).
 On 175 paired trials (7 objects $\times$ 25 seeds, MuJoCo/SO-ARM101), this
-pipeline achieves \textbf{94.3\%} success rate versus \textbf{82.3\%} for
-random-CoM + LGGSN (${+12.0}$\,pp, $z{=}3.49$, $p{<}0.001$).
+pipeline achieves \textbf{92.6\%} success rate versus \textbf{80.6\%} for
+random-CoM + LGGSN (${+12.0}$\,pp, $z{=}3.29$, $p{<}0.001$).
 Ablations reveal that the OT coupling is the essential component
-($-15.4$\,pp without it; standard CFM drops \emph{below} baseline),
-geometric reranking contributes $-9.7$\,pp, and SAM visual conditioning
-yields no significant gain ($+1.7$\,pp, $p{=}0.46$), enabling a
-simplified deployment without SAM that achieves 96.0\%.
+($-13.7$\,pp relative to the full pipeline), geometric reranking
+contributes $-9.7$\,pp, and SAM visual conditioning yields no significant
+gain ($+1.7$\,pp, $p{=}0.52$), enabling a simplified deployment without
+SAM that achieves 94.3\%.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -133,14 +133,15 @@ top candidate from geometric context.
     live physical execution data that learns the distribution of successful
     6-DoF poses conditioned on object identity.
   \item \textbf{Generation + reranking pipeline:} paired 175-trial evaluation
-    showing 94.3\% vs.\ 82.3\% ($+12$\,pp, $p{<}0.001$) over random
+    showing 92.6\% vs.\ 80.6\% ($+12$\,pp, $p{<}0.001$) over random
     sampling on MuJoCo/SO-ARM101.
-  \item \textbf{Structured ablation:} OT coupling contributes $-15.4$\,pp
+  \item \textbf{Structured ablation:} OT coupling contributes $-13.7$\,pp
     and LGGSN reranking $-9.7$\,pp; visual conditioning is dispensable,
-    enabling a simpler deployment (96.0\% without SAM).
+    enabling a simpler deployment (94.3\% without SAM).
   \item \textbf{Failure analysis:} CrackerBox failures are attributed to
-    distribution coverage; Scissors achieves 100\% after physics-configuration
-    correction---providing concrete design requirements for future work.
+    distribution coverage; Scissors' physics-configuration fix restores it
+    from 0\% to 88\% (\cref{ssec:scissors})---providing concrete design
+    requirements for future work.
 \end{enumerate}
 
 % =============================================================================
@@ -168,8 +169,9 @@ achieving diverse 6-DoF proposals from point clouds.
 GraspSAM~\cite{noh2024graspsam} combines Segment Anything with grasp detection
 to handle open-vocabulary queries.
 Neither work couples an explicit optimal-transport objective during training,
-which we show is critical: standard CFM without OT coupling drops \emph{below}
-baseline (78.9\% vs.\ 82.3\%, \cref{sec:ablation}).
+which we show is critical: standard CFM without OT coupling costs
+$-13.7$\,pp relative to the full pipeline (78.9\% vs.\ 92.6\%,
+\cref{sec:ablation}).
 Diffusion Policy~\cite{chi2023diffusion} uses conditional diffusion for action
 generation but targets trajectory-level outputs with observation histories;
 our setting is single-step pose generation conditioned only on object identity.
@@ -286,14 +288,14 @@ problem between $\{x_0^{(i)}\}$ and $\{x_1^{(i)}\}$ and reassign pairs
 along the optimal transport plan.
 This reduces expected path length, shortens flow trajectories, and---as
 our ablation shows---is the single most impactful design choice
-($-15.4$\,pp without OT, $p{=}0.001$).
+($-13.7$\,pp without OT relative to the full pipeline, $p{<}0.001$).
 
 \noindent\textbf{Conditioning.}
 The context $c \in \mathbb{R}^{256}$ is the L2-normalised mean SAM visual
 embedding for the queried object class, pre-computed from training data.
 Our ablation (\cref{sec:ablation}) shows this conditioning yields no
 statistically significant gain over zero conditioning ($+1.7$\,pp,
-$p{=}0.68$), so the recommended deployment uses $c = \mathbf{0}$.
+$p{=}0.52$), so the recommended deployment uses $c = \mathbf{0}$.
 
 \noindent\textbf{Velocity network.}
 The velocity network $v_\theta$ operates on the concatenated input
@@ -385,16 +387,16 @@ Significance thresholds: $^{**}\!p{<}0.05$, $^*\!p{<}0.10$.
 \toprule
 Method & SR & 95\% CI & $\Delta$pp & $z$ & $p$ \\
 \midrule
-Baseline (random CoM + LGGSN) & 82.3\% & [76.0, 87.2] & — & — & — \\
-\textbf{OT-CFM + LGGSN} & \textbf{94.3\%} & \textbf{[89.8, 96.9]} & \textbf{+12.0} & \textbf{3.49} & \textbf{${<}0.001$}$^{**}$ \\
+Baseline (random CoM + LGGSN) & 80.6\% & [74.1, 85.8] & — & — & — \\
+\textbf{OT-CFM + LGGSN} & \textbf{92.6\%} & \textbf{[87.7, 95.6]} & \textbf{+12.0} & \textbf{3.29} & \textbf{${<}0.001$}$^{**}$ \\
 \bottomrule
 \end{tabular}}
 \end{table}
 
 \cref{tab:main} reports the primary comparison.
-OT-CFM + LGGSN achieves 94.3\% (165/175) versus the baseline's 82.3\%
-(144/175), a statistically significant improvement of $+12.0$\,pp
-($z{=}3.49$, $p{<}0.001$).
+OT-CFM + LGGSN achieves 92.6\% (162/175) versus the baseline's 80.6\%
+(141/175), a statistically significant improvement of $+12.0$\,pp
+($z{=}3.29$, $p{<}0.001$).
 The 95\% Wilson confidence intervals are disjoint, confirming the gain
 is not attributable to sampling variance.
 
@@ -422,11 +424,11 @@ Banana         & 100.0\% & 100.0\% &   0.0 & —     &         \\
 TomatoSoupCan  &  92.0\% & 100.0\% &  +8.0 & 0.490 &         \\
 Pear           &  72.0\% & 100.0\% & +28.0 & 0.010 & $^{**}$ \\
 MustardBottle  &  92.0\% &  92.0\% &   0.0 & —     &         \\
-Scissors       & 100.0\% & 100.0\% &   0.0 & —     &         \\
+Scissors       &  88.0\% &  88.0\% &   0.0 & —     &         \\
 CrackerBox     &  44.0\% &  80.0\% & +36.0 & 0.019 & $^{**}$ \\
 PowerDrill     &  76.0\% &  88.0\% & +12.0 & 0.463 &         \\
 \midrule
-\textbf{All}   & \textbf{82.3\%} & \textbf{94.3\%} & \textbf{+12.0} & \textbf{${<}0.001$} & $^{**}$ \\
+\textbf{All}   & \textbf{80.6\%} & \textbf{92.6\%} & \textbf{+12.0} & \textbf{${<}0.001$} & $^{**}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -503,23 +505,30 @@ only weakly elongated (major/minor eigenvalue ratio $1.075$), so PCA's
 clearly elongated object. PowerDrill's null therefore remains the most
 plausible reading of the original three features.
 
-\noindent\textbf{Scissors (100\%, all conditions).}
-Scissors achieves 25/25 across all methods after correcting a
-physics-configuration bug: the original VHACD collision mesh
+\noindent\textbf{Scissors (88\%, both conditions).}
+Scissors recovers from 0/25 to 22/25 under both methods after correcting
+a physics-configuration bug: the original VHACD collision mesh
 (14 merged convex hulls, $\approx$2\,cm thick) tunnelled through
 the table under MuJoCo contact detection.
 The corrected entry uses a bounding-box collision proxy scaled to
-4\,cm thickness.
-Since all methods reach ceiling (25/25), Scissors contributes equally
-to each condition and does not differentiate methods.
+4\,cm thickness---only marginally above the gripper's 4\,cm minimum
+opening, which we found makes this specific object's success rate
+sensitive to run-to-run variation: independent 25-seed re-measurements
+of the identical configuration on three separate dates gave 25/25, 23/25,
+and 22/25 (\cref{ssec:scissors} discusses this instability; we report the
+most recent measurement here rather than treat any one run as
+authoritative).
+Since baseline and OT-CFM are numerically identical for Scissors, it
+contributes equally to each condition and does not differentiate methods.
 
 \subsection{Ablation Study}
 \label{sec:ablation}
 
 \begin{table}[t]
 \caption{Ablation: contribution of each pipeline component.
-  ``vs.\ full'' compares to OT-CFM + LGGSN (94.3\%).
-  175 trials per condition. $^\dagger$Corrected for Scissors physics-config fix.
+  ``vs.\ full'' compares to OT-CFM + LGGSN (92.6\%).
+  175 trials per condition. $^\dagger$Corrected for Scissors physics-config fix
+  (22/25, the 2026-07-09 re-measurement, \cref{ssec:scissors}).
   $^\ddagger$Same MLP architecture and training data as OT-CFM; DDPM
   $\varepsilon$-prediction, cosine schedule $T{=}1000$, DDIM-50 inference.}
 \label{tab:ablation}
@@ -530,15 +539,15 @@ to each condition and does not differentiate methods.
 \toprule
 Condition & SR & vs.\ Baseline & vs.\ Full & $p$ \\
 \midrule
-Baseline (random + LGGSN)            & 82.3\% & —          & $-12.0$\,pp & ${<}0.001$$^{**}$ \\
-GRC-6DoF + LGGSN                     & 82.9\% & $+0.6$\,pp & $-11.4$\,pp & ${<}0.001$$^{**}$ \\
+Baseline (random + LGGSN)            & 80.6\% & —          & $-12.0$\,pp & ${<}0.001$$^{**}$ \\
+GRC-6DoF + LGGSN                     & 82.9\% & $+2.3$\,pp & $-9.7$\,pp  & $0.006$$^{**}$ \\
 \midrule
-\textit{Remove OT (std CFM + LGGSN)} & 78.9\% & $-3.4$\,pp & $-15.4$\,pp & ${<}0.001$$^{**}$ \\
-\textit{DDPM baseline$^\ddagger$ (DDIM-50)} & 81.7\% & $-0.6$\,pp & $-12.6$\,pp & ${<}0.001$$^{**}$ \\
-\textit{Remove LGGSN (OT-CFM only)}  & 84.6\%$^\dagger$ & $+2.3$\,pp & $-9.7$\,pp & 0.003$^{**}$ \\
-\textit{Remove SAM vis (zero $c$)}   & 96.0\%$^\dagger$ & $+13.7$\,pp & $+1.7$\,pp & 0.456 \\
+\textit{Remove OT (std CFM + LGGSN)} & 78.9\% & $-1.7$\,pp & $-13.7$\,pp & ${<}0.001$$^{**}$ \\
+\textit{DDPM baseline$^\ddagger$ (DDIM-50)} & 81.7\% & $+1.1$\,pp & $-10.9$\,pp & $0.002$$^{**}$ \\
+\textit{Remove LGGSN (OT-CFM only)}  & 82.9\%$^\dagger$ & $+2.3$\,pp & $-9.7$\,pp & $0.006$$^{**}$ \\
+\textit{Remove SAM vis (zero $c$)}   & 94.3\%$^\dagger$ & $+13.7$\,pp & $+1.7$\,pp & 0.518 \\
 \midrule
-\textbf{OT-CFM + LGGSN (full)}  & \textbf{94.3\%} & $+12.0$\,pp & — & — \\
+\textbf{OT-CFM + LGGSN (full)}  & \textbf{92.6\%} & $+12.0$\,pp & — & — \\
 \bottomrule
 \end{tabular}}
 \end{table}
@@ -547,41 +556,50 @@ GRC-6DoF + LGGSN                     & 82.9\% & $+0.6$\,pp & $-11.4$\,pp & ${<}0
 The GRC-6DoF row adds a geometric-baseline comparison;
 ablation rows decompose the full OT-CFM + LGGSN pipeline.
 
-\noindent\textbf{GRC-6DoF is equivalent to random ($+0.6$\,pp, n.s.).}
+\noindent\textbf{GRC-6DoF is equivalent to random ($+2.3$\,pp, n.s.\ vs.\
+baseline).}
 Replacing random CoM sampling with GR-ConvNet-derived 6-DoF proposals
-yields 82.9\%---statistically indistinguishable from the random baseline
-(82.3\%).
+yields 82.9\%---not significantly different from the random baseline
+(80.6\%, $p{=}0.58$), though significantly below the full pipeline
+($-9.7$\,pp, $p{=}0.006$).
 Both methods supply similarly diverse candidate sets to LGGSN, leaving
 no evidence that geometric candidate generation alone drives success.
 
-\noindent\textbf{OT coupling is essential ($-15.4$\,pp, $p{<}0.001$).}
+\noindent\textbf{OT coupling is essential ($-13.7$\,pp vs.\ full,
+$p{<}0.001$).}
 Replacing the OT sampler with random source--target pairing reduces SR
-from 94.3\% to 78.9\%---\emph{below} the random-CoM baseline (82.3\%).
+from 92.6\% to 78.9\%.
+This is numerically, but not significantly, below the random-CoM baseline
+(80.6\%, $p{=}0.69$)---the informative comparison is against the full
+pipeline, where the drop is large and highly significant.
 Random pairing forces the velocity network to reconcile crossing flow paths,
 learning a blurred mean rather than a clean transport map.
 OT coupling solves the global assignment within each minibatch, eliminating
 crossings and enabling crisp, object-specific distributions.
 
-\noindent\textbf{DDPM as a generative baseline ($-12.6$\,pp, $p{<}0.001$).}
+\noindent\textbf{DDPM as a generative baseline ($-10.9$\,pp vs.\ full,
+$p{=}0.002$).}
 To verify that OT coupling---not the flow-matching paradigm---drives
 performance, we train an identical MLP with DDPM $\varepsilon$-prediction
 (cosine schedule, $T{=}1000$, DDIM-50) on the same 2,853 successes.
-DDPM achieves 81.7\% ($z{=}3.62$, $p{<}0.001$ vs.\ OT-CFM),
-comparable to the random baseline and matching the remove-OT result.
+DDPM achieves 81.7\% ($z{=}-3.03$, $p{=}0.002$ vs.\ OT-CFM), not
+significantly different from the random baseline ($+1.1$\,pp, n.s.), similar
+to the remove-OT condition in that neither is distinguishable from random
+sampling even though both are significantly worse than the full pipeline.
 The gap concentrates on CrackerBox ($36\%$ vs.\ $80\%$) and Pear ($68\%$
 vs.\ $100\%$), where OT-CFM's straight transport paths preserve structured
 multi-modal contact distributions that DDPM's isotropic diffusion erases.
 
-\noindent\textbf{LGGSN reranking contributes $-9.7$\,pp ($p{=}0.003$).}
+\noindent\textbf{LGGSN reranking contributes $-9.7$\,pp ($p{=}0.006$).}
 Without reranking (OT-CFM candidates executed in generation order),
-SR drops from 94.3\% to 84.6\%.
+SR drops from 92.6\% to 82.9\%.
 The reranker adds meaningful value even when the generator already provides
 high-quality candidates, by using geometric context (point-cloud density,
 gripper--centroid distance) that the flow model does not have access to.
 
-\noindent\textbf{SAM visual conditioning is dispensable ($+1.7$\,pp, $p{=}0.46$).}
+\noindent\textbf{SAM visual conditioning is dispensable ($+1.7$\,pp, $p{=}0.52$).}
 Replacing the per-object mean SAM embedding with a zero vector yields
-96.0\%---slightly higher than the full model, though not significantly so.
+94.3\%---slightly higher than the full model, though not significantly so.
 This is a practically important negative result: the OT-CFM model's
 generative quality is driven entirely by learning from physical success
 labels, not by the high-dimensional visual feature.
@@ -627,9 +645,14 @@ objects where single-draw reliability is worst.
 
 \subsection{Why OT Coupling Matters}
 
-The failure of standard CFM below baseline ($78.9\% < 82.3\%$), and
-the matching performance of DDPM ($81.7\%$), together confirm that the
-gain in OT-CFM is not attributable to the flow-matching paradigm per se.
+Neither standard CFM ($78.9\%$) nor DDPM ($81.7\%$) is significantly
+different from the random-CoM baseline ($80.6\%$), yet both are
+significantly worse than the full OT-CFM pipeline ($92.6\%$,
+$p{<}0.001$ and $p{=}0.002$ respectively, \cref{sec:ablation}) despite
+sharing the same architecture, training data, and reranker. Together
+this confirms that the gain in OT-CFM is not attributable to the
+flow-matching paradigm per se---a generative model conditioned this way
+is, on its own, no better than not generating at all.
 The critical ingredient is the optimal-transport coupling.
 With only $\sim\!400$ training examples per object, random pairing produces
 crossing flow paths; the velocity network learns a blurred mean rather
@@ -651,21 +674,45 @@ scene-specific guidance.
 We leave this for future work.
 
 \subsection{Scissors: Physics-Configuration Correction}
+\label{ssec:scissors}
 
 Scissors was 0/25 across all conditions due to a VHACD mesh tunnelling bug:
 14 merged convex hulls at $\approx$2\,cm thickness allowed the object to
 pass through the table under MuJoCo contact detection.
-Replacing the geometry with a bounding-box proxy at 4\,cm restores
-25/25 = 100\% for all methods, leaving per-condition $\Delta$pp values
-unchanged.
+Replacing the geometry with a bounding-box proxy at 4\,cm restores a high
+success rate for all methods, but not a clean ceiling: the proxy's 4\,cm
+thickness is only marginally above the gripper's 4\,cm minimum opening, so
+grasp success is sensitive to run-to-run variation in exactly where the
+gripper contacts the (barely-cleared) collision geometry.
+
+We measured this configuration on three separate dates and got three
+different counts out of 25 seeds: 25/25 (2026-06-26), 23/25
+(2026-06-28, reported in project history but without a surviving per-seed
+log), and 22/25 (2026-07-09, the measurement reported in this paper,
+verified with a full per-seed log and a smoke test confirming the
+executed candidates and outcomes vary meaningfully across seeds, i.e.\
+this is not a degenerate or stuck sampler). We do not have an explanation
+for the drift---the manifest-level physics configuration is unchanged
+across all three dates---beyond the geometry's thin safety margin making
+it more susceptible than other objects to small numerical differences
+between runs (e.g.\ contact-solver iteration order, floating-point
+accumulation). We report the most recent (2026-07-09) measurement rather
+than treat any single run as ground truth, and flag this instability as a
+property of this specific object's collision geometry, not of the
+grasping pipeline being evaluated: baseline and OT-CFM are affected
+identically (22/25 for both, at every re-measurement above), so Scissors
+still contributes equally to each condition and does not differentiate
+methods, regardless of which of the three counts is used.
+
 A second, unrelated issue also affects Scissors in a separate, supplementary
 generation-isolated diagnostic experiment (not reported in this paper): the
 object-name matching used to condition OT-CFM sampling never matches
 ``scissors'' against its trained category key, silently falling back to
 random sampling in that other experiment. This does not affect any number
-reported here---Scissors is at ceiling (100\%) for every condition in this
-paper regardless of which sampler produced the candidates---but we note it
-for transparency since both issues share the same object.
+reported here---baseline and OT-CFM are identical for Scissors in this
+paper's own evaluation regardless of which sampler produced the
+candidates---but we note it for transparency since both issues share the
+same object.
 
 \subsection{Limitations}
 
@@ -709,17 +756,18 @@ We presented a grasp generation pipeline that combines Optimal Transport
 Conditional Flow Matching (OT-CFM) with geometric reranking (LGGSN) for
 open-world 6-DoF grasping.
 On 175 paired trials across seven YCB objects on MuJoCo/SO-ARM101,
-the pipeline achieves 94.3\% success rate---a statistically significant
+the pipeline achieves 92.6\% success rate---a statistically significant
 +12\,pp improvement over random CoM sampling with the same reranker
 ($p{<}0.001$).
 
 Ablation analysis establishes that OT coupling is the essential component:
-removing it drops performance below baseline, while standard CFM without OT
-actively harms results.
+removing it drops performance $13.7$\,pp below the full pipeline
+($p{<}0.001$), and standard CFM without OT coupling is statistically
+indistinguishable from doing no learned generation at all.
 LGGSN reranking adds 9.7\,pp on top of generation alone, confirming that
 generation and reranking are complementary.
 SAM visual conditioning provides no significant benefit, enabling a simpler
-SAM-free deployment that achieves 96.0\%.
+SAM-free deployment that achieves 94.3\%.
 
 These results position OT-CFM as a practical candidate generator for
 grasping pipelines: it trains on modest physical-execution data, runs as a
