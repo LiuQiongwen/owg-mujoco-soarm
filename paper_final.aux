@@ -16,10 +16,19 @@
 \gdef\HyperFirstAtBeginDocument#1{#1}
 \providecommand\HyField@AuxAddToFields[1]{}
 \providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{cheng2025curse}
+\citation{florence2021implicit}
 \citation{mahler2017dexnet}
 \citation{fang2020graspnet1b}
 \citation{lipman2022cfm}
 \citation{tong2023otcfm}
+\citation{cheng2025curse}
+\citation{florence2021implicit}
+\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec:intro}{{I}{1}{Introduction}{section.1}{}}
+\newlabel{sec:intro@cref}{{[section][1][]I}{[1][1][]1}}
+\citation{cheng2025curse}
+\citation{florence2021implicit}
 \citation{mahler2017dexnet}
 \citation{fang2020graspnet1b}
 \citation{fang2023anygrasp}
@@ -28,13 +37,6 @@
 \citation{noh2024graspsam}
 \citation{chi2023diffusion}
 \citation{lim2025equigraspflow}
-\@writefile{toc}{\contentsline {section}{\numberline {I}Introduction}{1}{section.1}\protected@file@percent }
-\newlabel{sec:intro}{{I}{1}{Introduction}{section.1}{}}
-\newlabel{sec:intro@cref}{{[section][1][]I}{[1][1][]1}}
-\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{1}{section.2}\protected@file@percent }
-\newlabel{sec:related}{{II}{1}{Related Work}{section.2}{}}
-\newlabel{sec:related@cref}{{[section][2][]II}{[1][1][]1}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Grasp Quality Estimation and Generation}{1}{subsection.2.1}\protected@file@percent }
 \citation{lipman2022cfm}
 \citation{tong2023otcfm}
 \citation{lim2025equigraspflow}
@@ -42,82 +44,108 @@
 \citation{shridhar2022cliport}
 \citation{owg2024}
 \citation{rendle2009bpr}
-\citation{tong2023otcfm}
+\@writefile{toc}{\contentsline {section}{\numberline {II}Related Work}{2}{section.2}\protected@file@percent }
+\newlabel{sec:related}{{II}{2}{Related Work}{section.2}{}}
+\newlabel{sec:related@cref}{{[section][2][]II}{[1][2][]2}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-A}}Grasp Quality Estimation and Generation}{2}{subsection.2.1}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-B}}Generative Models for Grasping}{2}{subsection.2.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces OT-CFM + LGGSN pipeline. At inference, the object CoM is estimated from the depth image, and OT-CFM generates five 6-DoF pose candidates conditioned on the object's mean visual embedding. LGGSN reranks by geometric context and the top candidate is executed.}}{2}{figure.1}\protected@file@percent }
+\newlabel{fig:pipeline}{{1}{2}{OT-CFM + LGGSN pipeline. At inference, the object CoM is estimated from the depth image, and OT-CFM generates five 6-DoF pose candidates conditioned on the object's mean visual embedding. LGGSN reranks by geometric context and the top candidate is executed}{figure.1}{}}
+\newlabel{fig:pipeline@cref}{{[figure][1][]1}{[1][2][]2}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-C}}Flow Matching}{2}{subsection.2.3}\protected@file@percent }
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {II-D}}Grasp Reranking}{2}{subsection.2.4}\protected@file@percent }
 \@writefile{toc}{\contentsline {section}{\numberline {III}Method}{2}{section.3}\protected@file@percent }
 \newlabel{sec:method}{{III}{2}{Method}{section.3}{}}
 \newlabel{sec:method@cref}{{[section][3][]III}{[1][2][]2}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-A}}System Overview}{2}{subsection.3.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces OT-CFM + LGGSN pipeline. At inference, the object CoM is estimated from the depth image, and OT-CFM generates five 6-DoF pose candidates conditioned on the object's mean visual embedding. LGGSN reranks by geometric context and the top candidate is executed.}}{2}{figure.1}\protected@file@percent }
-\newlabel{fig:pipeline}{{1}{2}{OT-CFM + LGGSN pipeline. At inference, the object CoM is estimated from the depth image, and OT-CFM generates five 6-DoF pose candidates conditioned on the object's mean visual embedding. LGGSN reranks by geometric context and the top candidate is executed}{figure.1}{}}
-\newlabel{fig:pipeline@cref}{{[figure][1][]1}{[1][2][]2}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Training Data}{2}{subsection.3.2}\protected@file@percent }
-\newlabel{sec:data}{{\mbox  {III-B}}{2}{Training Data}{subsection.3.2}{}}
-\newlabel{sec:data@cref}{{[subsection][2][3]\mbox  {III-B}}{[1][2][]2}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}OT-CFM Grasp Generator}{2}{subsection.3.3}\protected@file@percent }
-\newlabel{sec:cfm}{{\mbox  {III-C}}{2}{OT-CFM Grasp Generator}{subsection.3.3}{}}
-\newlabel{sec:cfm@cref}{{[subsection][3][3]\mbox  {III-C}}{[1][2][]2}}
-\newlabel{eq:path}{{1}{2}{OT-CFM Grasp Generator}{equation.3.1}{}}
-\newlabel{eq:path@cref}{{[equation][1][]1}{[1][2][]2}}
-\newlabel{eq:loss}{{2}{2}{OT-CFM Grasp Generator}{equation.3.2}{}}
-\newlabel{eq:loss@cref}{{[equation][2][]2}{[1][2][]2}}
-\citation{owg2024}
+\citation{tong2023otcfm}
+\citation{cheng2025curse}
+\citation{florence2021implicit}
+\citation{singh2024cgdf}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-B}}Training Data}{3}{subsection.3.2}\protected@file@percent }
+\newlabel{sec:data}{{\mbox  {III-B}}{3}{Training Data}{subsection.3.2}{}}
+\newlabel{sec:data@cref}{{[subsection][2][3]\mbox  {III-B}}{[1][2][]3}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-C}}OT-CFM Grasp Generator}{3}{subsection.3.3}\protected@file@percent }
+\newlabel{sec:cfm}{{\mbox  {III-C}}{3}{OT-CFM Grasp Generator}{subsection.3.3}{}}
+\newlabel{sec:cfm@cref}{{[subsection][3][3]\mbox  {III-C}}{[1][3][]3}}
+\newlabel{eq:path}{{1}{3}{OT-CFM Grasp Generator}{equation.3.1}{}}
+\newlabel{eq:path@cref}{{[equation][1][]1}{[1][3][]3}}
+\newlabel{eq:loss}{{2}{3}{OT-CFM Grasp Generator}{equation.3.2}{}}
+\newlabel{eq:loss@cref}{{[equation][2][]2}{[1][3][]3}}
 \@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-D}}Inference: CoM-Relative Candidate Generation}{3}{subsection.3.4}\protected@file@percent }
 \newlabel{sec:inference}{{\mbox  {III-D}}{3}{Inference: CoM-Relative Candidate Generation}{subsection.3.4}{}}
 \newlabel{sec:inference@cref}{{[subsection][4][3]\mbox  {III-D}}{[1][3][]3}}
 \newlabel{eq:shift}{{5}{3}{Inference: CoM-Relative Candidate Generation}{equation.3.5}{}}
 \newlabel{eq:shift@cref}{{[equation][5][]5}{[1][3][]3}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-E}}LGGSN Reranker}{3}{subsection.3.5}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Overall success rate: 175 trials (7 objects $\times $ 25 seeds).}}{3}{table.1}\protected@file@percent }
-\newlabel{tab:main}{{I}{3}{Overall success rate: 175 trials (7 objects $\times $ 25 seeds)}{table.1}{}}
-\newlabel{tab:main@cref}{{[table][1][]I}{[1][3][]3}}
-\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Per-object success rate: Baseline vs.\ OT-CFM + LGGSN (25 seeds each).}}{3}{table.2}\protected@file@percent }
-\newlabel{tab:perobject}{{II}{3}{Per-object success rate: Baseline vs.\ OT-CFM + LGGSN (25 seeds each)}{table.2}{}}
-\newlabel{tab:perobject@cref}{{[table][2][]II}{[1][3][]3}}
-\@writefile{toc}{\contentsline {section}{\numberline {IV}Experiments}{3}{section.4}\protected@file@percent }
-\newlabel{sec:experiments}{{IV}{3}{Experiments}{section.4}{}}
-\newlabel{sec:experiments@cref}{{[section][4][]IV}{[1][3][]3}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Evaluation Protocol}{3}{subsection.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Main Result}{3}{subsection.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Per-Object Analysis}{3}{subsection.4.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Ablation Study}{4}{subsection.4.4}\protected@file@percent }
-\newlabel{sec:ablation}{{\mbox  {IV-D}}{4}{Ablation Study}{subsection.4.4}{}}
-\newlabel{sec:ablation@cref}{{[subsection][4][4]\mbox  {IV-D}}{[1][4][]4}}
-\@writefile{lot}{\contentsline {table}{\numberline {III}{\ignorespaces Ablation: contribution of each pipeline component. ``vs.\ full'' compares to OT-CFM + LGGSN (92.6\%). 175 trials per condition. $^\dagger $Corrected for Scissors physics-config fix (22/25, the 2026-07-09 re-measurement, \cref  {ssec:scissors}). $^\ddagger $Same MLP architecture and training data as OT-CFM; DDPM $\varepsilon $-prediction, cosine schedule $T{=}1000$, DDIM-50 inference.}}{5}{table.3}\protected@file@percent }
-\newlabel{tab:ablation}{{III}{5}{Ablation: contribution of each pipeline component. ``vs.\ full'' compares to OT-CFM + LGGSN (92.6\%). 175 trials per condition. $^\dagger $Corrected for Scissors physics-config fix (22/25, the 2026-07-09 re-measurement, \cref {ssec:scissors}). $^\ddagger $Same MLP architecture and training data as OT-CFM; DDPM $\varepsilon $-prediction, cosine schedule $T{=}1000$, DDIM-50 inference}{table.3}{}}
-\newlabel{tab:ablation@cref}{{[table][3][]III}{[1][4][]5}}
-\@writefile{toc}{\contentsline {section}{\numberline {V}Discussion}{5}{section.5}\protected@file@percent }
-\newlabel{sec:discussion}{{V}{5}{Discussion}{section.5}{}}
-\newlabel{sec:discussion@cref}{{[section][5][]V}{[1][5][]5}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Why OT Coupling Matters}{5}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-E}}Energy-Based Candidate Scoring, as an Alternative to OT-CFM}{3}{subsection.3.5}\protected@file@percent }
+\newlabel{sec:ebm}{{\mbox  {III-E}}{3}{Energy-Based Candidate Scoring, as an Alternative to OT-CFM}{subsection.3.5}{}}
+\newlabel{sec:ebm@cref}{{[subsection][5][3]\mbox  {III-E}}{[1][3][]3}}
+\citation{owg2024}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {III-F}}LGGSN Reranker}{4}{subsection.3.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {IV}Experiments}{4}{section.4}\protected@file@percent }
+\newlabel{sec:experiments}{{IV}{4}{Experiments}{section.4}{}}
+\newlabel{sec:experiments@cref}{{[section][4][]IV}{[1][4][]4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-A}}Evaluation Protocol}{4}{subsection.4.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {I}{\ignorespaces Overall success rate: 350 trials (7 objects $\times $ 50 seeds), fixed-seeding harness.}}{4}{table.1}\protected@file@percent }
+\newlabel{tab:main}{{I}{4}{Overall success rate: 350 trials (7 objects $\times $ 50 seeds), fixed-seeding harness}{table.1}{}}
+\newlabel{tab:main@cref}{{[table][1][]I}{[1][4][]4}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-B}}Main Result}{4}{subsection.4.2}\protected@file@percent }
+\citation{cheng2025curse}
+\@writefile{lot}{\contentsline {table}{\numberline {II}{\ignorespaces Per-object success rate: Baseline vs.\ OT-CFM vs.\ EBM v2 (50 seeds each). EBM v2 excludes Scissors (\S  \ref  {sec:ebm}: its object name never matches this checkpoint's trained conditioning keys, an unrelated bug that silently falls back to Baseline for that object, exactly as it does for OT-CFM in \cref  {ssec:scissors}).}}{5}{table.2}\protected@file@percent }
+\newlabel{tab:perobject}{{II}{5}{Per-object success rate: Baseline vs.\ OT-CFM vs.\ EBM v2 (50 seeds each). EBM v2 excludes Scissors (\S \ref {sec:ebm}: its object name never matches this checkpoint's trained conditioning keys, an unrelated bug that silently falls back to Baseline for that object, exactly as it does for OT-CFM in \cref {ssec:scissors})}{table.2}{}}
+\newlabel{tab:perobject@cref}{{[table][2][]II}{[1][4][]5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-C}}Per-Object Analysis}{5}{subsection.4.3}\protected@file@percent }
+\newlabel{sec:perobject}{{\mbox  {IV-C}}{5}{Per-Object Analysis}{subsection.4.3}{}}
+\newlabel{sec:perobject@cref}{{[subsection][3][4]\mbox  {IV-C}}{[1][4][]5}}
+\@writefile{lot}{\contentsline {table}{\numberline {III}{\ignorespaces Diagnostic comparison on the three objects where OT-CFM's failure is clearest. Baseline/OT-CFM/EBM v2 at their full $n{=}50$; the four diagnostic conditions at $n{=}25$ (same fixed-seeding harness). $p$ vs.\ Baseline.}}{5}{table.3}\protected@file@percent }
+\newlabel{tab:ablation}{{III}{5}{Diagnostic comparison on the three objects where OT-CFM's failure is clearest. Baseline/OT-CFM/EBM v2 at their full $n{=}50$; the four diagnostic conditions at $n{=}25$ (same fixed-seeding harness). $p$ vs.\^^MBaseline}{table.3}{}}
+\newlabel{tab:ablation@cref}{{[table][3][]III}{[1][5][]5}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {IV-D}}Ablation Study}{5}{subsection.4.4}\protected@file@percent }
+\newlabel{sec:ablation}{{\mbox  {IV-D}}{5}{Ablation Study}{subsection.4.4}{}}
+\newlabel{sec:ablation@cref}{{[subsection][4][4]\mbox  {IV-D}}{[1][5][]5}}
+\citation{cheng2025curse}
+\citation{florence2021implicit}
+\citation{tong2023otcfm}
+\citation{cheng2025curse}
+\@writefile{toc}{\contentsline {section}{\numberline {V}Discussion}{6}{section.5}\protected@file@percent }
+\newlabel{sec:discussion}{{V}{6}{Discussion}{section.5}{}}
+\newlabel{sec:discussion@cref}{{[section][5][]V}{[1][6][]6}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-A}}Why OT Coupling Hurts Here}{6}{subsection.5.1}\protected@file@percent }
+\newlabel{sec:why-ot-hurts}{{\mbox  {V-A}}{6}{Why OT Coupling Hurts Here}{subsection.5.1}{}}
+\newlabel{sec:why-ot-hurts@cref}{{[subsection][1][5]\mbox  {V-A}}{[1][6][]6}}
+\citation{florence2021implicit}
+\citation{singh2024cgdf}
 \citation{chen2024rfm}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}Why a Properly-Trained Energy-Based Model Reaches Parity}{7}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}Scissors: Physics-Configuration Correction}{7}{subsection.5.3}\protected@file@percent }
+\newlabel{ssec:scissors}{{\mbox  {V-C}}{7}{Scissors: Physics-Configuration Correction}{subsection.5.3}{}}
+\newlabel{ssec:scissors@cref}{{[subsection][3][5]\mbox  {V-C}}{[1][7][]7}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}Limitations}{7}{subsection.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-E}}Future Work}{7}{subsection.5.5}\protected@file@percent }
+\newlabel{sec:future}{{\mbox  {V-E}}{7}{Future Work}{subsection.5.5}{}}
+\newlabel{sec:future@cref}{{[subsection][5][5]\mbox  {V-E}}{[1][7][]7}}
+\citation{cheng2025curse}
+\citation{florence2021implicit}
 \bibcite{lipman2022cfm}{1}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-B}}Why Visual Conditioning Does Not Help}{6}{subsection.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-C}}Scissors: Physics-Configuration Correction}{6}{subsection.5.3}\protected@file@percent }
-\newlabel{ssec:scissors}{{\mbox  {V-C}}{6}{Scissors: Physics-Configuration Correction}{subsection.5.3}{}}
-\newlabel{ssec:scissors@cref}{{[subsection][3][5]\mbox  {V-C}}{[1][6][]6}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-D}}Limitations}{6}{subsection.5.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {\mbox  {V-E}}Future Work}{6}{subsection.5.5}\protected@file@percent }
-\newlabel{sec:future}{{\mbox  {V-E}}{6}{Future Work}{subsection.5.5}{}}
-\newlabel{sec:future@cref}{{[subsection][5][5]\mbox  {V-E}}{[1][6][]6}}
-\@writefile{toc}{\contentsline {section}{\numberline {VI}Conclusion}{6}{section.6}\protected@file@percent }
-\newlabel{sec:conclusion}{{VI}{6}{Conclusion}{section.6}{}}
-\newlabel{sec:conclusion@cref}{{[section][6][]VI}{[1][6][]6}}
 \bibcite{tong2023otcfm}{2}
 \bibcite{chi2023diffusion}{3}
-\bibcite{barad2023graspldm}{4}
-\bibcite{noh2024graspsam}{5}
-\bibcite{chen2024rfm}{6}
-\bibcite{mahler2017dexnet}{7}
-\bibcite{fang2020graspnet1b}{8}
-\bibcite{fang2023anygrasp}{9}
-\bibcite{mousavian2019graspnet6dof}{10}
-\bibcite{owg2024}{11}
-\bibcite{rendle2009bpr}{12}
-\bibcite{fang2024dexgraspnet2}{13}
-\bibcite{shridhar2022cliport}{14}
-\bibcite{lim2025equigraspflow}{15}
-\@writefile{toc}{\contentsline {section}{References}{7}{section*.1}\protected@file@percent }
-\gdef \@abspage@last{7}
+\bibcite{cheng2025curse}{4}
+\bibcite{florence2021implicit}{5}
+\bibcite{singh2024cgdf}{6}
+\bibcite{barad2023graspldm}{7}
+\bibcite{noh2024graspsam}{8}
+\bibcite{chen2024rfm}{9}
+\bibcite{mahler2017dexnet}{10}
+\bibcite{fang2020graspnet1b}{11}
+\bibcite{fang2023anygrasp}{12}
+\bibcite{mousavian2019graspnet6dof}{13}
+\bibcite{owg2024}{14}
+\bibcite{rendle2009bpr}{15}
+\bibcite{fang2024dexgraspnet2}{16}
+\bibcite{shridhar2022cliport}{17}
+\bibcite{lim2025equigraspflow}{18}
+\@writefile{toc}{\contentsline {section}{\numberline {VI}Conclusion}{8}{section.6}\protected@file@percent }
+\newlabel{sec:conclusion}{{VI}{8}{Conclusion}{section.6}{}}
+\newlabel{sec:conclusion@cref}{{[section][6][]VI}{[1][8][]8}}
+\@writefile{toc}{\contentsline {section}{References}{8}{section*.1}\protected@file@percent }
+\gdef \@abspage@last{8}
