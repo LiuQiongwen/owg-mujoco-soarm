@@ -44,7 +44,6 @@ N_SAMPLES    = int(os.environ.get("CFM_N_SAMPLES",  "20"))
 SEED         = 42
 POSE_COLS    = ["x", "y", "z", "roll", "pitch", "yaw"]
 
-torch.manual_seed(SEED); np.random.seed(SEED)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # ── 1. Cosine noise schedule (Nichol & Dhariwal 2021) ─────────────────────────
@@ -157,13 +156,18 @@ def train(dataset: GraspPoseDataset) -> NoiseNet:
 
 @torch.no_grad()
 def sample_poses_ddpm(model: NoiseNet, cond: torch.Tensor,
-                      n: int = 5, steps: int = DDIM_STEPS) -> np.ndarray:
+                      n: int = 5, steps: int = DDIM_STEPS,
+                      seed: int | None = None) -> np.ndarray:
     """DDIM deterministic reverse sampler (eta=0).
 
     Uses a uniformly-spaced subsequence of length `steps` from the full T-step
     schedule.  Returns (n, 6) normalised poses (same unit as CFM output).
 
     Set env DDPM_STOCHASTIC=1 to add posterior noise (full DDPM, same step count).
+
+    seed: if given, draws all randomness (initial noise, and posterior noise
+    if DDPM_STOCHASTIC=1) from a local torch.Generator seeded with this value
+    — see sample_poses()'s identical note in train_cfm_grasp.py.
     """
     model.eval()
     dev   = next(model.parameters()).device
@@ -171,10 +175,16 @@ def sample_poses_ddpm(model: NoiseNet, cond: torch.Tensor,
     abar  = _ALPHAS_BAR.to(dev)   # (T,)
     eta   = 1.0 if os.environ.get("DDPM_STOCHASTIC") == "1" else 0.0
 
+    gen = None
+    if seed is not None:
+        gen = torch.Generator(device=dev)
+        gen.manual_seed(seed)
+
     # Descending subsequence: T-1 → ... → 0  (length steps+1 for paired (t, t_prev))
     tau = torch.linspace(DDPM_T - 1, 0, steps + 1, dtype=torch.long).tolist()
 
-    x = torch.randn(n, POSE_DIM, device=dev)
+    x = torch.randn(n, POSE_DIM, device=dev, generator=gen) if gen is not None \
+        else torch.randn(n, POSE_DIM, device=dev)
     for i in range(steps):
         t_cur  = int(tau[i])
         t_prev = int(tau[i + 1])
@@ -196,7 +206,9 @@ def sample_poses_ddpm(model: NoiseNet, cond: torch.Tensor,
         x = ab_prev.sqrt() * x0_pred + dir_xt
         if eta > 0.0 and t_prev > 0:
             sigma = eta * ((1.0 - ab_prev) / (1.0 - ab_t) * (1.0 - ab_t / ab_prev)).clamp_min(0.0).sqrt()
-            x = x + sigma * torch.randn_like(x)
+            noise = torch.randn(x.shape, device=dev, generator=gen) if gen is not None \
+                    else torch.randn_like(x)
+            x = x + sigma * noise
 
     return x.cpu().numpy()
 
@@ -279,4 +291,7 @@ def main():
     plot_results(model, dataset)
 
 if __name__ == "__main__":
+    # Seeding training reproducibility only — see train_cfm_grasp.py's identical
+    # note. sample_poses_ddpm() takes its own `seed` param for inference-time use.
+    torch.manual_seed(SEED); np.random.seed(SEED)
     main()

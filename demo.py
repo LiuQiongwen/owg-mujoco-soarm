@@ -1,4 +1,5 @@
 import os, sys, argparse
+import numpy as np
 from copy import deepcopy
 
 sys.path.append(os.path.dirname(__file__))  # ensure tango_robot import works
@@ -102,6 +103,28 @@ def main():
                         help="Pin a specific YCB object in the scene (e.g. 'Banana'). "
                              "Case-insensitive. Overrides random shuffle.")
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--gen-seed", type=int, default=None, dest="gen_seed",
+                        help="Independent seed for the CFM/DDPM generator's sampling "
+                             "noise (torch.Generator in sample_poses/sample_poses_ddpm). "
+                             "Decoupled from --seed, which drives object spawn "
+                             "orientation (and everything else previously tied to it: "
+                             "object shuffling, width jitter, Random/GRC-6DoF candidate "
+                             "draws). Defaults to being derived from --seed if omitted, "
+                             "matching prior behavior.")
+    parser.add_argument("--consensus-n", type=int, default=None, dest="consensus_n",
+                        help="Phase 1 consensus-selection algorithm: draw this many "
+                             "independent CFM/DDPM candidates (seeds --gen-seed, "
+                             "--gen-seed+1, ..., --gen-seed+N-1), take their median "
+                             "pose, execute only the candidate nearest to that median. "
+                             "Unset or <=1 preserves the existing single-draw behavior.")
+    parser.add_argument("--ikmargin-n", type=int, default=None, dest="ikmargin_n",
+                        help="Phase 1 v2 IK-margin-selection algorithm: draw this many "
+                             "independent CFM/DDPM candidates (seeds --gen-seed, "
+                             "--gen-seed+1, ..., --gen-seed+N-1), solve headless IK for "
+                             "each, execute only the candidate with smallest IK error "
+                             "(pe_ik). Takes precedence over --consensus-n if both are "
+                             "set. Unset or <=1 preserves the existing single-draw "
+                             "behavior.")
     parser.add_argument("--vis", type=int, default=None)
     parser.add_argument("--verbose", type=int, default=None)
 
@@ -158,6 +181,26 @@ def main():
         cfg_set(cfg, "n_objects", args.n_objects)
     if args.seed is not None:
         cfg_set(cfg, "seed", args.seed)
+        # Seeds numpy's GLOBAL legacy RNG (np.random.*), which is distinct
+        # from both torch's RNG (fixed by the sample_poses seed= param) and
+        # Python's stdlib random module (already seeded via
+        # YcbObjects.set_seed -> random.seed(seed)). Without this,
+        # env_soarm.py:load_isolated_obj's `yaw = np.random.uniform(0, pi)`
+        # spawn-orientation draw was uncontrolled by --seed — meaning
+        # different methods run with the same --seed did not necessarily
+        # face the same object spawn orientation, confounding any
+        # cross-method comparison at fixed seed. Must run before
+        # RobotEnvUI(...) is constructed (which spawns objects in __init__).
+        np.random.seed(args.seed)
+    if args.gen_seed is not None:
+        # Independent override for generator sampling noise — see
+        # ui.py:_cfm_sample_candidates for where GEN_SEED is read. Decoupled
+        # from --seed's spawn-orientation control above.
+        os.environ["GEN_SEED"] = str(args.gen_seed)
+    if args.consensus_n is not None:
+        os.environ["CONSENSUS_N"] = str(args.consensus_n)
+    if args.ikmargin_n is not None:
+        os.environ["IKMARGIN_N"] = str(args.ikmargin_n)
     if args.object is not None:
         cfg_set(cfg, "object", args.object)
     if args.vis is not None:
