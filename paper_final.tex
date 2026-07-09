@@ -442,19 +442,55 @@ Random sampling at $\pm6$\,cm isotropically covers a $12{\times}12$\,cm
 square, of which only the subset aligned with the long axis succeeds.
 OT-CFM learns this asymmetric yaw prior (training yaw std 0.92\,rad,
 generated 0.97\,rad), concentrating proposals in the effective region.
+A separate contact-geometry diagnostic\footnote{Generation-isolated setup:
+single-object scenes, semantic grounding disabled to remove VLM grounding
+as a variable, 50 trials/object, OT-CFM candidates only. Three features
+(local point density, surface-normal consistency, contact-width ratio) are
+tested success- vs.\ fail-trial with Mann--Whitney $U$, corrected across
+3 features $\times$ 5 objects (Pear, MustardBottle, CrackerBox,
+TomatoSoupCan, PowerDrill; Banana and Scissors excluded as ceiling/invalid
+respectively) via Bonferroni and Benjamini--Hochberg. This is a different
+evaluation harness from \cref{tab:perobject} (no semantic grounding, a
+different seed grid), so its numbers are not directly comparable to the
+main table and are reported here only as corroborating evidence for
+\emph{why} per-object gains differ.} corroborates this: local point
+density under the gripper differs between successful and failed grasps
+for CrackerBox (Mann--Whitney $p{=}0.0119$, significant under
+Benjamini--Hochberg but not Bonferroni), consistent with success depending
+on landing within a specific sub-region of the flat top rather than
+anywhere on it.
 
 \noindent\textbf{Pear (+28\,pp, $p{=}0.010$).}
 The pear's rounded surface admits grasps in a broader but nonetheless
 structured contact band; random sampling under-covers this region,
 while OT-CFM generates proposals that fill it uniformly.
+The same diagnostic finds this the strongest per-object signal measured:
+surface-normal consistency under the gripper differs sharply between
+success and failure (Mann--Whitney $p{=}0.00068$, survives Bonferroni,
+large effect)---Pear's curvature makes grasp quality highly sensitive to
+exactly where contact lands, matching why a learned, non-uniform proposal
+distribution helps more here than on flatter objects.
 
 \noindent\textbf{Banana (0\,pp), MustardBottle (0\,pp).}
 Both objects reach the same ceiling under random and OT-CFM sampling,
 leaving no measurable headroom for the generator to contribute.
+Notably, the diagnostic finds MustardBottle has the \emph{strongest}
+contact-feature signal of any object tested (local point density and
+normal consistency both survive Bonferroni, $p{=}0.00030$ and
+$p{=}0.00029$)---landing position clearly matters for MustardBottle's
+grasp success, but random CoM sampling with LGGSN reranking already
+reaches the achievable ceiling ($92\%$) in our main evaluation, leaving
+OT-CFM no additional headroom to exploit that sensitivity.
 
-\noindent\textbf{PowerDrill (+12\,pp, $p{=}0.463$).}
-OT-CFM raises PowerDrill from 76\% to 88\%; the gain is not
-statistically significant at 25 seeds but is directionally consistent.
+\noindent\textbf{TomatoSoupCan (+8\,pp, $p{=}0.490$) and PowerDrill
+(+12\,pp, $p{=}0.463$).}
+Neither gain reaches significance at 25 seeds, but the diagnostic
+distinguishes them: TomatoSoupCan's local point density survives
+Bonferroni ($p{=}0.00123$, large effect), suggesting real but
+seed-limited headroom, whereas PowerDrill is the only object with a
+clean null across all three contact features under either correction
+($p{\geq}0.17$)---consistent with its gain being smaller and directionally
+weaker in \cref{tab:perobject}.
 
 \noindent\textbf{Scissors (100\%, all conditions).}
 Scissors achieves 25/25 across all methods after correcting a
@@ -540,6 +576,26 @@ generative quality is driven entirely by learning from physical success
 labels, not by the high-dimensional visual feature.
 The recommended deployment therefore omits the SAM dependency
 (saves $\sim$300\,MB GPU memory and one SAM forward pass per episode).
+
+\noindent\textbf{Reliability across generation seeds.}
+\cref{tab:ablation} compares methods at one generated candidate set per
+orientation seed (25 orientation seeds).
+To check whether the OT-CFM-vs.-alternatives ranking holds up under
+independently resampled candidates, we ran a separate, generation-isolated
+experiment (semantic grounding disabled, single-object scenes, 5
+orientation seeds $\times$ 10 generation seeds per object, the same
+OT-CFM/CFM-noOT/DDPM checkpoints).
+Pairing trials by (object, orientation seed, generation seed) and testing
+with McNemar's exact test, OT-CFM is significantly \emph{less} reliable
+than both alternatives specifically on Pear ($p{=}0.041$ vs.\ CFM-noOT,
+$p{=}0.021$ vs.\ DDPM) and TomatoSoupCan ($p{=}0.012$, $p{=}0.002$), with
+no significant difference on the remaining objects.
+We report this as a limitation rather than a contradiction of
+\cref{tab:ablation}: the two experiments differ in evaluation harness
+(semantic grounding on vs.\ off) and seed structure and are not directly
+comparable, but the seed-resampled result indicates OT-CFM's per-object
+advantage is not uniform across generator draws and should not be assumed
+to generalize to every resampling of the generator.
 
 % =============================================================================
 \section{Discussion}
