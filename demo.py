@@ -153,6 +153,12 @@ def main():
                         help="Path to OT-CFM checkpoint (.pt).  When set, replaces random "
                              "CoM-based candidate sampling with CFM-generated poses.  "
                              "Matching _stats.json must exist alongside the checkpoint.")
+    parser.add_argument("--ebm-ckpt", type=str, default="", dest="ebm_ckpt",
+                        help="Path to energy-based grasp scoring checkpoint (.pt, see "
+                             "train_ebm_grasp.py).  When set, replaces random CoM-based "
+                             "candidate sampling with cross-entropy-method (CEM) search "
+                             "guided by the learned energy, instead of an ODE/SDE generator. "
+                             "Matching _stats.json must exist alongside the checkpoint.")
     parser.add_argument("--grconvnet-6dof", action="store_true", dest="grconvnet_6dof",
                         help="Use GR-ConvNet 2D predictions lifted to 6-DoF instead of "
                              "uniform random CoM sampling.  Benchmark baseline for comparing "
@@ -164,6 +170,8 @@ def main():
     os.environ["OWG_MC_GATE_DELTA"] = str(args.mc_gate_delta)
     if args.cfm_ckpt:
         os.environ["CFM_CKPT"] = args.cfm_ckpt
+    if args.ebm_ckpt:
+        os.environ["EBM_CKPT"] = args.ebm_ckpt
     if args.no_ranker:
         os.environ["OWG_NO_RANKER"] = "1"
     if args.no_semantic:
