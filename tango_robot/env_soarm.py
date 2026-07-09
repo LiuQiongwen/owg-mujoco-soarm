@@ -2024,7 +2024,10 @@ class EnvironmentSoArm:
         for j, g in enumerate(grasps_to_try):
             if j >= self.N_GRASP_ATTEMPTS:
                 print(f"Exceeded {self.N_GRASP_ATTEMPTS} grasping attempts.")
-                return False, obj_id, None
+                # Return the top-ranked attempted candidate (not None) so the
+                # caller (_log_ui_grasp_exec) can still log a real pose on
+                # this failure path — see the matching change below.
+                return False, obj_id, grasps_to_try[0]
 
             # grasp: dict (from IK prefilter) or legacy tuple (x,y,z,yaw,opening,obj_height)
             if isinstance(g, dict):
@@ -2049,7 +2052,13 @@ class EnvironmentSoArm:
 
             print("Grasping failed. Retrying...")
 
-        return False, None, None
+        # All attempts failed. Previously returned (False, None, None) here,
+        # which meant _log_ui_grasp_exec always logged x=y=z=yaw=None on
+        # total failure — silently discarding every candidate pose that was
+        # actually attempted. Return the top-ranked attempted candidate
+        # instead so failed trials (e.g. a checkpoint that goes 0/25) still
+        # produce recoverable pose data.
+        return False, obj_id, (grasps_to_try[0] if grasps_to_try else None)
 
     # ── placement helpers ─────────────────────────────────────────────────────
 
@@ -2099,7 +2108,11 @@ class EnvironmentSoArm:
 
         if not success_grasp:
             print("Grasping failed. Exiting.")
-            self._log_ui_grasp_exec("tray", obj_id, None, False, False)
+            # `grasp` (not None) now carries the top-ranked attempted
+            # candidate on failure, per pick_obj_by_id's updated contract —
+            # log it instead of hardcoding None, so failed trials still
+            # produce recoverable pose data.
+            self._log_ui_grasp_exec("tray", obj_id, grasp, False, False)
             return False, False
 
         # deliver to tray
