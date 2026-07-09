@@ -42,7 +42,6 @@ ODE_STEPS    = int(os.environ.get("CFM_ODE_STEPS", "20"))
 SEED         = 42
 POSE_COLS    = ["x", "y", "z", "roll", "pitch", "yaw"]
 
-torch.manual_seed(SEED); np.random.seed(SEED)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # ── 1. Dataset ────────────────────────────────────────────────────────────────
@@ -185,10 +184,22 @@ def train(dataset: GraspPoseDataset) -> VelocityNet:
 
 @torch.no_grad()
 def sample_poses(model: VelocityNet, cond: torch.Tensor,
-                 n: int = N_SAMPLES, steps: int = ODE_STEPS) -> np.ndarray:
+                 n: int = N_SAMPLES, steps: int = ODE_STEPS,
+                 seed: int | None = None) -> np.ndarray:
+    """seed: if given, draws the initial noise from a local torch.Generator
+    seeded with this value, independent of global RNG state. Callers doing
+    per-trial inference (e.g. ui.py._cfm_sample_candidates) should always
+    pass a per-trial seed here — otherwise every call in a freshly-started
+    process draws from whatever the global RNG's current state happens to
+    be, which is NOT randomized per trial on its own."""
     model.eval()
     cond = cond.unsqueeze(0).expand(n, -1).to(device) if cond.dim()==1 else cond.to(device)
-    x = torch.randn(n, POSE_DIM, device=device)
+    if seed is not None:
+        gen = torch.Generator(device=device)
+        gen.manual_seed(seed)
+        x = torch.randn(n, POSE_DIM, device=device, generator=gen)
+    else:
+        x = torch.randn(n, POSE_DIM, device=device)
     dt = 1.0 / steps
     for i in range(steps):
         t_val = torch.full((n,), i * dt, device=device)
@@ -316,4 +327,10 @@ def main():
 
 
 if __name__ == "__main__":
+    # Seeding training reproducibility only — must NOT run on import, since
+    # sample_poses() is imported for inference (once per eval-trial subprocess)
+    # and a module-level reset here would make every trial draw identical
+    # noise regardless of the --seed CLI arg. See sample_poses()'s own `seed`
+    # parameter for inference-time randomness instead.
+    torch.manual_seed(SEED); np.random.seed(SEED)
     main()

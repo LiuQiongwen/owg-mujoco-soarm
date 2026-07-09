@@ -21,6 +21,19 @@ from tango_robot.env_soarm import (EnvironmentSoArm,      # MuJoCo backend
 # collect_lggsn_data._SPREAD_XY so inference features lie in the training distribution.
 _LGGSN_SPREAD_XY = 0.06
 
+# Lazy singleton for Phase 1 v2's IK-margin candidate selection (see
+# _cfm_sample_candidates's IKMARGIN_N branch). Built once per process on
+# first use, not at import time, since constructing it is not free (~0.15s,
+# builds a headless MjModel) and most runs never touch this mode.
+_headless_ik_solver = None
+
+def _get_headless_ik_solver():
+    global _headless_ik_solver
+    if _headless_ik_solver is None:
+        from tango_robot.headless_ik import HeadlessIKSolver
+        _headless_ik_solver = HeadlessIKSolver()
+    return _headless_ik_solver
+
 # ── CFM grasp generator (optional) ────────────────────────────────────────────
 # Set env var CFM_CKPT to enable CFM candidate generation in _setup_grasps_mujoco.
 # The matching _stats.json must exist alongside the .pt checkpoint.
@@ -90,14 +103,108 @@ def _cfm_sample_candidates(model, stats, obj_name: str, n: int,
     pmean  = np.array(stats["pose_mean"], dtype=np.float32)   # global training mean
     pstd   = np.array(stats["pose_std"],  dtype=np.float32)
 
-    if model_type == "ddpm":
-        from train_diffusion_grasp import sample_poses_ddpm
-        infer_steps = int(os.environ.get("DDIM_STEPS", stats.get("infer_steps", 100)))
-        poses_norm = sample_poses_ddpm(model, cond_t, n=n, steps=infer_steps)
+    # Per-trial seed for the generator's initial noise. Defaults to being
+    # derived from the already-per-trial-seeded `rng`
+    # (np.random.default_rng(self.seed)) — see sample_poses()/
+    # sample_poses_ddpm()'s `seed` param docstring. Without this, every
+    # trial in a freshly-started demo.py process drew from whatever state
+    # torch's global RNG happened to be in, which was NOT varying with
+    # --seed (this was a real bug, not a hypothetical).
+    #
+    # GEN_SEED env var (set via demo.py --gen-seed) overrides this,
+    # decoupling generator sampling noise from --seed's spawn-orientation
+    # control — lets an experiment hold one fixed while varying the other.
+    # Lazy evaluation deliberately: os.environ.get("GEN_SEED", rng.integers(...))
+    # would call rng.integers() unconditionally (eager default-arg evaluation),
+    # which happens to be harmless today (verified: the discarded draw's state
+    # effect depends only on rng's own state, not on GEN_SEED) but relies on a
+    # subtle invariant a future edit could silently break. Structural
+    # correctness instead of a fact that needs re-verifying every time this
+    # code changes.
+    gen_seed_env = os.environ.get("GEN_SEED")
+    gen_seed = int(gen_seed_env) if gen_seed_env is not None else int(rng.integers(0, 2**31 - 1))
+
+    # CONSENSUS_N env var (set via demo.py --consensus-n): opt-in candidate
+    # selection by ensemble agreement instead of the single-gen-seed default.
+    # Phase 0 diagnostic finding (150 trials, IK-verified): successful
+    # candidates sit closer to their cell's pose-space consensus than failed
+    # ones (Mann-Whitney p=0.0001, pooled across Pear/MustardBottle/
+    # CrackerBox) — but the effect is much weaker for CrackerBox specifically,
+    # where failures are dominated by physical grasp-execution quality rather
+    # than candidate position (71% of CrackerBox failures were IK-reachable
+    # but failed at contact/lift, vs 27%/40% for Pear/MustardBottle). This is
+    # a position-space heuristic, not a general fix — expect it to help where
+    # failure is a reachability/positioning problem and not where it's a
+    # grasp-quality problem.
+    #
+    # Draws CONSENSUS_N independent 1-candidate samples (seeds gen_seed,
+    # gen_seed+1, ..., gen_seed+N-1 — reuses the existing --gen-seed value as
+    # the ensemble's base seed, so sweeping --gen-seed in steps of N gives
+    # non-overlapping ensembles for a variance comparison against the
+    # single-draw baseline), takes the median pose (robust to outliers, per
+    # the diagnostic's own choice), and returns only the candidate nearest to
+    # that median — collapses to the existing single-draw behavior when
+    # CONSENSUS_N is unset or <= 1.
+    def _draw_ensemble(ensemble_n: int) -> np.ndarray:
+        """N independent 1-candidate draws, seeds gen_seed..gen_seed+N-1.
+        Shared by both CONSENSUS_N and IKMARGIN_N selection modes below."""
+        out = []
+        for i in range(ensemble_n):
+            if model_type == "ddpm":
+                from train_diffusion_grasp import sample_poses_ddpm
+                infer_steps = int(os.environ.get("DDIM_STEPS", stats.get("infer_steps", 100)))
+                pn = sample_poses_ddpm(model, cond_t, n=1, steps=infer_steps, seed=gen_seed + i)
+            else:
+                from train_cfm_grasp import sample_poses
+                pn = sample_poses(model, cond_t, n=1, steps=20, seed=gen_seed + i)
+            out.append((pn * pstd + pmean)[0])
+        return np.array(out)   # (ensemble_n, 6): x,y,z,roll,pitch,yaw
+
+    consensus_n = int(os.environ.get("CONSENSUS_N", "0"))
+    ikmargin_n  = int(os.environ.get("IKMARGIN_N", "0"))
+
+    if ikmargin_n > 1:
+        # Phase 1 v2: select by IK error margin (pe_ik from the headless
+        # solver) instead of pose-space consensus. Phase 0 diagnostic
+        # (150 IK-verified trials) found successful candidates had a mean IK
+        # error of 1.4mm vs 38.2mm for failures on Pear (Mann-Whitney
+        # p=0.0002) — an order of magnitude stronger signal than distance-
+        # from-consensus, which collapsed to non-significance (p=0.27) once
+        # conditioned on reachability. This selects the candidate with the
+        # smallest pe_ik among the ensemble — using the causal quantity
+        # directly instead of a noisy positional proxy for it.
+        ensemble_poses = _draw_ensemble(ikmargin_n)
+        solver = _get_headless_ik_solver()
+        pe_iks = []
+        for p in ensemble_poses:
+            cfm_x, cfm_y, cfm_z = float(p[0]), float(p[1]), float(p[2])
+            tx = cfm_x - float(pmean[0]) + gx
+            ty = cfm_y - float(pmean[1]) + gy
+            target = np.array([tx, ty, gz])
+            _, pe, _ = solver.solve_ik_jaw_pos_only(target, silent=True)
+            pe_iks.append(pe)
+        winner_idx = int(np.argmin(pe_iks))
+        poses = ensemble_poses[winner_idx:winner_idx + 1]
+    elif consensus_n > 1:
+        ensemble_poses = _draw_ensemble(consensus_n)
+        # Weighted distance in (x, y, yaw) — yaw scaled to roughly match x/y's
+        # metre-scale spread, same 0.05 weighting used in the Phase 0 diagnostic.
+        YAW_WEIGHT = 0.05
+        feat = ensemble_poses[:, [0, 1, 5]].copy()
+        feat[:, 2] *= YAW_WEIGHT
+        median = np.median(feat, axis=0)
+        dists = np.linalg.norm(feat - median, axis=1)
+        winner_idx = int(np.argmin(dists))
+        poses = ensemble_poses[winner_idx:winner_idx + 1]   # already denormalised above
     else:
-        from train_cfm_grasp import sample_poses
-        poses_norm = sample_poses(model, cond_t, n=n, steps=20)   # (n, 6) normalised
-    poses      = poses_norm * pstd + pmean                     # denormalise → absolute
+        if model_type == "ddpm":
+            from train_diffusion_grasp import sample_poses_ddpm
+            infer_steps = int(os.environ.get("DDIM_STEPS", stats.get("infer_steps", 100)))
+            poses_norm = sample_poses_ddpm(model, cond_t, n=n, steps=infer_steps, seed=gen_seed)
+        else:
+            from train_cfm_grasp import sample_poses
+            poses_norm = sample_poses(model, cond_t, n=n, steps=20, seed=gen_seed)   # (n, 6) normalised
+        poses      = poses_norm * pstd + pmean                     # denormalise → absolute
 
     grasps = []
     for p in poses:
