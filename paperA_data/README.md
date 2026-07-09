@@ -1,5 +1,39 @@
 # Paper A raw data archive
 
+## ✅ RESOLVED (2026-07-09): Scissors excluded from Paper A, clean 5/6-object results published
+
+The Scissors fallback bug described in the CRITICAL section below was confirmed by
+re-executing the exact matching code and re-deriving the 40/50-tie and 0-discordant-trial
+evidence independently on 2026-07-09. Decision: **exclude Scissors entirely from Paper A**
+rather than attempt a same-day rerun. The other 6 objects (Banana/Pear/MustardBottle/
+CrackerBox/PowerDrill/TomatoSoupCan) are unaffected — confirmed clean by running the same
+matching code against all 7 object names.
+
+What changed on disk:
+- **New authoritative summary**: `formal_results/PAPER_A_CLEAN_SUMMARY.md` — the single file
+  to cite from the paper. Consolidates the corrected contact-feature Bonferroni/BH table
+  (15 tests, 5 objects) and the corrected exp1_variance method comparison (`ALL_excl_scissors`
+  scope, 6 objects).
+- **New file**: `formal_results/contact_features_bonferroni_bh_5obj_clean.csv`
+  (`scripts/run_contact_features_stats_5obj_clean.py`) — Scissors dropped entirely from both
+  the p-values and the correction family (15 tests, not 18). No significance conclusion
+  changed vs. the old 18-test file (checked row-by-row).
+- **Existing files annotated, not deleted**: `contact_features_bonferroni_bh_6obj.csv` and
+  `exp1_variance_significance.csv` now carry an `excluded_reason` column — non-empty only for
+  Scissors rows, pointing back to this README and to the clean replacement file. Both are kept
+  on disk for provenance/audit but are no longer the files to cite.
+- **New pooled scope**: `exp1_variance_significance.csv` gained an `ALL_excl_scissors` row
+  (n=300/method, the 6 valid objects) alongside the original `ALL` (n=350/method, still
+  includes the invalid Scissors rows, kept for comparison only). One conclusion changes here:
+  OT-CFM vs. DDPM's unpaired tests move from non-significant (p≈0.051) to significant
+  (p≈0.037) once Scissors' diluting 80%/80%/80% tie is removed. The paired McNemar result
+  (the statistically preferred test) was already significant and is numerically unchanged,
+  since Scissors contributed exactly 0 discordant pairs.
+
+See `formal_results/PAPER_A_CLEAN_SUMMARY.md` for full numbers and the file map of what to
+cite vs. what's kept for provenance only.
+
+
 Copied verbatim (md5 verified) from the Claude Code job scratchpad
 `/home/lina/.claude/jobs/b899ad73/tmp/` on 2026-07-08, because that directory
 is not part of any git repo and is subject to cleanup. This is a straight
