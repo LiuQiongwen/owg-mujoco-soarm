@@ -2,3 +2,4 @@ object,ikmargin_ensemble_n,ikmargin_success,ikmargin_n,ikmargin_rate,consensus_e
 Pear,10,3,50,0.06,10,34,50,0.68,-0.62,0.03,5.807483825915782e-11,ensemble sizes matched (10 vs 10) -- controlled test of selection rule alone
 MustardBottle,10,25,50,0.5,10,34,50,0.68,-0.18,0.4706,0.10330962903225446,ensemble sizes matched (10 vs 10) -- controlled test of selection rule alone
 CrackerBox,10,22,50,0.44,10,22,50,0.44,0.0,1.0,1.0,ensemble sizes matched (10 vs 10) -- controlled test of selection rule alone
+TomatoSoupCan,10,17,50,0.34,10,32,50,0.64,-0.3,0.2898,0.004849500768603563,ensemble sizes matched (10 vs 10) -- controlled test of selection rule alone

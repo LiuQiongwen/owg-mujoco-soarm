@@ -1,0 +1,2 @@
+object,feature,n_succ,n_fail,succ_mean,succ_std,fail_mean,fail_std,mannwhitney_U,p_raw,rank_biserial_effect_size,note
+PowerDrill,lateral_score,41,9,0.40071,0.24492,0.57652,0.28135,110.0,0.06167385691523226,0.4038,"post-hoc single exploratory test, NOT part of the pre-specified 3-feature x 5-object=15-test Bonferroni/BH family in contact_features_bonferroni_bh_5obj_clean.csv; no correction applied"

@@ -1,6 +1,12 @@
 """
 Ensemble-size-matched IK-margin vs consensus comparison, for
-Pear / MustardBottle / CrackerBox.
+Pear / MustardBottle / CrackerBox / TomatoSoupCan.
+
+TomatoSoupCan added 2026-07-09 (run_ikmargin_n10_tomatosoupcan.sh +
+run_consensus_n10_tomatosoupcan.sh) to close a gap: the paper's "Reliability
+across generation seeds" paragraph names Pear AND TomatoSoupCan as objects
+where OT-CFM is less reliable across seeds than CFM-noOT/DDPM, but this
+ikmargin-vs-consensus mitigation check previously only covered Pear.
 
 This is the controlled counterpart to run_ikmargin_vs_consensus.py: that
 script compared ikmargin(pool=10) against consensus(pool=5), an ensemble-size
@@ -25,7 +31,7 @@ from scipy.stats import fisher_exact
 
 BASE = Path(__file__).resolve().parent.parent
 
-OBJECTS = ["Pear", "MustardBottle", "CrackerBox"]
+OBJECTS = ["Pear", "MustardBottle", "CrackerBox", "TomatoSoupCan"]
 
 
 def load(path):
