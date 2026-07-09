@@ -1,5 +1,111 @@
 # Paper A raw data archive
 
+## ✅ ROOT CAUSE FOUND AND FIXED (2026-07-09/10): the seeding bug behind every instability finding below, full clean re-evaluation, and the paper's final (honest, mixed) narrative
+
+**This section supersedes the "broader implication, not resolved here" note at the bottom of the
+TomatoSoupCan section directly below.** That note asked whether a documented pattern of run-to-run
+non-determinism (Scissors' 3 different measurements, TomatoSoupCan's reversal at n=50) pointed to
+something systemic. It did: `sample_poses`/`sample_poses_ddpm` (the CFM/DDPM inference-time
+samplers) never received a per-trial `seed` parameter in `tango_robot/ui.py`'s main code path.
+Combined with a module-level `torch.manual_seed(42)` in `train_cfm_grasp.py`/`train_diffusion_grasp.py`
+(executed once on import), every trial in a freshly-started process drew generator noise from
+whatever state that fixed seed left behind at import time -- **independent of the trial's nominal
+`--seed`**. Concretely: 25 nominally-distinct OT-CFM trials per object were, in practice, close to
+25 repeats of one candidate. Baseline (random-CoM sampling) was unaffected -- it draws from
+`numpy`'s properly-seeded generator, not the torch-seeded generator network -- which is exactly why
+only the learned-generator conditions showed suspiciously narrow, high success rates in every
+earlier draft of `paper_final.tex`, and why Scissors' instability and TomatoSoupCan's reversal
+(both documented below, both found *before* this root cause was known) only ever showed up as
+individually-explained anomalies rather than a single mechanism.
+
+**Fix**: developed on a separate worktree (`worktree-fix-eval-seeding`, commit `10814cd`) and
+merged into `main` (commit `1434533`, 2026-07-09) after the user chose, when presented with the
+alternative of a narrower patch, to fully merge and re-run rather than leave main and the
+worktree diverged. `demo.py`/`tango_robot/ui.py`/`train_cfm_grasp.py`/`train_diffusion_grasp.py`
+now pass a real per-trial `seed=` into both the spawn-orientation draw (`np.random.seed`) and the
+CFM/DDPM sampling call itself.
+
+**Before deciding how to write the paper, checked for other bugs of the same shape** (per explicit
+user instruction) rather than assuming this was the only one: re-verified LGGSN reranking, the
+spawn-position fix, and DDPM's own sampling path. None had a second instance of the same class of
+bug. Concluded the fix was complete and proceeded to a full clean re-evaluation.
+
+**Full clean re-evaluation** (all 7 objects, `n=50`/object/condition, 350 trials/condition pooled,
+fixed code, `tango` env — scripts `run_clean_seed1_25_6obj.sh` + `run_clean_scissors_seed26_50.sh`
++ prior Scissors recheck data; aggregated by `scripts/run_final_paper_stats.py` ->
+`formal_results/final_paper_all_methods.csv`):
+
+| Comparison | Baseline | OT-CFM / EBM v2 | Δ (pp) | z | p |
+|---|---|---|---|---|---|
+| Pooled, 7 objects, OT-CFM | 79.1% (277/350) | 69.1% (242/350) | **−10.0** | −3.02 | **0.0025** |
+| Pooled, 6 objects excl. Scissors, OT-CFM | 77.7% (233/300) | 66.0% (198/300) | **−11.7** | −3.18 | **0.0015** |
+| Pooled, 6 objects excl. Scissors, EBM v2 | 77.7% (233/300) | 74.0% (222/300) | −3.7 | −1.05 | 0.294 (ns) |
+
+**This reverses the paper's original headline claim** (previously reported as a ~+12pp OT-CFM win
+built on the unseeded 175-trial evaluation) **to a significant loss.** This is the single most
+consequential finding of the whole session and is now the paper's actual thesis.
+
+**Diagnosis, not just reporting the reversal**: rather than discard OT-CFM, used the fixed pipeline
+as a diagnostic instrument. Three-object (Pear/TomatoSoupCan/CrackerBox) controlled comparisons at
+`n=25` (`run_removeOT_check_fixed_code.sh`, `run_ddpm_check_fixed_code.sh`,
+`run_stratifiedOT_check_fixed_code.sh`) isolate the failure to minibatch OT coupling specifically:
+
+- **Remove-OT** (identical architecture/data, no OT coupling): Pear 72% (= baseline exactly),
+  TomatoSoupCan 100% (baseline 92%), CrackerBox 28% (baseline 42%, the one object no method
+  recovers on).
+- **DDPM** (same data, diffusion instead of flow matching, still no OT coupling): same pattern —
+  tracks baseline far more closely than OT-CFM.
+- **Stratified-OT** (per-object OT coupling instead of mixed-minibatch coupling — the discrete-class
+  limit of C²OT's condition-aware fix, Cheng & Schwing, ICCV 2025, arXiv:2503.10636; implemented via
+  `CFM_STRATIFY_OT=1` in `train_cfm_grasp.py`): partially recovers TomatoSoupCan (78%→88%, still
+  below baseline) and CrackerBox (28%→44%, now above baseline, but CrackerBox is noisy for every
+  method), but **leaves Pear completely unmoved** (52%, identical to unfixed OT-CFM) — the object
+  where OT-CFM's failure is largest. Read as: the fix is not wrong in principle, but Pear has the
+  fewest training examples of the three objects and a per-object OT sub-batch of that size may be
+  too small for any coupling scheme to help.
+
+This matches Cheng & Schwing's mechanism (condition-agnostic minibatch OT coupling creates a
+training-time prior skewed by which noise samples the solver assigned to which object, that
+inference-time sampling — drawing from the full unconditional prior — was never trained to match)
+almost exactly, and localizes the problem to the coupling step, not to conditional flow matching or
+learned candidate generation in general.
+
+**EBM v1 → v2**: separately implemented an energy-based scoring alternative
+(`train_ebm_grasp.py`, `tango_robot/ui.py`'s `_load_ebm_model`/`_ebm_sample_candidates`, CEM search
+over (x,y,yaw)), motivated by Implicit Behavioral Cloning (Florence et al., CoRL 2021) as a
+small-data-friendlier alternative to an ODE/SDE generator.
+
+- **v1 (naive, static contrastive labels, `ebm_allobj.pt`)**: catastrophic failure, 0–16% success.
+  Root-caused via a standalone diagnostic script replicating the CEM loop: search converged to
+  `mean_xy≈[1.67,−0.26]` normalized (~8.5cm real-world offset from CoM, matching the observed
+  ~9.8cm gap in failed physical trials) where the model gave artificially high confidence
+  (logit=4.55) despite that region being entirely unconstrained by training data — the textbook IBC
+  "unconstrained energy exploitation" failure: inference-time search finds and exploits any region
+  the training loss never penalized.
+- **v2 (adversarial hard-negative mining, `ebm_allobj_v2.pt`)**: rewrote training to mine hard
+  negatives from the model's own current beliefs during training (short CEM search each step,
+  `K_HARD=4` per positive alongside `K_STATIC=4` logged failures and `K_UNIFORM=4` uniform-coverage
+  negatives, InfoNCE/cross-entropy loss) — exactly the mechanism IBC prescribes and v1 omitted.
+  Verified via the same standalone diagnostic: CEM now converges near the true CoM (<2mm offset)
+  with a modest, well-calibrated confidence (logit≈−0.05), not a confidently-wrong one.
+  Full 6-object (excl. Scissors) `n=50` evaluation (`run_ebm_v2_full7obj_n50.sh`): **74.0% vs.
+  baseline's 77.7% (p=0.294, not significant)** — statistical parity, not a clean win, and
+  significantly *beats* baseline on exactly one of six objects. Reported as a mixed, honest result.
+
+**Final paper narrative** (fully rewritten in `paper_final.tex`, new title "When Generative
+Candidates Do Not Beat Random Sampling: A Seeding-Bug Audit and Diagnosis for 6-DoF Grasp
+Generation"): no generative candidate method tested (OT-CFM, Remove-OT, DDPM, Stratified-OT, EBM
+v1, EBM v2) reliably and significantly beats a well-reranked random baseline in this small-data
+(~400 examples/object), single-GPU regime. The one significant effect in either direction is
+OT-CFM's specific, avoidable harm from condition-agnostic minibatch OT coupling. The one method
+that does robustly help is training-free: consensus candidate selection from an ensemble of
+independent draws (documented in the ikmargin-vs-consensus section below). This is reported as the
+paper's actual contribution — a confirmed evaluation bug and its consequence, a physically-grounded
+transfer of a generative-modeling diagnosis (to our knowledge the first on physically executed
+robot task success rather than a generation-quality proxy), and a documented EBM failure-and-fix
+pair — rather than spun as a win. Compiles cleanly to exactly 8 pages (RA-L's hard limit, references
+included, zero headroom left) as of 2026-07-10, `latexmk -pdf paper_final.tex && pdfinfo`.
+
 ## ⚠️ TomatoSoupCan's Table II direction reverses at n=50 -- not applied to the table, disclosed as a limitation instead (2026-07-09)
 
 Follow-up to the Scissors instability finding below: while investigating whether the same kind
