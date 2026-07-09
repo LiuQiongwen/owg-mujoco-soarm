@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  9 JUL 2026 22:07
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  9 JUL 2026 23:04
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -687,18 +687,22 @@ LaTeX Font Info:    External font `lmex10' loaded for size
 Package balance Warning: You have called \balance in second column
 (balance)                Columns might not be balanced.
 
-[6] [7] (./paper_final.aux)
+[6]
+Overfull \vbox (1.95688pt too high) has occurred while \output is active []
+
+
+[7] (./paper_final.aux)
 Package rerunfilecheck Info: File `paper_final.out' has not changed.
 (rerunfilecheck)             Checksum: A27B1843B473BF449245889659151E10;3758.
  ) 
 Here is how much of TeX's memory you used:
- 15454 strings out of 478287
- 257379 string characters out of 5849289
+ 15456 strings out of 478287
+ 257401 string characters out of 5849289
  608286 words of memory out of 5000000
  33056 multiletter control sequences out of 15000+600000
- 698427 words of font info for 297 fonts, out of 8000000 for 9000
+ 698557 words of font info for 298 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 60i,11n,63p,1008b,493s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 60i,11n,63p,1008b,495s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texmf/fonts/enc/dvips/lm/lm-ec.enc}{/usr/share/texmf/fonts/enc/dv
 ips/lm/lm-mathsy.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/s
 hare/texmf/fonts/enc/dvips/lm/lm-rm.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm
@@ -726,7 +730,7 @@ s/type1/public/lm/lmsy10.pfb></usr/share/texmf/fonts/type1/public/lm/lmsy6.pfb>
 are/texmf/fonts/type1/public/lm/lmtt10.pfb></usr/share/texlive/texmf-dist/fonts
 /type1/public/amsfonts/symbols/msbm10.pfb></usr/share/texlive/texmf-dist/fonts/
 type1/public/amsfonts/symbols/msbm5.pfb>
-Output written on paper_final.pdf (7 pages, 566432 bytes).
+Output written on paper_final.pdf (7 pages, 567684 bytes).
 PDF statistics:
  425 PDF objects out of 1000 (max. 8388607)
  341 compressed objects within 4 object streams

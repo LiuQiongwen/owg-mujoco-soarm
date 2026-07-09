@@ -1,0 +1,7 @@
+object,condition,orig_1_25,new_26_50,merged_1_50,merged_pct
+TomatoSoupCan,baseline,23,24,47,94.0
+TomatoSoupCan,otcfm,25,19,44,88.0
+PowerDrill,baseline,19,17,36,72.0
+PowerDrill,otcfm,22,20,42,84.0
+TomatoSoupCan,OT-CFM_vs_baseline_n50,,,delta=-6.0pp,z=-1.048 p=0.2945 fisher_p=0.4870
+PowerDrill,OT-CFM_vs_baseline_n50,,,delta=+12.0pp,z=1.448 p=0.1475 fisher_p=0.2270
