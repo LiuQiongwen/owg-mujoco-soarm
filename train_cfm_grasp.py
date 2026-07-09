@@ -32,6 +32,17 @@ from torchcfm.conditional_flow_matching import (
 JSONL_PATH   = os.environ.get("CFM_JSONL",  "grasp_6dof/dataset/lggsn_candidates_v9.jsonl")
 OUT_PNG      = os.environ.get("CFM_PNG",    "cfm_all_poses_ot.png")
 CKPT_PATH    = os.environ.get("CFM_CKPT",   "grasp_6dof/models/cfm_allobj_ot.pt")
+# CFM_STRATIFY_OT=1: compute the minibatch OT coupling independently within
+# each object's own examples instead of across the mixed multi-object batch.
+# This is the discrete-class limit of C2OT's condition-aware coupling fix
+# (Cheng & Schwing, ICCV 2025) -- their own released config for CIFAR-10's
+# 10 discrete classes sets the condition weight so large (1e8) that it
+# forbids cross-class pairing whenever a same-class pairing exists, which
+# is exactly what per-object stratification implements directly. Motivation:
+# the original (condition-agnostic, whole-batch) OT coupling was found to
+# produce a generator that is *worse* than not using OT at all on physically
+# executed grasp trials -- see paperA_data/README.md, 2026-07-09/10 entries.
+STRATIFY_OT  = os.environ.get("CFM_STRATIFY_OT", "0") == "1"
 OBJECTS      = ["banana","can","cracker","cylinder","drill","mustard","pear"]
 N_EPOCHS     = int(os.environ.get("CFM_EPOCHS",    "1000"))
 BATCH_SIZE   = int(os.environ.get("CFM_BATCH",     "128"))
@@ -69,6 +80,7 @@ class GraspPoseDataset(Dataset):
         self.poses   = torch.from_numpy(poses_norm)   # (N, 6)
         self.vis     = torch.from_numpy(vis_norm)     # (N, 256)
         self.queries = queries
+        self.obj_ids = torch.tensor([OBJECTS.index(q) for q in queries], dtype=torch.long)
         self.N       = len(rows)
 
         # Per-object stats for reporting
@@ -98,7 +110,7 @@ class GraspPoseDataset(Dataset):
         return self.N
 
     def __getitem__(self, idx):
-        return self.vis[idx], self.poses[idx]
+        return self.vis[idx], self.poses[idx], self.obj_ids[idx]
 
 
 # ── 2. Velocity network ───────────────────────────────────────────────────────
@@ -147,15 +159,37 @@ def train(dataset: GraspPoseDataset) -> VelocityNet:
     print(f"[Train] VelocityNet params: {n_params:,}  device: {device}")
     print(f"[Train] {N_EPOCHS} epochs  batch={BATCH_SIZE}  lr={LR}  wd={WEIGHT_DECAY}")
 
+    if STRATIFY_OT:
+        print("[Train] CFM_STRATIFY_OT=1: OT coupling computed within each object's own "
+              "examples, not across the mixed multi-object batch (C2OT discrete-class fix).")
+
     best_loss, best_state = float("inf"), None
     for epoch in range(1, N_EPOCHS + 1):
         model.train()
         total_loss = 0.0
-        for cond_b, x1_b in loader:
+        for cond_b, x1_b, obj_b in loader:
             cond_b = cond_b.to(device)
             x1_b   = x1_b.to(device)
-            x0     = torch.randn_like(x1_b)
-            t, xt, ut = FM.sample_location_and_conditional_flow(x0, x1_b)
+            if STRATIFY_OT:
+                # One shared OT plan across the whole (multi-object) batch lets the
+                # solver pair noise samples with *any* object's target pose, ignoring
+                # which object each x0/x1 "belongs to" -- exactly the failure mode
+                # C2OT identifies. Instead, run the same exact-OT solver independently
+                # per object group, then recombine, so no noise sample is ever paired
+                # across a condition boundary.
+                t_parts, xt_parts, ut_parts, cond_parts = [], [], [], []
+                for obj_id in obj_b.unique():
+                    mask = obj_b == obj_id
+                    x1_g = x1_b[mask]
+                    x0_g = torch.randn_like(x1_g)
+                    t_g, xt_g, ut_g = FM.sample_location_and_conditional_flow(x0_g, x1_g)
+                    t_parts.append(t_g); xt_parts.append(xt_g); ut_parts.append(ut_g)
+                    cond_parts.append(cond_b[mask])
+                t, xt, ut = torch.cat(t_parts), torch.cat(xt_parts), torch.cat(ut_parts)
+                cond_b = torch.cat(cond_parts)
+            else:
+                x0 = torch.randn_like(x1_b)
+                t, xt, ut = FM.sample_location_and_conditional_flow(x0, x1_b)
             loss = F.mse_loss(model(t, xt, cond_b), ut)
             optim.zero_grad()
             loss.backward()
