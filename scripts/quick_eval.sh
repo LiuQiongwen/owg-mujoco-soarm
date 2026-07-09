@@ -55,11 +55,11 @@ for obj in "${OBJECTS[@]}"; do
     [ "$GRC6DOF"     = "1" ] && EXTRA_ARGS="$EXTRA_ARGS --grconvnet-6dof"
 
     if [ -n "$ENV_VARS" ]; then
-      OUTPUT=$(timeout "$TIMEOUT" conda run -n owg-mujoco env $ENV_VARS python demo.py \
+      OUTPUT=$(timeout "$TIMEOUT" conda run -n tango env $ENV_VARS python demo.py \
         --stage "$STAGE" --prompt "$obj" --seed "$seed" --once --verbose 0 \
         --gate-delta "$GATE_DELTA" --mc-gate-delta "$MC_GATE_DELTA" $EXTRA_ARGS 2>&1)
     else
-      OUTPUT=$(timeout "$TIMEOUT" conda run -n owg-mujoco python demo.py \
+      OUTPUT=$(timeout "$TIMEOUT" conda run -n tango python demo.py \
         --stage "$STAGE" --prompt "$obj" --seed "$seed" --once --verbose 0 \
         --gate-delta "$GATE_DELTA" --mc-gate-delta "$MC_GATE_DELTA" $EXTRA_ARGS 2>&1)
     fi
