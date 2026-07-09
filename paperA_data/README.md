@@ -1,5 +1,45 @@
 # Paper A raw data archive
 
+## ⚠️ TomatoSoupCan's Table II direction reverses at n=50 -- not applied to the table, disclosed as a limitation instead (2026-07-09)
+
+Follow-up to the Scissors instability finding below: while investigating whether the same kind
+of cross-run drift affects other objects (motivated by finding `logs/eval_baseline_nosem_v2.log`
+gives PowerDrill baseline 17/25 vs. the adopted run's 19/25 -- not chased further, out of scope),
+extended TomatoSoupCan and PowerDrill from 25 to 50 seeds (25 new seeds each, both Baseline and
+OT-CFM+LGGSN conditions, exact harness reverse-engineered from the original source logs' own
+printed headers: `logs/eval_baseline_nosem.log` and `logs/eval_cfm_ot_nosem_current.log`, both
+confirmed byte-for-byte matching Table II's published counts before extending). Smoke-tested
+first (seed=26, both objects, both conditions, all 4 ran and completed cleanly) before committing
+to the full 100-trial batch (`scripts/run_seed26_50_tomatosoupcan_powerdrill.sh`, 0 timeouts).
+
+**TomatoSoupCan's OT-CFM rate on the 25 *new* seeds is 76% (19/25)** -- sharply lower than the
+original 25 seeds' 100% (25/25). Pooled to n=50: **Baseline 94.0% (47/50) vs. OT-CFM 88.0%
+(44/50), a -6.0pp reversal** of the original +8.0pp direction (still not significant either way:
+z-test p=0.29, Fisher p=0.49). The original 25-seed result was a favorable draw, not an
+underpowered-but-real effect. PowerDrill's direction holds at n=50 (Baseline 72.0%[36/50] vs.
+OT-CFM 84.0%[42/50], +12.0pp, still p=0.15/0.23, not significant).
+
+**Decision (2026-07-09, user call)**: do not overwrite Table II's TomatoSoupCan/PowerDrill rows
+with the n=50 figures -- doing so for only 2 of 7 objects would make the table's own stated
+methodology ("25 seeds each") inconsistent across rows. Instead, `paper_final.tex`'s Per-Object
+Analysis text now discloses the reversal directly and retracts the "suggesting real but
+seed-limited headroom" claim that had been written into that same paragraph during the Tier 1
+contact-feature work earlier in this session -- that claim is now known to be wrong, not merely
+unproven. The contact-feature diagnostic's TomatoSoupCan finding (`local_point_density` p=0.00123)
+is reframed as describing that diagnostic's own sample only, not evidence that OT-CFM finds
+better landing positions than random sampling.
+
+Formalized via `scripts/run_seed26_50_stats.py` ->
+`formal_results/seed26_50_tomatosoupcan_powerdrill.csv`; raw per-seed data in
+`phase0_diag_extended/seed26_50_{TomatoSoupCan,PowerDrill}_{baseline,otcfm}.jsonl`.
+
+**Broader implication, not resolved here**: between this finding and the Scissors instability and
+the PowerDrill-baseline-v2 discrepancy noted above, there is now a documented pattern of
+run-to-run non-determinism affecting multiple objects and conditions in the 175-trial main
+evaluation, not just Scissors. A full re-audit of all 7 objects at higher seed counts would be
+needed to know how much of Table I/II/III is affected -- out of scope for this session, flagged
+here for whoever picks this up next.
+
 ## ⚠️ Separate issue, same object: `paper_final.tex`'s own Scissors number was also unreplicated (found + fixed 2026-07-09)
 
 This is unrelated to the CFM name-matching fallback bug below -- it affects `paper_final.tex`'s
