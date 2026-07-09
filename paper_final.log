@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  26 JUN 2026 21:27
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2026.3.26)  9 JUL 2026 16:55
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -674,18 +674,28 @@ Package microtype Info: Character `029' is missing
 (microtype)             Ignoring protrusion settings for this character.
 LaTeX Font Info:    External font `lmex10' loaded for size
 (Font)              <8> on input line 379.
- [3] [4] [5] (./paper_final.aux)
+ [3]
+Underfull \hbox (badness 1442) in paragraph at lines 518--527
+\T1/lmr/m/n/10 (+20) To ver-ify that OT coupling---not the flow-matching
+ []
+
+[4]
+
+Package balance Warning: You have called \balance in second column
+(balance)                Columns might not be balanced.
+
+[5] (./paper_final.aux)
 Package rerunfilecheck Info: File `paper_final.out' has not changed.
 (rerunfilecheck)             Checksum: A27B1843B473BF449245889659151E10;3758.
  ) 
 Here is how much of TeX's memory you used:
- 15416 strings out of 478287
- 256983 string characters out of 5849289
+ 15430 strings out of 478287
+ 257129 string characters out of 5849289
  608286 words of memory out of 5000000
  33052 multiletter control sequences out of 15000+600000
- 694291 words of font info for 281 fonts, out of 8000000 for 9000
+ 694800 words of font info for 288 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 60i,11n,63p,1008b,342s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 60i,11n,63p,1008b,339s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texmf/fonts/enc/dvips/lm/lm-ec.enc}{/usr/share/texmf/fonts/enc/dv
 ips/lm/lm-mathsy.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm-mathit.enc}{/usr/s
 hare/texmf/fonts/enc/dvips/lm/lm-rm.enc}{/usr/share/texmf/fonts/enc/dvips/lm/lm
@@ -712,7 +722,7 @@ nts/type1/public/lm/lmsy6.pfb></usr/share/texmf/fonts/type1/public/lm/lmsy7.pfb
 1/public/lm/lmsy9.pfb></usr/share/texmf/fonts/type1/public/lm/lmtt10.pfb></usr/
 share/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/s
 hare/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm5.pfb>
-Output written on paper_final.pdf (5 pages, 537313 bytes).
+Output written on paper_final.pdf (5 pages, 540208 bytes).
 PDF statistics:
  399 PDF objects out of 1000 (max. 8388607)
  319 compressed objects within 4 object streams

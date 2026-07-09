@@ -578,6 +578,14 @@ pass through the table under MuJoCo contact detection.
 Replacing the geometry with a bounding-box proxy at 4\,cm restores
 25/25 = 100\% for all methods, leaving per-condition $\Delta$pp values
 unchanged.
+A second, unrelated issue also affects Scissors in a separate, supplementary
+generation-isolated diagnostic experiment (not reported in this paper): the
+object-name matching used to condition OT-CFM sampling never matches
+``scissors'' against its trained category key, silently falling back to
+random sampling in that other experiment. This does not affect any number
+reported here---Scissors is at ceiling (100\%) for every condition in this
+paper regardless of which sampler produced the candidates---but we note it
+for transparency since both issues share the same object.
 
 \subsection{Limitations}
 

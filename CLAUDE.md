@@ -179,4 +179,4 @@ Parsed from demo.py stdout. The benchmark logger writes per-trial JSONL to `resu
 - Do not `import robots` from inside `tango_robot/` or `tango/` — circular imports.
 - Do not call `env._step_hook` directly; only `MujocoBackend.execute_grasp()` sets it.
 - Do not edit `paper_final.tex` without checking `paper_final.pdf` diff — it is the live submission draft.
-  - Target venue: RA-L. Hard limit: **8 pages** (references excluded). Currently at exactly 8 pages (commit 397158f). Do not add content without a corresponding cut.
+  - Target venue: RA-L. Hard limit: **8 pages** (references excluded). Currently **5 pages** (verified by compiling commit 9cd0b21, 2026-07-09) — 3 pages of headroom, not "exactly 8" as this note previously said (stale since at least commit 00748d3/9cd0b21's table/ablation additions). Re-verify page count with `latexmk -pdf paper_final.tex && pdfinfo paper_final.pdf` after any substantial edit rather than trusting this note.
