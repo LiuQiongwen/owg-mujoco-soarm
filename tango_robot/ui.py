@@ -69,6 +69,117 @@ def _load_cfm_model(ckpt_path: str):
         print(f"[CFM] Failed to load: {e}")
         return None, None
 
+# ── EBM grasp scoring model (optional) ────────────────────────────────────────
+# Set env var EBM_CKPT to enable energy-based candidate generation (CEM search)
+# in _setup_grasps_mujoco, in place of the CFM/DDPM ODE/SDE generator. See
+# train_ebm_grasp.py for the training-side rationale (2026-07-10): OT-CFM was
+# found to significantly underperform random-CoM sampling on physically
+# executed trials; an energy-based model trained on the same
+# success/fail-labelled data, sampled via cross-entropy-method search instead
+# of a learned trajectory, sidesteps the small-per-condition-data coupling
+# problem that OT-CFM's ODE training needs enough samples to avoid.
+def _load_ebm_model(ckpt_path: str):
+    """Load an energy-based grasp scoring model and inference stats. Returns (model, stats) or (None, None)."""
+    if not ckpt_path or not os.path.isfile(ckpt_path):
+        return None, None
+    stats_path = ckpt_path.replace(".pt", "_stats.json")
+    if not os.path.isfile(stats_path):
+        print(f"[EBM] stats file not found: {stats_path}")
+        return None, None
+    try:
+        import torch, json as _json
+        from train_ebm_grasp import EnergyNet
+        stats = _json.load(open(stats_path))
+        model = EnergyNet(hidden=256)
+        sd = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        model.load_state_dict(sd)
+        model.eval()
+        dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = model.to(dev)
+        print(f"[EBM] Loaded {ckpt_path} — objects: {list(stats['mean_vis_per_obj'].keys())}")
+        return model, stats
+    except Exception as e:
+        print(f"[EBM] Failed to load: {e}")
+        return None, None
+
+
+def _ebm_sample_candidates(model, stats, obj_name: str, n: int,
+                            gx: float, gy: float, gz: float, pe: float,
+                            rng: np.random.Generator,
+                            pop_size: int = 64, n_iters: int = 6, elite_frac: float = 0.2):
+    """Generate n grasp candidates by cross-entropy-method (CEM) search over
+    (x, y, yaw) guided by the trained energy model, centred on obj_name's
+    live CoM. Returns list of grasp dicts, or None if obj_name not in stats.
+
+    No noise-to-data coupling of any kind is used -- the search is a plain
+    iterative refinement of a Gaussian proposal toward high-energy (high
+    predicted success-probability) regions, which is why this approach does
+    not need the per-condition sample budget an OT-coupled ODE trainer does.
+    """
+    import torch
+    key = obj_name.lower().replace("ycb", "").replace(" ", "")
+    vis_map = stats["mean_vis_per_obj"]
+    cond_vec = None
+    for k in vis_map:
+        if k in key or key.startswith(k):
+            cond_vec = vis_map[k]
+            break
+    if cond_vec is None:
+        return None
+
+    dev = next(model.parameters()).device
+    cond_t = torch.tensor(cond_vec, dtype=torch.float32, device=dev)
+    xy_std = np.array(stats["xy_std"], dtype=np.float32)
+
+    yaw_lo, yaw_hi = -np.pi / 2, np.pi / 2
+    mean_xy = np.zeros(2, dtype=np.float32)   # normalised-space offset, matches CFM's prior centering
+    std_xy  = np.ones(2, dtype=np.float32)
+    pop_yaw = rng.uniform(yaw_lo, yaw_hi, size=pop_size).astype(np.float32)
+    pop_xy_norm = rng.normal(mean_xy, std_xy, size=(pop_size, 2)).astype(np.float32)
+
+    def _score(xy_norm, yaw):
+        pose_feat = np.concatenate(
+            [xy_norm, np.sin(yaw)[:, None], np.cos(yaw)[:, None]], axis=1
+        ).astype(np.float32)
+        pose_t = torch.tensor(pose_feat, dtype=torch.float32, device=dev)
+        cond_b = cond_t.unsqueeze(0).expand(pop_size, -1)
+        with torch.no_grad():
+            return model(pose_t, cond_b).cpu().numpy()
+
+    for _ in range(n_iters):
+        logits = _score(pop_xy_norm, pop_yaw)
+        elite_n = max(2, int(pop_size * elite_frac))
+        elite_idx = np.argsort(-logits)[:elite_n]
+        mean_xy = pop_xy_norm[elite_idx].mean(0)
+        std_xy  = pop_xy_norm[elite_idx].std(0).clip(min=0.05)
+        elite_yaw = pop_yaw[elite_idx]
+        yaw_mean = float(np.arctan2(np.sin(elite_yaw).mean(), np.cos(elite_yaw).mean()))
+        yaw_std  = max(0.1, float(elite_yaw.std()))
+        pop_xy_norm = rng.normal(mean_xy, std_xy, size=(pop_size, 2)).astype(np.float32)
+        pop_yaw = np.clip(rng.normal(yaw_mean, yaw_std, size=pop_size), yaw_lo, yaw_hi).astype(np.float32)
+
+    logits = _score(pop_xy_norm, pop_yaw)
+    top_idx = np.argsort(-logits)[:n]
+
+    grasps = []
+    for i in top_idx:
+        # Same CoM-shift convention as _cfm_sample_candidates: the model's
+        # normalised offset is scaled back to metric units and centred on
+        # the *current* object CoM, not the training-set global mean.
+        x = float(pop_xy_norm[i, 0]) * float(xy_std[0]) + gx
+        y = float(pop_xy_norm[i, 1]) * float(xy_std[1]) + gy
+        yaw = float(pop_yaw[i])
+        width = float(rng.uniform(0.04, 0.09))
+        grasps.append({
+            "position": [x, y, gz],
+            "rpy":      [np.pi, 0.0, yaw],
+            "width":    width,
+            "score":    float(logits[i]),
+            "_metrics": {"H": 0.05, "dz": 0.0, "dz_lift": 0.0, "need_dz": 0.0, "pe_ik": pe},
+        })
+    return grasps
+
+
 def _cfm_sample_candidates(model, stats, obj_name: str, n: int,
                             gx: float, gy: float, gz: float, pe: float,
                             rng: np.random.Generator):
@@ -263,6 +374,7 @@ class RobotEnvUI:
         self.n_grasp_attempts = self.cfg.n_grasp_attempts
         # Read CFM_CKPT at __init__ time (not module level) so demo.py can set it before UI creation
         self._cfm_model, self._cfm_stats = _load_cfm_model(os.environ.get("CFM_CKPT", ""))
+        self._ebm_model, self._ebm_stats = _load_ebm_model(os.environ.get("EBM_CKPT", ""))
 
         if self.backend == "mujoco":
             # ── MuJoCo / SO-ARM101 backend ─────────────────────────────────
@@ -518,12 +630,19 @@ class RobotEnvUI:
                       f"> {IK_PE_THRESHOLD*1000:.0f}mm threshold; "
                       f"fallback to first {len(use_idx)}")
 
-            # ── CFM candidate generation (replaces random sampling when enabled) ─
+            # ── EBM (CEM search) / CFM candidate generation (replaces random sampling when enabled) ─
+            obj_name = (self.env.obj_names[self.env.obj_ids.index(obj_id)]
+                        if obj_id in self.env.obj_ids and self.env.obj_names
+                        else "")
             cfm_grasps = None
-            if self._cfm_model is not None:
-                obj_name = (self.env.obj_names[self.env.obj_ids.index(obj_id)]
-                            if obj_id in self.env.obj_ids and self.env.obj_names
-                            else "")
+            if self._ebm_model is not None:
+                cfm_grasps = _ebm_sample_candidates(
+                    self._ebm_model, self._ebm_stats, obj_name,
+                    n=len(use_idx), gx=gx, gy=gy, gz=gz, pe=pe, rng=rng,
+                )
+                if cfm_grasps is not None:
+                    print(f"  [EBM] Generated {len(cfm_grasps)} candidates for '{obj_name}'")
+            elif self._cfm_model is not None:
                 cfm_grasps = _cfm_sample_candidates(
                     self._cfm_model, self._cfm_stats, obj_name,
                     n=len(use_idx), gx=gx, gy=gy, gz=gz, pe=pe, rng=rng,
