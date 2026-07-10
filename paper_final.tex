@@ -101,9 +101,8 @@ two objects where single-draw sampling is least stable (6\%$\to$68\% and
 \end{abstract}
 
 \begin{IEEEkeywords}
-6-DoF grasping, flow matching, optimal transport, energy-based models,
-grasp reranking, generative models, robot manipulation, evaluation
-reproducibility, YCB benchmark
+6-DoF grasping, flow matching, energy-based models, robot manipulation,
+evaluation reproducibility
 \end{IEEEkeywords}
 
 % =============================================================================
@@ -874,13 +873,13 @@ consistent with CrackerBox's flat geometry being intrinsically harder for
 any of the position/orientation-based methods tested, but this is not
 confirmed.
 
-\noindent\textbf{The condition-aware OT fix and the EBM are both
-single-attempt results.} We report one hyperparameter setting each for
-Stratified-OT (\cref{sec:ablation}) and EBM v2 (\cref{sec:ebm}); neither was
-swept. Stratified-OT's failure to move Pear at all, despite recovering
-TomatoSoupCan and CrackerBox partially, may reflect Pear's smaller training
-set rather than a fundamental limit of the approach -- we did not
-distinguish these explanations.
+\noindent\textbf{Not fully swept; one check finds Pear specifically
+fragile.} Stratified-OT's failure to move Pear at all, unlike its partial
+recovery of TomatoSoupCan/CrackerBox, may reflect Pear's smaller training
+set (248 positives, fewest of all 7) rather than a limit of the approach.
+A stronger EBM v2 hard-negative-mining schedule reproduces TomatoSoupCan/
+CrackerBox exactly (100\%/28\%) but drops Pear 72\%$\to$48\% (ns at
+$n{=}25$, McNemar $p{=}0.15$) -- again Pear, again the least data.
 
 \subsection{Future Work}
 \label{sec:future}
