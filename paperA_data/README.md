@@ -1,5 +1,67 @@
 # Paper A raw data archive
 
+## ⚠️ Phase 3 real-robot pilot (2026-07-10): mechanism works, open-loop replay does not transfer precisely -- confirms the anticipated sim-to-real gap
+
+First physical-hardware test of the year-long roadmap
+(`/home/lina/.claude/plans/floating-crunching-yeti.md`, Phase 3): validated
+consensus candidate selection (Pear, orient_seed=5, gen_seed_base=1, a
+confirmed-successful trial from the same-day main-branch re-verification
+above) by recording its full joint-space trajectory in simulation
+(`paperA_data/scripts/record_consensus_grasp.py`, driving the real
+`RobotEnvUI`/`demo.py` pipeline directly rather than re-deriving its logic --
+see that script's docstring for why a standalone re-derivation attempt failed)
+and replaying it on the physical SO-ARM101
+(`paperA_data/scripts/real_hw_replay.py`).
+
+**Infrastructure verified working end-to-end**: serial connection, motor
+handshake, calibration loading (found at lerobot's default user-cache
+location, from a prior calibration run in a separate project), joint-position
+read/write, a minimal single-joint motion test (±10° wrist_roll, other 4
+joints held exactly at 0.00° delta), and full 2530-point trajectory replay
+(reset → move_joints → set_gripper sequence) -- all completed without errors,
+safe disconnect (torque disabled) after each step. Two real, non-hardware
+environment bugs found and fixed along the way (recorded in
+`paperA_data/scripts/real_hw_connect.py`'s docstring): this project's own
+`datasets/episode.py` collides with the HuggingFace `datasets` package
+`lerobot` needs internally (worked around via import ordering, no source
+files modified); `scservo_sdk` (`feetech-servo-sdk`) was not installed in the
+`tango` env (installed via the exact extras pin from
+`/lena/projects/lerobot/pyproject.toml`).
+
+**Physical execution result**: the arm correctly executed the full recorded
+motion sequence (approach → descend → close → lift → move to place), but the
+grasp itself did not land on the real object -- user's direct observation:
+"角度太偏左了，抓取位置也不同步" (the angle is off to the left, and the grasp
+position is not synchronized [with the real object]), with the overall motion
+shape (grasp on the left side, then move right for placement) matching the
+trajectory's intended structure.
+
+**Can support**: the mechanism -- record a consensus-selected trajectory in
+sim, replay it on hardware -- works correctly as an *execution* pipeline (the
+arm faithfully reproduces the recorded joint sequence). It does **not**,
+on this first attempt, reproduce simulation's grasp *precision*, because
+`SOARMRealBackend.execute_grasp()` is intentionally unimplemented (per its
+own docstring: "Online IK on real hardware is outside this module's scope")
+-- replay is pure open-loop joint-sequence reproduction with zero real-time
+perception of where the physical object actually sits. The recorded
+trajectory's target coordinates were computed relative to simulation's
+randomly-spawned object position; reproducing that exact position by manually
+placing a real object is effectively impossible to do precisely by eye. This
+is exactly the sim-to-real gap `paper_final.tex`'s Limitations section
+already names ("Sim-to-real transfer requires alignment of the physical
+SO-ARM101's calibration, contact dynamics, and depth-camera intrinsics with
+the simulation geometry") -- now confirmed empirically rather than
+anticipated.
+
+**Cannot support** (yet): whether the reported "angle offset" is a
+systematic, fixable coordinate-frame/calibration mismatch between sim and
+real, or incidental noise from imprecise real-world object placement --
+under investigation as a follow-up (see next entry if added). Also cannot
+support a success-rate claim for consensus selection on real hardware from
+this single n=1 pilot in either direction -- this entry documents
+infrastructure validation and a qualitative failure mode, not a statistically
+meaningful physical replication of the simulation finding.
+
 ## ✅ RESOLVED (2026-07-10): Pear ikmargin-vs-consensus finding re-verified on confirmed main-branch code -- exact match
 
 Before using the Pear consensus finding (ikmargin 6.0% vs consensus 68.0%, Fisher's
