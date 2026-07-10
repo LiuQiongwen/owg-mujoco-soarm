@@ -53,14 +53,37 @@ SO-ARM101's calibration, contact dynamics, and depth-camera intrinsics with
 the simulation geometry") -- now confirmed empirically rather than
 anticipated.
 
-**Cannot support** (yet): whether the reported "angle offset" is a
-systematic, fixable coordinate-frame/calibration mismatch between sim and
-real, or incidental noise from imprecise real-world object placement --
-under investigation as a follow-up (see next entry if added). Also cannot
-support a success-rate claim for consensus selection on real hardware from
-this single n=1 pilot in either direction -- this entry documents
-infrastructure validation and a qualitative failure mode, not a statistically
-meaningful physical replication of the simulation finding.
+**Follow-up diagnostic (same session): base-rotation calibration checked out.**
+To isolate "calibration/coordinate-frame mismatch" from "object not placed
+where simulation assumed" as competing explanations for the reported angle
+offset, ran a targeted, minimal test
+(`paperA_data/scripts/real_hw_check_shoulder_pan_zero.py`): commanded ONLY
+`shoulder_pan` (the base-rotation joint, most directly responsible for a
+left/right bias) to 0 degrees -- simulation's `HOME_QPOS` zero for this joint,
+which `robots/soarm_real_backend.py`'s `HOME_DEG` is explicitly derived from
+-- leaving all other joints untouched. User's direct visual confirmation:
+the arm pointed straight ahead ("向前"), matching the expected "0 = facing
+forward" convention. **This rules out a base-rotation calibration/coordinate-
+frame bug** as the primary explanation, despite the calibration file being
+imported from a different project (openvla) rather than calibrated
+in-project -- and despite the user having recalibrated multiple times in
+that other context without resolving the symptom, which is itself consistent
+with the root cause being elsewhere (recalibration wouldn't fix an
+open-loop object-placement gap). The reported "angle offset" during the
+full trajectory replay is therefore best explained by the already-identified
+dominant cause -- open-loop replay reproducing a trajectory computed for
+simulation's object position, not the real object's actual (manually,
+imprecisely placed) position -- not by a separate calibration defect.
+
+**Cannot support**: a success-rate claim for consensus selection on real
+hardware from this single n=1 pilot in either direction -- this entry
+documents infrastructure validation and a qualitative failure mode, not a
+statistically meaningful physical replication of the simulation finding. Also
+cannot rule out smaller, joint-specific calibration inaccuracies beyond
+shoulder_pan (only the base-rotation joint was isolated and checked) -- if a
+future attempt controls for object placement (e.g., a fixture that
+guarantees precise, repeatable positioning) and the grasp still misses
+systematically, revisit per-joint calibration for the remaining 4 joints.
 
 ## ✅ RESOLVED (2026-07-10): Pear ikmargin-vs-consensus finding re-verified on confirmed main-branch code -- exact match
 
