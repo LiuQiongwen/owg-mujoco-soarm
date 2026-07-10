@@ -166,9 +166,15 @@ def _load_mpc_correction_model(ckpt_path: str) -> Optional[dict]:
                 "x_mean":  np.array(ckpt["x_mean"], dtype=np.float32),
                 "x_std":   np.array(ckpt["x_std"], dtype=np.float32),
                 "objects": ckpt["objects"],
+                # "gap" (regress jaw_obj_xy_gap, pick argmin) or "bilateral"
+                # (classify bilateral_contacts, pick argmax) -- older
+                # checkpoints predate this field and default to "gap" for
+                # backward compatibility.
+                "target":  ckpt.get("target", "gap"),
             }
-            print(f"[MPC] Loaded correction model {ckpt_path} "
-                  f"(held-out test MAE={ckpt.get('model_mae')}, objects={ckpt['objects']})")
+            print(f"[MPC] Loaded correction model {ckpt_path} target={bundle['target']} "
+                  f"(held-out test metric={ckpt.get('model_metric', ckpt.get('model_mae'))}, "
+                  f"objects={ckpt['objects']})")
         except Exception as e:
             print(f"[MPC] Failed to load correction model {ckpt_path}: {e}")
     _MPC_MODEL_CACHE[ckpt_path] = bundle
@@ -1848,9 +1854,15 @@ class EnvironmentSoArm:
         with torch.no_grad():
             pred = bundle["model"](torch.tensor(feat_n, dtype=torch.float32)).numpy()
 
-        best = int(np.argmin(pred))
-        print(f"  [mpc_correction] searched {n_candidates} deltas: best predicted "
-              f"gap={pred[best]:.4f}  no-correction predicted={pred[0]:.4f}  "
+        # "gap" target: lower predicted jaw_obj_xy_gap is better (argmin).
+        # "bilateral" target: pred is a logit for P(bilateral_contacts=1),
+        # higher is better (argmax) -- no sigmoid needed, monotonic in logit.
+        if bundle["target"] == "bilateral":
+            best = int(np.argmax(pred))
+        else:
+            best = int(np.argmin(pred))
+        print(f"  [mpc_correction] searched {n_candidates} deltas (target={bundle['target']}): "
+              f"best predicted={pred[best]:.4f}  no-correction predicted={pred[0]:.4f}  "
               f"applying delta=({dx[best]:.4f}, {dy[best]:.4f}, {dyaw[best]:.4f})")
         return x + float(dx[best]), y + float(dy[best]), yaw + float(dyaw[best])
 
@@ -1888,14 +1900,15 @@ class EnvironmentSoArm:
         # in which case it can only run if self.obj_ids is non-empty (single
         # target object per episode, as in every evaluation this session).
         #
-        # Trust-but-verify: the correction model's held-out top-1
-        # delta-selection accuracy is 37.5% (see train_mpc_correction.py) --
-        # well above the ~11% chance level, but far from reliable enough to
-        # commit to blindly. A live smoke test caught a case where the model
-        # predicted a mild improvement but the REAL re-settled result was
-        # dramatically worse than the uncorrected baseline. Since re-settling
-        # is cheap, always verify for real and only keep the correction if it
-        # actually beats the baseline's own real jaw_obj_xy_gap; otherwise
+        # Trust-but-verify: neither correction model (gap-regression, 37.5%
+        # top-1 accuracy; bilateral-classification, 72.7%) is reliable enough
+        # to commit to blindly -- a live smoke test with the gap model caught
+        # a case where it predicted a mild improvement but the REAL
+        # re-settled result was dramatically worse than the uncorrected
+        # baseline. Since re-settling is cheap, always verify for real and
+        # only keep the correction if it actually beats the baseline on the
+        # SAME metric the loaded model targets (bilateral_contacts for the
+        # bilateral model, jaw_obj_xy_gap for the older gap model); otherwise
         # revert to the original (uncorrected) settle.
         if os.environ.get("MPC_CORRECTION", "") and self.obj_ids:
             jaw_mid = self._get_jaw_midpoint()[:2]
@@ -1904,17 +1917,28 @@ class EnvironmentSoArm:
             obj_name = self.obj_names[0] if self.obj_names else ""
             cx, cy, cyaw = self._mpc_correction_search(x, y, yaw, off_x, off_y, obj_name)
             if (cx, cy, cyaw) != (x, y, yaw):
-                baseline_gap = metrics_pre.get("jaw_obj_xy_gap")
+                bundle = _load_mpc_correction_model(os.environ.get("MPC_CORRECTION", ""))
+                target = bundle["target"] if bundle else "gap"
                 corrected_metrics, corrected_mg0 = self._settle_at_pose(cx, cy, z, cyaw, opening)
-                corrected_gap = corrected_metrics.get("jaw_obj_xy_gap")
-                if (baseline_gap is None or corrected_gap is None
-                        or corrected_gap < baseline_gap):
-                    metrics_pre, mg0 = corrected_metrics, corrected_mg0
-                    print(f"  [mpc_correction] verified real improvement "
-                          f"({baseline_gap} -> {corrected_gap}), keeping correction")
+
+                if target == "bilateral":
+                    baseline_val  = metrics_pre.get("bilateral_contacts")
+                    corrected_val = corrected_metrics.get("bilateral_contacts")
+                    is_better = (baseline_val is None or corrected_val is None
+                                 or corrected_val > baseline_val)
                 else:
-                    print(f"  [mpc_correction] real re-settle was worse "
-                          f"({baseline_gap} -> {corrected_gap}), reverting to original")
+                    baseline_val  = metrics_pre.get("jaw_obj_xy_gap")
+                    corrected_val = corrected_metrics.get("jaw_obj_xy_gap")
+                    is_better = (baseline_val is None or corrected_val is None
+                                 or corrected_val < baseline_val)
+
+                if is_better:
+                    metrics_pre, mg0 = corrected_metrics, corrected_mg0
+                    print(f"  [mpc_correction] verified real improvement (target={target}) "
+                          f"({baseline_val} -> {corrected_val}), keeping correction")
+                else:
+                    print(f"  [mpc_correction] real re-settle was worse (target={target}) "
+                          f"({baseline_val} -> {corrected_val}), reverting to original")
                     metrics_pre, mg0 = self._settle_at_pose(x, y, z, yaw, opening)
 
         self.auto_close_gripper(check_contact=False)
