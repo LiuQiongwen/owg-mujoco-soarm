@@ -1,0 +1,15 @@
+{"object": "pear", "seed": 1, "gap_call1_original": 0.0221, "gap_callA_immediate_repeat": 0.1666, "gap_callB2_different": 0.1561, "gap_callB3_reverted": 0.1669, "drift_A_vs_1": 0.1445, "drift_B3_vs_1": 0.1448}
+{"object": "pear", "seed": 2, "gap_call1_original": 0.0292, "gap_callA_immediate_repeat": 0.025, "gap_callB2_different": 0.0505, "gap_callB3_reverted": 0.0255, "drift_A_vs_1": -0.0042, "drift_B3_vs_1": -0.0037}
+{"object": "pear", "seed": 3, "gap_call1_original": 0.076, "gap_callA_immediate_repeat": 0.0763, "gap_callB2_different": 0.0743, "gap_callB3_reverted": 0.0769, "drift_A_vs_1": 0.0003, "drift_B3_vs_1": 0.0009}
+{"object": "pear", "seed": 4, "gap_call1_original": 0.0305, "gap_callA_immediate_repeat": 0.032, "gap_callB2_different": 0.0409, "gap_callB3_reverted": 0.0312, "drift_A_vs_1": 0.0015, "drift_B3_vs_1": 0.0007}
+{"object": "pear", "seed": 5, "gap_call1_original": 0.0224, "gap_callA_immediate_repeat": 0.0461, "gap_callB2_different": 0.2277, "gap_callB3_reverted": 0.2357, "drift_A_vs_1": 0.0237, "drift_B3_vs_1": 0.2133}
+{"object": "can", "seed": 1, "gap_call1_original": 0.0198, "gap_callA_immediate_repeat": 0.0139, "gap_callB2_different": 0.0145, "gap_callB3_reverted": 0.0077, "drift_A_vs_1": -0.0059, "drift_B3_vs_1": -0.0121}
+{"object": "can", "seed": 2, "gap_call1_original": 0.0546, "gap_callA_immediate_repeat": 0.0462, "gap_callB2_different": 0.0673, "gap_callB3_reverted": 0.0457, "drift_A_vs_1": -0.0084, "drift_B3_vs_1": -0.0089}
+{"object": "can", "seed": 3, "gap_call1_original": 0.0731, "gap_callA_immediate_repeat": 0.0732, "gap_callB2_different": 0.0711, "gap_callB3_reverted": 0.0735, "drift_A_vs_1": 0.0001, "drift_B3_vs_1": 0.0004}
+{"object": "can", "seed": 4, "gap_call1_original": 0.0366, "gap_callA_immediate_repeat": 0.0432, "gap_callB2_different": 0.0735, "gap_callB3_reverted": 0.0478, "drift_A_vs_1": 0.0066, "drift_B3_vs_1": 0.0112}
+{"object": "can", "seed": 5, "gap_call1_original": 0.0261, "gap_callA_immediate_repeat": 0.0436, "gap_callB2_different": 0.0376, "gap_callB3_reverted": 0.069, "drift_A_vs_1": 0.0175, "drift_B3_vs_1": 0.0429}
+{"object": "cracker", "seed": 1, "gap_call1_original": 0.1316, "gap_callA_immediate_repeat": 0.1349, "gap_callB2_different": 0.1482, "gap_callB3_reverted": 0.1349, "drift_A_vs_1": 0.0033, "drift_B3_vs_1": 0.0033}
+{"object": "cracker", "seed": 2, "gap_call1_original": 0.1441, "gap_callA_immediate_repeat": 0.1441, "gap_callB2_different": 0.163, "gap_callB3_reverted": 0.1441, "drift_A_vs_1": 0.0, "drift_B3_vs_1": 0.0}
+{"object": "cracker", "seed": 3, "gap_call1_original": 0.0857, "gap_callA_immediate_repeat": 0.087, "gap_callB2_different": 0.0881, "gap_callB3_reverted": 0.0875, "drift_A_vs_1": 0.0013, "drift_B3_vs_1": 0.0018}
+{"object": "cracker", "seed": 4, "gap_call1_original": 0.0468, "gap_callA_immediate_repeat": 0.0491, "gap_callB2_different": 0.0907, "gap_callB3_reverted": 0.0762, "drift_A_vs_1": 0.0023, "drift_B3_vs_1": 0.0294}
+{"object": "cracker", "seed": 5, "gap_call1_original": 0.1457, "gap_callA_immediate_repeat": 0.1457, "gap_callB2_different": 0.1582, "gap_callB3_reverted": 0.1457, "drift_A_vs_1": 0.0, "drift_B3_vs_1": 0.0}
