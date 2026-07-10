@@ -8,19 +8,19 @@ Trajectory JSON for replay on the physical SO-ARM101.
 Usage
 -----
     # Record one grasp of a banana (random seed 42)
-    conda run -n owg-mujoco python scripts/record_trajectory.py \
+    conda run -n tango python scripts/record_trajectory.py \
         --obj banana --seed 42 --out trajs/banana_42.json
 
     # Try up to 5 random grasps until one succeeds
-    conda run -n owg-mujoco python scripts/record_trajectory.py \
+    conda run -n tango python scripts/record_trajectory.py \
         --obj mustard --seed 7 --n-tries 5 --out trajs/mustard_7.json
 
     # Record with visualisation (for debugging)
-    conda run -n owg-mujoco python scripts/record_trajectory.py \
+    conda run -n tango python scripts/record_trajectory.py \
         --obj banana --seed 1 --vis --out trajs/banana_vis.json
 
     # Save regardless of success (useful for failure analysis)
-    conda run -n owg-mujoco python scripts/record_trajectory.py \
+    conda run -n tango python scripts/record_trajectory.py \
         --obj drill --seed 3 --save-all --out trajs/drill_3.json
 """
 
