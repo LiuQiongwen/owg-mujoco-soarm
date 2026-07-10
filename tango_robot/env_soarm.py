@@ -1630,32 +1630,31 @@ class EnvironmentSoArm:
             return True, grasped_ids[0]
         return False, None
 
-    def _execute_grasp_physics_topdown(self, pos: tuple, yaw: float,
-                                       gripper_opening_length: float,
-                                       obj_height: float) -> Tuple[bool, Optional[int]]:
-        """Physics grasp with jaw-midpoint–targeted approach.
+    def _settle_at_pose(self, x: float, y: float, z: float, yaw: float,
+                         opening: float) -> Tuple[dict, Optional[np.ndarray]]:
+        """Hover, descend, and settle the jaw at (x, y, z, yaw) WITHOUT closing
+        the gripper or checking success. Returns (metrics_pre, mg0):
+        metrics_pre is get_grasp_debug_metrics() at the settled pre-close
+        state (jaw_obj_xy_gap, ori_err_norm, symmetry_score,
+        bilateral_contacts, ...); mg0 is the pre-close moving-jaw geom
+        position (or None), needed by callers that report the post-close
+        ΔY_moving delta.
 
-        Uses IK_MODE_JAW_POS so the JAW MIDPOINT (not the site) is driven to
-        the target position with the arm in its natural configuration.  This
-        avoids the near-joint-limit configs that arise when top-down orientation
-        is forced at table-level reach distances, which caused the site Z-axis
-        to flip to the -X world direction and the jaw midpoint to miss the
-        object entirely.
+        Cheap sub-routine, reused by both the main grasp execution
+        (_execute_grasp_physics_topdown, unchanged behaviour after this
+        extraction) and Phase 1's MPC correction-model data collection /
+        online correction search (see
+        paperA_data/scripts/collect_mpc_correction_data.py and
+        train_mpc_correction.py) -- the latter calls this repeatedly with
+        small (x, y, yaw) perturbations around a candidate target to measure
+        how the settled contact geometry responds, without paying for a full
+        close/lift/contact-check cycle each time.
 
-        The arm descends in three phases:
-          1. Hover above the object at GRIPPER_MOVING_HEIGHT (jaw-pos IK).
-          2. Descend to the grasp Z with jaw-midpoint alignment maintained.
-          3. Close gripper, wait, lift, verify.
+        Caller is responsible for z-clipping and gripper_opening_length ->
+        opening (GRIP_REDUCTION) conversion, and for reset_robot() before the
+        first call in a fresh episode -- this method assumes the arm is
+        already at (or near) HOME / a valid pre-hover state.
         """
-        self.reset_robot()
-
-        x, y, z = pos
-        z = np.clip(z, *self.ee_position_limit[2])
-        opening = gripper_opening_length * self.GRIP_REDUCTION
-
-        print(f"  [grasp/physics_weld] approach → xy=({x:.3f}, {y:.3f})"
-              f"  z={z:.3f}  yaw={yaw:.3f}")
-
         self.move_gripper(opening)
 
         # Phase 1 — Hover: rotate base joint to correct orientation via physics.
@@ -1730,13 +1729,43 @@ class EnvironmentSoArm:
         self._steps(100)   # settle object into jaw gap
 
         metrics_pre = self.get_grasp_debug_metrics()
-        jaw_gap_pre = metrics_pre.get("jaw_obj_xy_gap", 0)
         print(f"  [grasp/physics_weld] pre-close metrics: {metrics_pre}")
 
+        mg0 = None
         if self._jaw_fixed_geom_id >= 0:
             fg0 = self.data.geom_xpos[self._jaw_fixed_geom_id].copy()
             mg0 = self.data.geom_xpos[self._jaw_mv_geom_id].copy()
             print(f"  [grasp/physics_weld] pre-close geoms: fixed_Y={fg0[1]:.4f} moving_Y={mg0[1]:.4f} moving_Z={mg0[2]:.4f}")
+
+        return metrics_pre, mg0
+
+    def _execute_grasp_physics_topdown(self, pos: tuple, yaw: float,
+                                       gripper_opening_length: float,
+                                       obj_height: float) -> Tuple[bool, Optional[int]]:
+        """Physics grasp with jaw-midpoint–targeted approach.
+
+        Uses IK_MODE_JAW_POS so the JAW MIDPOINT (not the site) is driven to
+        the target position with the arm in its natural configuration.  This
+        avoids the near-joint-limit configs that arise when top-down orientation
+        is forced at table-level reach distances, which caused the site Z-axis
+        to flip to the -X world direction and the jaw midpoint to miss the
+        object entirely.
+
+        The arm descends in three phases:
+          1. Hover above the object at GRIPPER_MOVING_HEIGHT (jaw-pos IK).
+          2. Descend to the grasp Z with jaw-midpoint alignment maintained.
+          3. Close gripper, wait, lift, verify.
+        """
+        self.reset_robot()
+
+        x, y, z = pos
+        z = np.clip(z, *self.ee_position_limit[2])
+        opening = gripper_opening_length * self.GRIP_REDUCTION
+
+        print(f"  [grasp/physics_weld] approach → xy=({x:.3f}, {y:.3f})"
+              f"  z={z:.3f}  yaw={yaw:.3f}")
+
+        metrics_pre, mg0 = self._settle_at_pose(x, y, z, yaw, opening)
 
         self.auto_close_gripper(check_contact=False)
         self._steps(120)   # let gripper settle and contacts stabilize
