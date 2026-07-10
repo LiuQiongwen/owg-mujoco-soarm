@@ -1,7 +1,8 @@
 # Phase 2: The "Reactive" Autopsy & The "Predictive" Blueprint
 
 **Date**: 2026-07-10
-**Status**: analysis complete, pending decision on Phase 3/4 scope (see roadmap plan file)
+**Status**: analysis complete, including a physical test that substantially revised
+Part C's original conclusion. Pending decision on Phase 3/4 scope (see roadmap plan file).
 **Scope**: this document analyzes Phase 1 of the year-long follow-on roadmap
 (`/home/lina/.claude/plans/floating-crunching-yeti.md`), pursued after `paper_final.tex`
 was finalized for RA-L submission. It is not part of `paper_final.tex` itself.
@@ -13,19 +14,28 @@ Phase 1 built and physically tested an MPC-style real-time correction mechanism 
 a small set of local pose corrections and apply the best one. Three consecutive
 physical pilots (n=25/object, 3 objects) were all net negative, despite each of two
 intermediate fixes substantially improving the model's offline validation metric.
-This document formalizes three findings from that process:
+This document formalizes four findings from that process, the last of which revised
+the document's own initial conclusion after a physical test:
 
 - **(A) Benchmark critique**: the offline validation metric never once predicted the
   physical result's direction across three independently-motivated model variants.
 - **(B) Root-cause analysis**: two real, previously-undiagnosed bugs, plus a third,
-  newly-confirmed mechanistic issue (settle non-idempotency) that plausibly explains
-  why the physical results were negative even when the underlying model had real signal.
-- **(C) Forward-looking argument**: a retrospective, zero-new-simulation reanalysis
-  shows the trained model's predictions nearly *double* the pre-close contact rate
-  when evaluated in a clean, single-shot (open-loop) setting -- the same signal that
-  evaporates in the reactive, multi-settle-call deployment. This is direct evidence
-  for pivoting toward predictive, world-model-style trajectory evaluation instead of
-  reactive real-time correction.
+  newly-confirmed mechanistic issue (settle non-idempotency, directly measured) that
+  plausibly explains why the physical results were negative even when the underlying
+  model had real signal.
+- **(C1) Retrospective evidence (misleading)**: a zero-new-simulation reanalysis of
+  already-collected data suggested the model's predictions nearly *double* the
+  pre-close contact rate when evaluated open-loop, implying a pivot to predictive,
+  world-model-style evaluation would fix the problem.
+- **(C2) Physical test of that prediction (the actual finding)**: implementing and
+  physically testing open-loop candidate selection was **worse than every reactive
+  round tested** (−49.3pp pooled, vs. −9.3 to −18.7pp for reactive correction) --
+  because the "open-loop" implementation still evaluated candidates by repeatedly
+  settling the *same shared, live object*, which drifts cumulatively even without the
+  gripper ever closing. The retrospective analysis (C1) was itself a second instance
+  of Part A's core claim: it did not predict the physical result either. The
+  corrected takeaway is sharper than "reactive vs. predictive" -- see the revised
+  argument at the end of Part C.
 
 ## Part A: Benchmark Critique -- offline validation did not predict physical outcome
 
@@ -172,19 +182,21 @@ exactly the kind of state-coupling fragility that survey's "Deployment Gauntlet"
 framing warns reactive systems are prone to, independent of how accurate the
 underlying model is.
 
-## Part C: Forward-Looking Argument -- predictive beats reactive here, with direct evidence
+## Part C: Forward-Looking Argument -- predictive vs. reactive, and what "predictive" actually requires
 
-**Claim**: abandon reactive, high-frequency, closed-loop-verified correction; pivot
-toward predictive, world-model-style evaluation -- assess several candidate outcomes
-once, independently, before committing, rather than committing and then verifying
-against a live, state-coupled physical process that Part B3 shows is not cleanly
-reversible. This is the central thesis of "World Model for Robot
-Learning: A Comprehensive Survey" (arXiv:2605.00080; authors include Pieter Abbeel,
-Jitendra Malik, Yilun Du, Jiajun Wu among others), which surveys world models across policy
-learning, planning, simulation, and evaluation from exactly this "assess before
-acting" premise.
+**Original claim (C1, retrospective)**: abandon reactive, high-frequency,
+closed-loop-verified correction; pivot toward predictive, world-model-style
+evaluation -- assess several candidate outcomes once, independently, before
+committing, rather than committing and then verifying against a live, state-coupled
+physical process that Part B3 shows is not cleanly reversible. This is the central
+thesis of "World Model for Robot Learning: A Comprehensive Survey" (arXiv:2605.00080;
+authors include Pieter Abbeel, Jitendra Malik, Yilun Du, Jiajun Wu among others),
+which surveys world models across policy learning, planning, simulation, and
+evaluation from exactly this "assess before acting" premise. As shown below, this
+claim survived a *retrospective* data check but not a *physical* one -- the revised,
+more precise version is at the end of this section.
 
-**Direct, zero-new-simulation evidence** (`paperA_data/scripts/analyze_openloop_vs_closedloop.py`):
+**C1: retrospective, zero-new-simulation evidence** (`paperA_data/scripts/analyze_openloop_vs_closedloop.py`):
 reusing the already-collected round-3 dataset (`paperA_data/worldmodel_trajs/mpc_correction_{pear,can,cracker}.jsonl`,
 120 candidate groups, each with 1 base + 8 delta rows and real recorded
 `bilateral_contacts` outcomes from the *original, single, clean* data-collection
@@ -215,29 +227,80 @@ multiple dependent, non-idempotent `_settle_at_pose` calls compounding state dri
 within a single episode (Part B3) -- that destroys this signal before it reaches the
 physical pilot.
 
-**Caveat**: this retrospective analysis operates on `bilateral_contacts` at the
-pre-close settle stage, the same proxy label the model was trained on -- not final
-grasp success (which additionally requires closing, a stable weld, and clearing the
-lift threshold). The ~2x improvement shown here is evidence the *proxy signal*
-survives open-loop evaluation; whether it fully carries through to final success
-under a genuinely open-loop deployment (single settle, single close, no revert) is
-an untested, falsifiable prediction this analysis makes but does not yet confirm
-physically.
+**Caveat (flagged before the physical test, confirmed correct by it)**: this
+retrospective analysis operates on `bilateral_contacts` at the pre-close settle
+stage, the same proxy label the model was trained on -- not final grasp success. The
+~2x improvement shown here demonstrated the *proxy signal* survives open-loop
+*retrospective replay*; whether it carries through to a genuinely live open-loop
+*execution* was an untested, falsifiable prediction. It was tested. It failed, badly.
 
-## What This Argues For, Concretely
+### C2: physical test of the open-loop prediction -- catastrophically negative, and why
 
-A predictive architecture for this task would: (1) generate several candidate grasp
-targets (as the existing baseline/EBM pipelines already do), (2) evaluate each with a
-**single, independent** settle-and-score pass -- never re-visiting or correcting a
-candidate after evaluating a different one in the same physical process -- and (3)
-commit to and execute only the winner, once. This is structurally the open-loop
-protocol tested above, and is a minimal, low-risk first step toward the broader
-world-model framing in arXiv:2605.00080 (which extends further into learned dynamics
-and multi-step planning, not just single-step, independent-per-candidate scoring).
-The next falsifiable test is a real physical pilot of exactly this open-loop
-selection-among-candidates protocol (not a real-time correction of one candidate),
-which was not run this session -- flagged as the immediate next step if this
-direction is pursued further.
+We ran the predicted protocol for real (`paperA_data/scripts/run_openloop_select_pilot.py`):
+per episode, generate 5 candidates (identical formula and seeding to `ui.py`'s own
+Baseline candidate generator), evaluate each with one `_settle_at_pose` call (never
+closing the gripper), commit to and physically execute only the model's top choice.
+Same 3-object, n=25 pilot, same locked baseline comparison.
+
+| Object | Baseline | Open-loop select | Δ | McNemar p |
+|---|---|---|---|---|
+| Pear | 64.0% | 12.0% | −52.0pp | 0.0002 |
+| TomatoSoupCan | 88.0% | 24.0% | −64.0pp | 0.0001 |
+| CrackerBox | 40.0% | 8.0% | −32.0pp | 0.0386 |
+| **Pooled** | **64.0%** | **14.7%** | **−49.3pp** | — |
+
+**This is far worse than any reactive-correction round tested (−9.3pp to −18.7pp),
+not better.** The retrospective analysis's optimism did not survive contact with a
+live pilot -- which is itself a second, independent instance of Part A's central
+claim (offline/retrospective validation does not reliably predict physical
+deployment), now demonstrated on the *predictive* protocol too, not just the
+reactive one.
+
+**Root cause, confirmed directly** (`_settle_at_pose` called 5 times in sequence,
+object position logged before and after each): the object's live position drifts
+*monotonically* across the evaluation phase even though the gripper never closes --
+one traced example showed cumulative XY drift of 0.3cm / 1.0cm / 1.7cm / 2.2cm / 2.7cm
+across the five evaluation calls. Candidates are generated within a ±6cm window
+around the object's *original* position; by the fifth evaluation the object has
+moved far enough that even a correctly-identified "best" candidate's coordinates no
+longer align with where the object actually is by the time of the sixth, real,
+committing settle.
+
+**This sharpens, and partially revises, the argument in Part B3.** The mechanism is
+the same one identified there (repeated live settle calls on a shared, persistent
+object without a full reset compound state drift), but it is not specific to
+reactive, verify-and-revert protocols. **Any protocol that evaluates multiple
+candidates via repeated live physics queries against the one object it is about to
+manipulate inherits this fragility, regardless of whether the decision logic on top
+is reactive or "predictive."** Calling a protocol open-loop at the level of decision
+logic (commit once, no verification) does not make the underlying physical process
+open-loop if evaluation itself still requires repeatedly touching the same live
+object -- and in this implementation, evaluating 5 candidates before committing is
+*worse* than reactive correction's 2-3 touches, not better, because there are more
+opportunities for cumulative drift before the one commitment that matters.
+
+### What This Argues For, Concretely (revised after the physical test)
+
+The original claim -- "evaluate several candidates independently, then commit" -- is
+correct in spirit but was implemented wrong: "evaluate via `_settle_at_pose`" is not
+actually independent evaluation, because it still perturbs the one real object shared
+across all candidates. A genuinely independent, world-model-style evaluation needs to
+score candidates **without touching the live/simulated object at all** during
+evaluation -- e.g., a learned model that predicts `bilateral_contacts`/`jaw_obj_xy_gap`
+purely from the candidate's geometric features and the object's *originally observed*
+pose (exactly the static-feature scoring EBM v2 already does, and exactly what this
+session's retrospective analysis implicitly assumed when it reused each row's
+independently-collected ground truth rather than re-querying a shared object) --
+committing to execute only once no matter which candidate wins. Concretely: this is
+closer to EBM v2's original design (already tested this session, reached parity with
+baseline: 74.0% vs. 77.7%, not a clean win either, but nowhere near this catastrophic)
+than to anything requiring a live settle-based evaluation loop, open- or closed-loop.
+The lesson from this whole Phase 1+2 arc is now sharper than originally framed: **the
+failure mode is not "reactive vs. predictive," it is "physically-grounded, live,
+repeated-query evaluation vs. genuinely offline, model-only evaluation" -- only the
+latter avoids compounding simulation state drift, and EBM v2's already-tested,
+already-parity-reaching design is the closer existing example of it, not the new
+mechanisms built in Phase 1/2.**
 
 ## References
 
