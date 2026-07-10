@@ -1,5 +1,104 @@
 # Paper A raw data archive
 
+## ❌ CONCLUDED (2026-07-10): Phase 1 (MPC-style real-time correction world model) does not work at this data scale -- three consecutive physical pilots net negative
+
+**Scope note**: this section documents work on the *next* project (a year-long
+follow-on roadmap, `/home/lina/.claude/plans/floating-crunching-yeti.md`, pursued
+after `paper_final.tex` was finalized for RA-L submission), not `paper_final.tex`
+itself. Recorded here because it reuses this session's infrastructure, conventions,
+and objects, and because the roadmap's Phase 0 explicitly locks `paper_final.tex`'s
+numbers as the reference baseline for everything below.
+
+**Motivation and mechanism.** The roadmap's Phase 1 was originally "retrieval-augmented
+EBM," then briefly "world-model rollout scorer," then corrected (after checking current
+world-model literature) to **MPC-style real-time correction**: a real, previously
+unused decision point exists in `tango_robot/env_soarm.py`'s `physics_weld_after_bilateral`
+grasp mode -- right before closing the gripper, the code already computes
+`get_grasp_debug_metrics()` (including `jaw_obj_xy_gap`, the same metric that
+root-caused EBM v1's catastrophic failure earlier this session) but discards it and
+closes unconditionally. The idea: train a small model to predict the outcome of a
+local correction (Δx, Δy, Δyaw) applied just before closing, search a handful of
+candidate corrections, and apply the best one -- a genuine real-time decision, not a
+static candidate-scorer wearing a "world model" label.
+
+**Two real bugs found and fixed during this work (both worth remembering independent
+of the final outcome):**
+
+1. **Directional information loss.** The first training pass used the scalar
+   `base_jaw_gap` as the only context feature -- this can say *how far off* the
+   current settle is, but not *which way* to correct. Top-1 delta-selection accuracy
+   was 16.7%, barely above the ~11% chance level for 9 options/group. Fixed by adding
+   the directional offset vector (`base_off_x`/`base_off_y`, jaw midpoint minus object
+   centre) as a feature -- accuracy jumped to 37.5%.
+2. **Spawn-range train/deployment mismatch.** `paperA_data/scripts/collect_mpc_correction_data.py`
+   copied its object-spawn constants from `scripts/record_trajectory.py`
+   (`_CENTRE_Y=-0.40`, spread `0.06`, giving object y in `[-0.46,-0.34]`) without checking
+   they matched the actual evaluation harness. `tango_robot/ui.py`'s real spawn path
+   (`env.load_isolated_obj`, the one every physical pilot and the whole paper's Baseline/
+   OT-CFM/EBM numbers go through) uses `r_x=uniform(-0.15,0.15)`, `r_y=uniform(-0.35,-0.10)`
+   -- these two ranges barely overlap. The correction model was trained on object
+   positions from a different part of the workspace than the one it was asked to correct
+   at physical-pilot time. Found only because the user explicitly asked to sanity-check
+   simulation object/arm positions (a good instinct -- worth remembering: **when an ML
+   fix doesn't transfer from offline metrics to physical results, check for a data-
+   generation/deployment distribution mismatch before concluding the method itself is
+   wrong**). Verified the rest of the scene geometry (`ROBOT_BASE_POS="0 0 0.785"` at the
+   table's front edge, `ee_position_limit` centred on the base, `TARGET_ZONE_POS` on the
+   opposite side with its own floor geom) is internally self-consistent -- no further
+   geometry bugs found.
+
+**Three physical pilots (3-object, n=25, Pear/TomatoSoupCan/CrackerBox, paired same-seed
+vs. the locked `pilot_baseline_*.jsonl`), all net negative:**
+
+| Pilot | Fix applied before this run | Pear | TomatoSoupCan | CrackerBox | Pooled |
+|---|---|---|---|---|---|
+| Round 1 (gap-regression target, wrong spawn range) | directional feature | 64.0%→36.0% (p=0.092) | 88.0%→96.0% | 40.0%→32.0% | **−9.3pp** |
+| Round 2 (bilateral-classification target, wrong spawn range) | retarget to predict success directly | 64.0%→28.0% (p=0.023, sig.) | 88.0%→80.0% | 40.0%→28.0% | **−18.7pp** |
+| Round 3 (bilateral target, fixed spawn range) | spawn-range fix | 64.0%→36.0% (p=0.065) | 88.0%→84.0% | 40.0%→32.0% | **−13.3pp** |
+
+(Raw per-seed data: `paperA_data/worldmodel_trajs/pilot_mpc_correction_*.jsonl` (round 1),
+`pilot_mpc_correction_bilateral_*.jsonl` (round 2), `pilot_mpc_correction_v2_*.jsonl` (round 3),
+all compared against the same locked `pilot_baseline_*.jsonl`.)
+
+Each fix was well-motivated and each offline validation metric improved substantially
+(37.5%→72.7%→50.0% top-1 delta-selection accuracy across the three model variants,
+all far above the ~11% chance level) -- **but none of it translated into a better, or
+even a neutral, physical result.** Fixing the second bug (spawn-range mismatch)
+improved the pooled number somewhat (−13.3pp vs. −18.7pp) but did not flip the sign.
+
+**Can support:** the correction mechanism, as designed and implemented (small MLP,
+1080-row/~120-candidate-group dataset, local ±0.03m/±0.2rad search range), does not
+reliably improve physical grasp success at this data scale -- it is net harmful, and
+the harm concentrates overwhelmingly on Pear (the object with the fewest training
+examples throughout this entire session). Pear's fragility is now corroborated by
+**five independent diagnostics** across this session and the follow-on work: OT-CFM's
+largest per-object failure, Stratified-OT's one completely-unmoved object, EBM v2's
+hyperparameter sensitivity (72%→48% under a stronger mining schedule), and both
+correction pilots (rounds 2 and 3) here. **Offline validation metrics (MAE, top-1
+delta-selection accuracy) did not predict physical outcome in any of the three
+rounds** -- this is itself a transferable methodological lesson: a proxy-metric
+offline gate, however much it improves, is not a substitute for a physical pilot,
+and should not be treated as sufficient evidence before scaling to a full evaluation.
+
+**Cannot support:** that a larger dataset, a different architecture, or further
+hyperparameter tuning would fix this -- none of those were tried, and the pattern
+(three different, individually-reasonable fixes, three negative results) is
+suggestive but not proof that the mechanism is fundamentally unworkable at any scale.
+Also cannot support a specific mechanistic explanation for *why* Pear is uniquely hard
+across so many unrelated methods -- geometry (round/symmetric, easy to overshoot a
+correction into a worse configuration) and data scarcity (fewest positive examples)
+are both plausible, untested hypotheses.
+
+**Decision:** stop iterating on this specific mechanism (per the roadmap's own
+pre-registered risk log, which anticipated this exact outcome and its honest framing).
+The infrastructure built here -- `_settle_at_pose()` (the reusable settle-and-measure
+primitive in `env_soarm.py`), the data collection and training scripts, and the
+now-corrected spawn-range convention -- remains available for Phase 3 (real-robot
+validation) or a redesigned Phase 1, regardless of this outcome. The roadmap's Phase 2
+(6-DoF extension) was scoped as "extend Phase 1's model," which no longer has a
+working Phase 1 to extend -- needs revisiting before proceeding, separately from this
+write-up.
+
 ## ⚠️ EBM v2 hyperparameter robustness check: Pear specifically is sensitive, TomatoSoupCan/CrackerBox are not (2026-07-10)
 
 Follow-up to the paper's own flagged Limitation ("single hyperparameter setting each for Stratified-OT
