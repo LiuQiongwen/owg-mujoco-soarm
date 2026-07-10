@@ -71,19 +71,24 @@ def main():
     ap.add_argument("--obj", default="Pear")
     ap.add_argument("--orient-seed", type=int, default=5)
     ap.add_argument("--gen-seed-base", type=int, default=1)
+    ap.add_argument("--strategy", choices=["consensus", "ikmargin"], default="consensus")
+    ap.add_argument("--ensemble-n", type=int, default=10)
     ap.add_argument("--cfm-ckpt", default="grasp_6dof/models/cfm_allobj_ot.pt")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
     out_path = Path(args.out) if args.out else Path(
-        f"trajs/{args.obj.lower()}_consensus_orient{args.orient_seed}_gen{args.gen_seed_base}.json")
+        f"trajs/{args.obj.lower()}_{args.strategy}_orient{args.orient_seed}_gen{args.gen_seed_base}.json")
 
     # Exactly demo.py's own env-var / seeding sequence for --consensus-n /
-    # --gen-seed, applied BEFORE RobotEnvUI construction (matches demo.py's
-    # documented requirement: "Must run before RobotEnvUI(...) is
-    # constructed (which spawns objects in __init__)").
+    # --ikmargin-n / --gen-seed, applied BEFORE RobotEnvUI construction
+    # (matches demo.py's documented requirement: "Must run before
+    # RobotEnvUI(...) is constructed (which spawns objects in __init__)").
     os.environ["CFM_CKPT"] = args.cfm_ckpt
-    os.environ["CONSENSUS_N"] = "10"
+    if args.strategy == "consensus":
+        os.environ["CONSENSUS_N"] = str(args.ensemble_n)
+    else:
+        os.environ["IKMARGIN_N"] = str(args.ensemble_n)
     os.environ["GEN_SEED"] = str(args.gen_seed_base)
     os.environ["OWG_NO_SEMANTIC"] = "1"
     os.environ["OWG_GATE_DELTA"] = "0.0"
@@ -107,7 +112,7 @@ def main():
     recorder = TrajectoryRecorder()
     backend_adapter = _EnvAsBackend(demo.env)
     recorder.begin(metadata={
-        "backend": "mujoco", "obj_name": args.obj, "strategy": "consensus",
+        "backend": "mujoco", "obj_name": args.obj, "strategy": args.strategy,
         "orient_seed": args.orient_seed, "gen_seed_base": args.gen_seed_base,
     })
     demo.env._step_hook = lambda: recorder.snap(backend_adapter)
