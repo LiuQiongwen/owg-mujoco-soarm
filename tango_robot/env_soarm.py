@@ -122,6 +122,59 @@ GRASP_MODE_PHYSICS      = "physics"                        # legacy alias
 GRASP_MODE_DEMO_ATTACH  = "demo_attach"
 
 
+# ── Phase 1: MPC-style real-time correction model (optional) ─────────────────
+# Set env var MPC_CORRECTION to a checkpoint path (see train_mpc_correction.py)
+# to enable a pre-close correction search in _execute_grasp_physics_topdown:
+# after the normal settle, search a handful of small (dx, dy, dyaw) nudges
+# using the model's predicted post-correction jaw_obj_xy_gap, and if the best
+# one beats "no correction", re-settle there before closing. Disabled by
+# default (identical behaviour to before this feature existed) -- see
+# /home/lina/.claude/plans/floating-crunching-yeti.md, Phase 1.
+_MPC_MODEL_CACHE: Dict[str, Optional[dict]] = {}
+
+
+def _load_mpc_correction_model(ckpt_path: str) -> Optional[dict]:
+    """Load a Phase 1 correction-model checkpoint. Cached by path. Returns
+    None (and caches None) if ckpt_path is empty, missing, or fails to load
+    -- callers must treat None as 'correction disabled', not an error."""
+    if ckpt_path in _MPC_MODEL_CACHE:
+        return _MPC_MODEL_CACHE[ckpt_path]
+    bundle = None
+    if ckpt_path and os.path.isfile(ckpt_path):
+        try:
+            import torch
+            import torch.nn as nn
+
+            class _CorrectionNet(nn.Module):
+                def __init__(self, in_dim: int, hidden: int = 64):
+                    super().__init__()
+                    self.net = nn.Sequential(
+                        nn.Linear(in_dim, hidden), nn.SiLU(),
+                        nn.Linear(hidden, hidden), nn.SiLU(),
+                        nn.Linear(hidden, 1),
+                    )
+
+                def forward(self, x):
+                    return self.net(x).squeeze(-1)
+
+            ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+            model = _CorrectionNet(in_dim=ckpt["in_dim"])
+            model.load_state_dict(ckpt["state_dict"])
+            model.eval()
+            bundle = {
+                "model":   model,
+                "x_mean":  np.array(ckpt["x_mean"], dtype=np.float32),
+                "x_std":   np.array(ckpt["x_std"], dtype=np.float32),
+                "objects": ckpt["objects"],
+            }
+            print(f"[MPC] Loaded correction model {ckpt_path} "
+                  f"(held-out test MAE={ckpt.get('model_mae')}, objects={ckpt['objects']})")
+        except Exception as e:
+            print(f"[MPC] Failed to load correction model {ckpt_path}: {e}")
+    _MPC_MODEL_CACHE[ckpt_path] = bundle
+    return bundle
+
+
 # ── compatibility shim ───────────────────────────────────────────────────────
 
 class FailToReachTargetError(RuntimeError):
@@ -1739,6 +1792,68 @@ class EnvironmentSoArm:
 
         return metrics_pre, mg0
 
+    def _mpc_correction_search(self, x: float, y: float, yaw: float,
+                                off_x: float, off_y: float, obj_name: str,
+                                n_candidates: int = 16,
+                                delta_xy_range: float = 0.03,
+                                delta_yaw_range: float = 0.20) -> Tuple[float, float, float]:
+        """Phase 1 correction search (opt-in, see MPC_CORRECTION env var above).
+
+        Given the current settled jaw-object offset vector (off_x, off_y) and
+        the candidate's (x, y, yaw), searches n_candidates random small
+        (dx, dy, dyaw) corrections using the trained model's PREDICTED
+        post-correction jaw_obj_xy_gap (one batched forward pass, no
+        re-settling per candidate -- that cost is paid once, for real, by the
+        caller after this returns). Always includes the zero-delta
+        "no correction" option so the search can never do worse than baseline
+        according to the model's own prediction. Returns the corrected
+        (x, y, yaw), or the unchanged inputs if correction is disabled, the
+        model failed to load, or obj_name isn't one the model was trained on
+        (does not extrapolate to untrained objects).
+        """
+        bundle = _load_mpc_correction_model(os.environ.get("MPC_CORRECTION", ""))
+        if bundle is None:
+            return x, y, yaw
+
+        objects = bundle["objects"]
+        key = obj_name.lower().replace("ycb", "").replace(" ", "")
+        obj_onehot = [1.0 if (k in key or key.startswith(k)) else 0.0 for k in objects]
+        if sum(obj_onehot) == 0:
+            return x, y, yaw
+
+        import torch
+
+        # Draw from the GLOBAL numpy random state (seeded once per trial by
+        # demo.py's np.random.seed(args.seed), same convention already used by
+        # this file's own load_isolated_obj yaw sampling) rather than a fresh
+        # np.random.default_rng() -- an independent, unseeded stream here would
+        # make the correction search (and therefore the trial's outcome)
+        # non-reproducible across runs with the same --seed, exactly the class
+        # of bug this whole project's evaluation harness was built to catch.
+        dx   = np.random.uniform(-delta_xy_range, delta_xy_range, size=n_candidates).astype(np.float32)
+        dy   = np.random.uniform(-delta_xy_range, delta_xy_range, size=n_candidates).astype(np.float32)
+        dyaw = np.random.uniform(-delta_yaw_range, delta_yaw_range, size=n_candidates).astype(np.float32)
+        dx[0], dy[0], dyaw[0] = 0.0, 0.0, 0.0   # always include "no correction"
+
+        feat = np.stack([
+            np.full(n_candidates, off_x, dtype=np.float32),
+            np.full(n_candidates, off_y, dtype=np.float32),
+            np.full(n_candidates, math.sin(yaw), dtype=np.float32),
+            np.full(n_candidates, math.cos(yaw), dtype=np.float32),
+            dx, dy, np.sin(dyaw).astype(np.float32), np.cos(dyaw).astype(np.float32),
+            *[np.full(n_candidates, v, dtype=np.float32) for v in obj_onehot],
+        ], axis=1)
+        feat_n = (feat - bundle["x_mean"]) / bundle["x_std"]
+
+        with torch.no_grad():
+            pred = bundle["model"](torch.tensor(feat_n, dtype=torch.float32)).numpy()
+
+        best = int(np.argmin(pred))
+        print(f"  [mpc_correction] searched {n_candidates} deltas: best predicted "
+              f"gap={pred[best]:.4f}  no-correction predicted={pred[0]:.4f}  "
+              f"applying delta=({dx[best]:.4f}, {dy[best]:.4f}, {dyaw[best]:.4f})")
+        return x + float(dx[best]), y + float(dy[best]), yaw + float(dyaw[best])
+
     def _execute_grasp_physics_topdown(self, pos: tuple, yaw: float,
                                        gripper_opening_length: float,
                                        obj_height: float) -> Tuple[bool, Optional[int]]:
@@ -1766,6 +1881,41 @@ class EnvironmentSoArm:
               f"  z={z:.3f}  yaw={yaw:.3f}")
 
         metrics_pre, mg0 = self._settle_at_pose(x, y, z, yaw, opening)
+
+        # Phase 1: opt-in MPC-style correction search (see MPC_CORRECTION env
+        # var and _mpc_correction_search above). Disabled by default -- the
+        # block below is a no-op unless MPC_CORRECTION points to a checkpoint,
+        # in which case it can only run if self.obj_ids is non-empty (single
+        # target object per episode, as in every evaluation this session).
+        #
+        # Trust-but-verify: the correction model's held-out top-1
+        # delta-selection accuracy is 37.5% (see train_mpc_correction.py) --
+        # well above the ~11% chance level, but far from reliable enough to
+        # commit to blindly. A live smoke test caught a case where the model
+        # predicted a mild improvement but the REAL re-settled result was
+        # dramatically worse than the uncorrected baseline. Since re-settling
+        # is cheap, always verify for real and only keep the correction if it
+        # actually beats the baseline's own real jaw_obj_xy_gap; otherwise
+        # revert to the original (uncorrected) settle.
+        if os.environ.get("MPC_CORRECTION", "") and self.obj_ids:
+            jaw_mid = self._get_jaw_midpoint()[:2]
+            obj_pos = self.get_obj_pos(self.obj_ids[0])[:2]
+            off_x, off_y = float(jaw_mid[0] - obj_pos[0]), float(jaw_mid[1] - obj_pos[1])
+            obj_name = self.obj_names[0] if self.obj_names else ""
+            cx, cy, cyaw = self._mpc_correction_search(x, y, yaw, off_x, off_y, obj_name)
+            if (cx, cy, cyaw) != (x, y, yaw):
+                baseline_gap = metrics_pre.get("jaw_obj_xy_gap")
+                corrected_metrics, corrected_mg0 = self._settle_at_pose(cx, cy, z, cyaw, opening)
+                corrected_gap = corrected_metrics.get("jaw_obj_xy_gap")
+                if (baseline_gap is None or corrected_gap is None
+                        or corrected_gap < baseline_gap):
+                    metrics_pre, mg0 = corrected_metrics, corrected_mg0
+                    print(f"  [mpc_correction] verified real improvement "
+                          f"({baseline_gap} -> {corrected_gap}), keeping correction")
+                else:
+                    print(f"  [mpc_correction] real re-settle was worse "
+                          f"({baseline_gap} -> {corrected_gap}), reverting to original")
+                    metrics_pre, mg0 = self._settle_at_pose(x, y, z, yaw, opening)
 
         self.auto_close_gripper(check_contact=False)
         self._steps(120)   # let gripper settle and contacts stabilize
