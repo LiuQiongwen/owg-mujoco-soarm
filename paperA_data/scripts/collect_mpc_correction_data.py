@@ -41,8 +41,18 @@ OBJECT_REGISTRY = {
     "cylinder": "YcbMediumClamp",
 }
 
-_CENTRE_Y     = -0.40
-_SPREAD_XY    = 0.06
+# Spawn range: MUST match tango_robot/ui.py's env.load_isolated_obj(pos=None
+# default) exactly -- r_x=uniform(-0.15,0.15), r_y=uniform(-0.35,-0.10) -- NOT
+# scripts/record_trajectory.py's constants (_CENTRE_Y=-0.40, spread=0.06,
+# giving y in [-0.46,-0.34]), which barely overlaps the real evaluation
+# harness's range and was silently copied here without checking, causing a
+# train/deployment distribution mismatch: the correction model was trained on
+# object positions from a different part of the workspace than the one it was
+# actually asked to correct at physical-pilot time. Found 2026-07-10 after two
+# consecutive physical pilots showed net-negative results despite passing
+# offline validation.
+_SPAWN_X_LO, _SPAWN_X_HI = -0.15, 0.15
+_SPAWN_Y_LO, _SPAWN_Y_HI = -0.35, -0.10
 _DROP_Z       = TABLE_TOP_Z + 0.12
 _SETTLE_STEPS = 300
 _Z_OFFSET     = 0.025
@@ -92,8 +102,8 @@ def main():
             rng = np.random.default_rng(seed)
             env = EnvironmentSoArm(vis=False, grasp_mode="physics_weld_after_bilateral")
 
-            cx = float(rng.uniform(-_SPREAD_XY, _SPREAD_XY))
-            cy = _CENTRE_Y + float(rng.uniform(-_SPREAD_XY, _SPREAD_XY))
+            cx = float(rng.uniform(_SPAWN_X_LO, _SPAWN_X_HI))
+            cy = float(rng.uniform(_SPAWN_Y_LO, _SPAWN_Y_HI))
             obj_id = env.load_obj(ycb_name, name=args.obj, pos=[cx, cy, _DROP_Z])
             env._steps(_SETTLE_STEPS)
             obj_pos = env.get_obj_pos(obj_id)
