@@ -1,5 +1,43 @@
 # Paper A raw data archive
 
+## ✅ RESOLVED (2026-07-10): Pear ikmargin-vs-consensus finding re-verified on confirmed main-branch code -- exact match
+
+Before using the Pear consensus finding (ikmargin 6.0% vs consensus 68.0%, Fisher's
+exact p=5.8e-11 -- the flagship result behind the year-long roadmap's Phase 3 real-robot
+plan) as the basis for physical hardware validation, checked whether it might be
+affected by the seeding-bug timeline: `--consensus-n`/`--ikmargin-n` (and the
+`sample_poses(seed=...)` parameter they structurally require) were only ever added to
+`tango_robot/ui.py`/`demo.py` in commit `10814cd` (2026-07-09 23:44, the seeding-bug fix
+commit), but the file mtimes of the original Pear data
+(`phase1_v2/ikmargin_Pear.jsonl`, `phase1_matched_n10/consensus_n10_Pear.jsonl`) show
+they were generated 2026-07-08 09:37-10:46 -- over a full day *before* that commit. The
+data-collection scripts ran from `.claude/worktrees/fix-eval-seeding`, whose exact
+uncommitted code state at that specific timestamp can't be reconstructed from git
+history alone (worktrees accumulate uncommitted changes; the commit date only marks
+when work was finally formalized, not when it started working).
+
+**Re-ran the identical protocol** (`paperA_data/scripts/reverify_pear_ikmargin_vs_consensus.sh`:
+orient_seed 5-9 × gen-seed base 1,11,...,91, n=10 ensemble, `cfm_allobj_ot.pt`) on
+current main-branch HEAD (confirmed to include the seeding fix). Result:
+
+| | ikmargin | consensus | Fisher's exact p |
+|---|---|---|---|
+| Original (2026-07-08, worktree) | 6.0% (3/50) | 68.0% (34/50) | 5.8e-11 |
+| Re-verification (2026-07-10, main branch) | 6.0% (3/50) | 68.0% (34/50) | 5.81e-11 |
+
+**Can support**: the worktree's code at data-collection time already had the complete
+seeding fix -- the match is exact (same counts, same p-value to 3 significant figures),
+not just directionally consistent. This is also a nice independent confirmation that
+the fix itself produces fully deterministic, reproducible results given the same seeds.
+The Pear consensus finding is trustworthy and ready to serve as the basis for Phase 3
+real-robot validation (`/home/lina/.claude/plans/floating-crunching-yeti.md`).
+
+**Cannot support**: that every other pre-fix-commit data file in this repository is
+automatically safe by the same reasoning -- this check was specific to Pear's
+ikmargin/consensus data. If a similar timeline question comes up for other data
+generated from the same worktree before 2026-07-09 23:44, re-verify rather than
+assume the same conclusion transfers.
+
 ## ❌ CONCLUDED (2026-07-10): Phase 1 (MPC-style real-time correction world model) does not work at this data scale -- three consecutive physical pilots net negative
 
 **Scope note**: this section documents work on the *next* project (a year-long
