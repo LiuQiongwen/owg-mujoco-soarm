@@ -1,5 +1,55 @@
 # Paper A raw data archive
 
+## ⚠️ EBM v2 hyperparameter robustness check: Pear specifically is sensitive, TomatoSoupCan/CrackerBox are not (2026-07-10)
+
+Follow-up to the paper's own flagged Limitation ("single hyperparameter setting each for Stratified-OT
+and EBM v2, neither was swept") — before submitting, checked whether EBM v2's reported parity result
+(74.0% vs. baseline's 77.7%, 6 objects, p=0.294) is specific to the one hard-negative-mining schedule
+reported, or holds under a meaningfully different choice.
+
+**What changed**: retrained a variant, `ebm_allobj_v2b.pt` (`train_ebm_grasp.py`, same InfoNCE +
+static/uniform/hard-negative recipe as v2), with a stronger adversarial-mining schedule —
+`EBM_K_STATIC=3 EBM_K_UNIFORM=3 EBM_K_HARD=6 EBM_HARD_POP=64 EBM_HARD_ITERS=6` (v2 was
+`K_STATIC=4 K_UNIFORM=4 K_HARD=4 HARD_POP=32 HARD_ITERS=3`) — more self-mined adversarial pressure,
+less static/uniform coverage. Converged cleanly (positive-ranked-top1 acc 0.819, vs. v2's 0.777).
+Smoke-tested (2 trials, Pear seeds 1-2, `--verbose 1`, confirmed candidates and rankings vary
+seed-to-seed, not a degenerate fallback) before running the full batch
+(`scripts/run_ebm_v2b_check_fixed_code.sh`, same 3 objects/25 seeds as every other diagnostic this
+session: Pear/TomatoSoupCan/CrackerBox).
+
+**Result** (raw: `phase0_diag_extended/ebm_v2b_check_*.jsonl`; existing v2 numbers from
+`ebm_v2_check_*.jsonl` for direct, same-seed comparison):
+
+| object | EBM v2 (existing) | EBM v2b (stronger mining) | paired McNemar exact p |
+|---|---|---|---|
+| Pear | 72.0% (18/25) | **48.0% (12/25)** | 0.146 (ns at n=25, but 9 v2-only vs 3 v2b-only discordant pairs) |
+| TomatoSoupCan | 100.0% (25/25) | 100.0% (25/25) | 1.0 (byte-for-byte identical, same seeds) |
+| CrackerBox | 28.0% (7/25) | 28.0% (7/25) | 1.0 (byte-for-byte identical, same seeds) |
+
+- **Can support**: TomatoSoupCan and CrackerBox's EBM v2 numbers are robust to this hyperparameter
+  change — literally identical outcomes per seed, not just similar aggregate rates. **Pear is not**:
+  a −24pp point-estimate drop under stronger mining, not statistically significant at this sample size
+  but too large to dismiss as noise. Pear is also the object with the fewest training positives (248,
+  lowest of all 7 — see `train_ebm_grasp.py`'s dataset printout) and the one Stratified-OT could not
+  move at all (see the OT-coupling section above) — three independent diagnostics now converge on
+  "Pear specifically is fragile," which is a more precise and more defensible claim than the paper's
+  previous blanket "neither was swept."
+- **Cannot support**: that EBM v2's reported parity result is fully hyperparameter-robust in general —
+  it demonstrably is not, for Pear. Also cannot support a causal mechanism for *why* stronger mining
+  hurts Pear specifically (small-data instability in the mining CEM itself vs. something else) — not
+  tested here.
+- **Paper impact**: `paper_final.tex`'s Limitations section rewritten (was: "we report one
+  hyperparameter setting each... neither was swept") to report this finding directly, staying within
+  the 8-page hard limit (recompiled and reverified after the edit: `latexmk -pdf && pdfinfo`).
+  Also fixed a real RA-L compliance gap while reviewing formatting requirements: `IEEEkeywords` had
+  9 entries, exceeding RA-L's stated 2–5 keyword limit — trimmed to 5. Double-blind compliance
+  (no author/affiliation leaks, no identifying links, self-citation `owg2024` already anonymized as
+  "[Author(s) omitted for blind review]") was checked and found already compliant. Note for the
+  authors: RA-L is 6 free pages + up to 2 extra pages with page charges (8 max) — this paper is
+  exactly at 8, so it will incur the maximum extra-page charge; trimming to 6 was not attempted given
+  the amount of content, but is a cost/quality tradeoff the authors should be aware of before
+  submission.
+
 ## ✅ ROOT CAUSE FOUND AND FIXED (2026-07-09/10): the seeding bug behind every instability finding below, full clean re-evaluation, and the paper's final (honest, mixed) narrative
 
 **This section supersedes the "broader implication, not resolved here" note at the bottom of the
