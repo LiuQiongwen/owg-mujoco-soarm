@@ -1,6 +1,535 @@
 # Paper A raw data archive
 
-## ⚠️ Phase 3 real-robot pilot (2026-07-10): mechanism works, open-loop replay does not transfer precisely -- confirms the anticipated sim-to-real gap
+## 🔍 Depth-noise vs shared-reference-cloud diagnostic (2026-07-13): sensor noise is a minor factor; the real culprit is GeoEBM's cached single-reference point cloud
+
+Follow-up to the GeoEBM Pear/TomatoSoupCan pilot above. Before investing in a
+"perception algorithm" research direction (real RealSense D435i integration
++ depth-denoising, motivated by literature like R2SGrasp's "Real-to-Sim
+Feature Enhancer" and DiffuDepGrasp), ran a cheap offline diagnostic
+(`scripts/depth_noise_feature_degradation_check.py`, no camera/hardware
+needed) injecting D435i-realistic synthetic depth noise (Intel's published
+RMS-error curve, ~1.06mm at the assumed 0.55m working distance; edge/void
+dropout; small-object sparsification) onto the existing clean cached point
+clouds, and measuring how much the 3 point-cloud-derived geometric features
+(`local_point_density`, `normal_consistency`, `contact_width_ratio`)
+degrade in GroupKFold AUC.
+
+| Severity | Pear AUC | TomatoSoupCan AUC |
+|---|---|---|
+| Clean (0 injected noise, but still the SHARED cached reference cloud) | 0.610 | 0.515 (≈chance) |
+| Mild | 0.593 | 0.513 |
+| Medium | 0.569 | 0.535 |
+| Severe (2x D435i RMS error) | 0.537 | 0.500 |
+
+**Key finding**: injected sensor noise alone only costs Pear ~7pp of AUC
+(0.610→0.537) and TomatoSoupCan is already at chance even with ZERO
+injected noise. The dominant factor is not depth-sensor noise -- it's that
+GeoEBM's live-inference design uses ONE FIXED cached reference point cloud
+per object (`scripts/cache_object_pointclouds.py`, one replayed scene) for
+every trial, instead of a genuine per-trial point cloud. This single design
+choice alone accounts for the drop from the true per-scene AUC (Pear 0.901,
+TomatoSoupCan 0.846, both computed on the original dataset's real per-scene
+point clouds) down to 0.610/0.515 -- an order of magnitude larger effect
+than realistic sensor noise on top of it.
+
+**Can support**: a real depth camera (D435i, already purchased), once
+properly integrated, captures a FRESH point cloud every trial -- this
+directly fixes the dominant problem (shared-reference-cloud approximation),
+not a secondary one. **This reframes the "perception algorithm" research
+direction**: the priority is verifying real per-trial point cloud capture
+integration, not designing a depth-denoising algorithm (which this
+diagnostic shows would target a comparatively minor effect). Depth
+denoising / noise-robustness may still be worth a lighter follow-up check
+once real per-trial capture is working, but is not the primary blocker.
+
+**Cannot support**: whether a REAL per-trial point cloud (once the D435i is
+integrated) actually recovers AUC close to the original 0.901/0.846 --
+this diagnostic only shows the shared-cache approximation is the dominant
+known cost, not that fixing it recovers full performance. Real camera noise,
+calibration error, and real (non-simulated) object placement variability
+could still cost additional AUC in ways this synthetic-noise-only check
+can't capture. Needs a real hardware validation once the camera is
+integrated, not just this offline check.
+
+## ⚠️ GeoEBM physical pilot (2026-07-13): works on Pear (72%, parity with baseline), catastrophically fails on TomatoSoupCan (8% vs baseline ~92%) -- does not generalize
+
+Follow-up to the killed affordance-auxiliary-VLA proposal (see below): pivoted
+to a "Geometry-Conditioned EBM" -- same InfoNCE + self-mined-hard-negative
+training recipe as the existing EBM v2 (`train_ebm_grasp.py`, RA-L paper),
+but scoring the 6-dim live-computable geometric feature subset instead of
+raw pose (`train_geo_ebm_grasp.py`, new file). Two real bugs found and fixed
+before getting a usable model, both confirmed via `GEO_EBM_CEM_DEBUG=1`
+diagnostic logging in `tango_robot/ui.py`'s `_geo_ebm_sample_candidates`:
+
+1. **Point cloud / live object position mismatch**: the cached per-object
+   reference point cloud (`scripts/cache_object_pointclouds.py`, one fixed
+   seed=1 replay per object) has different absolute world coordinates than
+   the object's actual live position at inference time (different spawn RNG
+   convention between the data-collection scripts and the real evaluation
+   harness -- a recurrence of the same class of bug documented in the
+   "🔧 BREAKING CHANGE" entry below). Fixed by recentring the cached cloud
+   onto the live CoM at inference time (`pcd = pcd_ref + (gx - ref_x, gy -
+   ref_y, 0)`), using a `ref_xy` saved alongside the cache.
+2. **Point cloud downsampling diluted local density to near-zero**: uniform
+   random downsampling of the whole scene (table + object + background) to
+   3000 points left only ~9 points within 3cm of the object itself -- most
+   CEM-mining candidates landed in bbox regions with too few points, hitting
+   `normal_consistency`/`contact_width_ratio`'s `min_pts` degenerate
+   fallback (returns 0.0), producing a saturated/identical score across the
+   entire population (confirmed: all 5 final CEM candidates scored EXACTLY
+   the same logit, 7.123, regardless of position). Fixed by cropping to a
+   0.35m radius around the object BEFORE downsampling (preserves local
+   density: 46-81 points within 3cm, vs ~9 before), instead of uniform
+   sampling over the whole scene.
+
+After both fixes, single-trial CEM diagnostics showed real score
+differentiation (12.1/11.1/11.1/10.6/10.5, not identical) and candidates
+converging to 1.8-5.6cm from the true object (down from 10-16cm) -- a
+genuine, verified fix, not just a training re-run.
+
+**Physical pilot results** (`demo.py --stage 4`, same harness as all prior
+Paper A comparisons, n=25/object):
+
+| Object | GeoEBM | Baseline (historical) |
+|---|---|---|
+| Pear | 72% (18/25) | 72% |
+| TomatoSoupCan | **8% (2/25)** | **~92%** |
+
+**Can support**: the two bugs above are real and the fixes are verified
+(CEM no longer saturates, candidates converge near the true object) -- this
+diagnostic methodology (point-cloud recentring, crop-before-downsample,
+`GEO_EBM_CEM_DEBUG=1` per-iteration convergence logging) is reusable for any
+future point-cloud-conditioned candidate scorer in this codebase. Pear
+reaching exact parity with baseline (72% both) after the fixes is a real,
+non-trivial result -- notably better than OT-CFM's 52% on Pear.
+
+**Cannot support**: that GeoEBM is a viable general method -- TomatoSoupCan's
+8% is not noise (n=25, consistent near-zero success across most seeds, not
+a few unlucky trials) and is far worse than every other method tried on
+this object this project (OT-CFM 78%, DDPM/Remove-OT ~100%). Root cause not
+yet diagnosed -- plausibly the 0.35m crop radius or CEM search-range
+assumptions were implicitly tuned against Pear's size/geometry and don't
+transfer to a differently-shaped/sized object (TomatoSoupCan is a cylinder,
+notably different aspect ratio from Pear). **Do not report this as a working
+method or invest further training time before diagnosing the TomatoSoupCan
+failure specifically** -- a single-object positive result has misled this
+project before (see the whole "new-method search" thread above).
+
+## 🔍 New-method search for T-RO/IJRR (2026-07-12): five routes killed offline (zero real-hardware time spent), one route drafted as a proposal
+
+## 🔍 New-method search for T-RO/IJRR (2026-07-12): five routes killed offline (zero real-hardware time spent), one route drafted as a proposal
+
+After the RA-L submission (2026-07-11), separately from the real-hardware
+imitation-learning thread (ACT policy on 41 Pear teleop demos), ran a
+dedicated new-method search targeting a T-RO/IJRR-level *learned* core
+method to replace the dead OT-CFM. Five candidate routes were tested and
+killed using **existing sim data only** (`grasp_6dof/dataset/lggsn_candidates_v9.jsonl`,
+1000 candidates/object x 7 objects), before any physical trial was burned:
+
+1. **Retrieval-Anchored Residual Flow Matching (RARFM)** -- retrieve nearest
+   real/sim anchor pose, apply residual correction. Single-object anchor
+   bank: -18.0pp vs naive mean-shrinkage control. Oracle same-object
+   single-NN: still -17.4pp (proves it's single-NN estimator noise, not a
+   data-scale problem -- yaw std is huge, ~0.87-0.92 rad, near-symmetric/
+   multimodal, so any single retrieved anchor is a noisy point estimate).
+   k-NN(10)-averaged oracle: ties control (0.0pp) -- fixes the noise but
+   adds no value. Object-centroid-normalized coordinates: still -14.0pp
+   (rules out "wrong coordinate frame" as the explanation).
+2. **Geometric-feature-space generation + nearest-neighbour back-projection**
+   -- naive nearest-centroid-to-typical-success-descriptor selection: only
+   +4.6pp mean lift over random pick, weaker than what the already-trained
+   LGGSN pairwise reranker plausibly achieves on the same features. No
+   clear incremental value shown over existing infra.
+
+**Key diagnostic finding** (the one genuinely new, decisive, reusable
+result from this search): logistic-regression AUC for predicting true
+physical grasp success is **~chance (0.48-0.54) from raw world-frame pose**
+for Pear/Mustard/Can -- the exact objects hit hardest by every past
+generative failure -- but **0.85-0.92 from the existing 12-dim LGGSN-style
+object-relative geometric features**, pooled pose AUC=0.581 vs geom
+AUC=0.725. This is a clean, one-number explanation for why every method
+that generates/corrects raw pose (OT-CFM, C²OT, RARFM) has struggled while
+LGGSN reranking and consensus selection (which operate on/benefit from
+relative geometry) keep working. Root cause of *why* raw pose carries so
+little signal: all 7 objects are spawned within ~0.4-4cm of the same table
+position across scenes (confirmed by comparing each object's own success-
+region centroid to the global grand mean), so world-frame (x,y) carries
+almost no object-specific information to begin with.
+
+**Proposal drafted from this finding** (not yet novelty-checked externally
+-- Codex/GPT-5.4 returned 401 all session, as in every other attempt this
+project has made): `paperA_data/new_method_affordance_auxiliary_proposal.md`
+-- affordance-auxiliary multi-task fine-tuning of a small VLA (SmolVLA +
+LoRA), with a second auxiliary head reusing the killed Phase-1 MPC
+project's cheap `_settle_at_pose` sub-process data as an *offline*
+representation-learning signal (not an online correction loop, which is
+what killed Phase 1). Toy-scale validation (2-layer MLP proxy, not real
+SmolVLA): auxiliary geometric-feature supervision raises a 32-dim
+bottleneck's success-probe AUC from 0.775±0.004 to 0.791±0.012 (4/5 seeds
+improved) -- small but real and non-artifactual, the first candidate this
+search did *not* kill. Self-reviewed novelty verdict (honest, no external
+reviewer available): NOVEL-BUT-INCREMENTAL -- affordance-auxiliary VLA
+training as a mechanism class already exists (AffordVLA arXiv:2605.17517,
+SG-VLA arXiv:2603.22760); what's new here is the quantified diagnostic
+motivation and the specific small-data/single-GPU instantiation, not the
+mechanism itself.
+
+**Can support**: a decisive, cheap (zero real-hardware time), reusable
+methodology for killing candidate directions before physical investment --
+now demonstrated on 5 more routes on top of the routes killed earlier in
+Paper A. The pose-vs-geometric-feature AUC gap is a solid, quotable,
+reusable diagnostic finding regardless of which method direction is chosen
+next.
+
+**Cannot support**: whether the affordance-auxiliary proposal survives a
+real (non-toy) SmolVLA-scale check (Stage 1 in the proposal doc, not yet
+run) -- the toy MLP result is suggestive, not decisive. Do not re-propose
+routes 1-2 above (or the MPC/C²OT/OT-CFM routes killed earlier) in future
+sessions without new evidence.
+
+## ❌ Stage 1 update (same day, 2026-07-12): affordance-auxiliary VLA route also killed -- toy-MLP signal was noise
+
+Ran Stage 1 of `paperA_data/new_method_affordance_auxiliary_proposal.md` for
+real: regenerated 1400 real scene images (deterministic object-spawn replay,
+`scripts/regen_lggsn_scene_images.py` -- a reusable new asset, first real
+images for this benchmark), downloaded SmolVLM2-500M, and reran the
+single-task-vs-multi-task probe-AUC comparison using the actual SmolVLA
+action-expert (direct fine-tune, not LoRA -- lerobot's PEFT wrapper refuses
+a from-scratch action-expert) instead of the earlier toy 2-layer MLP.
+3 seeds x 300 steps x 1500 rows: advantage = +0.017 / -0.032 / +0.001,
+mean -0.005 -- sign flips across seeds, noise-level. The toy-MLP's
++1.6pp (4/5 seeds positive) did **not** survive the jump to real
+architecture scale -- exactly the failure mode the proposal doc's own risk
+section anticipated ("the toy MLP's +1.6pp was itself close to noise").
+**This route is now killed, joining routes 1-5** (RARFM variants,
+geometric-feature-space generation). Did not proceed to the planned
+cross-object few-shot-transfer follow-up (no in-distribution baseline
+effect to test transfer of). Do not re-propose affordance-auxiliary VLA
+training for this benchmark without new evidence -- the 1400 real images
+are a reusable asset for whatever comes next, the mechanism itself is not.
+
+## ❌➡️✅ Phase 3 real-robot pilot, round 6 (2026-07-11): `topdown_bias`'s first version targeted the wrong quantity -- fixed to target actual EEF orientation via the rotational Jacobian
+
+Direct follow-up to round 5. Real-hardware test of the mount-rotation-fixed
+trajectory (round 5) still failed: user reported "抓夹前伸的抓取姿势，容易把
+物品推出去而不是夹住" (the gripper's forward-extending posture pushes the
+object away instead of gripping it), consistent with a non-top-down
+approach. Diagnosed the *first* `topdown_bias` fix (added same day, before
+this entry) as wrong: it targeted
+`shoulder_lift+elbow_flex+wrist_flex -> 0` on the assumption this matched
+`HOME_QPOS`'s own top-down orientation. **Directly checked via forward
+kinematics and found this assumption false**: `HOME_QPOS`'s own EEF Z-axis
+(the jaw approach/closing direction) is `[-0.05, 0, 0.999]` -- HOME points
+nearly straight **up**, not down. The original (unbiased) trajectory's
+Z-axis was `[-0.045, -0.606, 0.794]` (tilted, mostly up); the first
+`topdown_bias` fix made this *worse*, not better (`[-0.047, 0.107, 0.993]`,
+even more upward) -- consistent with, and now fully explaining, the user's
+report.
+
+**Fix**: rewrote `_ik_step`'s null-space secondary task
+(`tango_robot/env_soarm.py`) to target the actual EEF Z-axis alignment with
+world $-Z$ via the rotational Jacobian (`mj_jacSite`'s `jacr` output) and a
+standard rotation-vector error (`cross(z_current, z_desired)`), instead of
+the joint-angle-sum proxy. Verified: at `topdown_bias=0.1`, Z-axis becomes
+`[-0.342, 0.004, -0.94]` -- now genuinely pointing down, with position error
+still small (0.047cm, well within the 0.5cm tolerance). Quick pilot check
+(n=5/condition, Pear): 2/5 (bias=0) vs 3/5 (bias=0.1) -- no regression.
+Recorded a corrected trajectory
+(`trajs/pear_consensus_orient3_gen1_v4_topdown_fixed.json`): pre-close
+pan=-1.1° (safe), Z-axis=`[-0.341, -0.067, -0.938]`.
+
+**Can support**: the null-space secondary-task *technique* is sound (as
+theory predicted, it doesn't sacrifice position accuracy); the bug was in
+which target quantity the first implementation optimized for, not the
+technique itself. Always verify a claimed reference orientation (like
+"HOME = top-down") via direct FK rather than assuming it from a
+naming convention or a proxy quantity.
+
+**Cannot support**: whether this real EEF-orientation fix actually resolves
+the "pushed away instead of gripped" symptom on real hardware -- not yet
+tested with the corrected trajectory. Next step before further diagnosis:
+real-hardware trial of `pear_consensus_orient3_gen1_v4_topdown_fixed.json`.
+
+## 🔧 BREAKING CHANGE (2026-07-10): rotated the arm's mount in simulation (`ROBOT_BASE_EULER`) -- invalidates ALL prior paper-reported numbers, must be re-verified before citing anything against them
+
+Direct follow-up to round 4. User provided a photo of the physical setup and
+correctly identified the real issue: the arm's mount, in the simulated
+scene, sits exactly at `table_top`'s edge (`table_top` spans y in
+[-0.90, 0.00], `robot_base_mount` at y=0) with `HOME_QPOS`'s natural reach
+direction (pan=0 -> world +X, confirmed via FK) running PARALLEL to that
+edge rather than into the table (world -Y). This is why every real-hardware
+attempt so far needed ~90-100 deg of shoulder_pan just to reach the object.
+User's explicit decision, after being told this would invalidate existing
+comparison data: **"替换成仿真默认设置"** (make it the new simulation
+default), not a real-hardware-only opt-in.
+
+**Change**: added `ROBOT_BASE_EULER = "0 0 -1.5707963267948966"` (-90 deg
+about Z) to `robot_base_mount` in `tango_robot/env_soarm.py`. Verified via
+direct FK: HOME eef moved from `(0.337, ~0, 0.96)` to `(~0, -0.337, 0.96)` --
+now pointing into the table. Verified via `_solve_ik_jaw_pos_only`: the
+default single-object spawn `(0, -0.30)` now needs shoulder_pan **-0.2 deg**
+(was ~97 deg) to reach.
+
+**Immediate breakage found and fixed**: the old `TARGET_ZONE_POS = (0.20,
+0.25)` (tray) became fully unreachable under the rotated mount (`ok=False`,
+pe=21.8cm, would need pan~-110 deg) -- confirmed the pick zone (~97 deg from
+old HOME) and the old tray (~-57 deg from old HOME) are ~154 deg apart, which
+cannot both fit inside any single ±60 deg-from-HOME window regardless of
+mount rotation (a hard geometric conflict, not a parameter-tuning problem).
+Repositioned `TARGET_ZONE_POS = (0.25, -0.30, TABLE_TOP_Z)`, verified cleanly
+reachable (pe<1mm, pan~-44 deg) and, unlike the old position, actually sits
+on `table_top`'s own footprint (the old tray never did -- y=0.25 is outside
+table_top's y range; the old mount's geometry happened to make it reachable
+anyway).
+
+**End-to-end verification**: `demo.py --stage 4 --prompt Pear --seed 1
+--once --no-semantic` completes the full pick -> lift -> transport -> place
+sequence and prints `Done pick` under the new mount + repositioned tray (5th
+grasp-candidate retry succeeded; the first 4 failing is normal multi-attempt
+behaviour, unrelated to this change).
+
+**Quick directional check (n=9/strategy, not a formal re-verification)**:
+re-ran a reduced ikmargin-vs-consensus sweep for Pear (orient_seed in
+{5,6,7} x gen-seed base in {1,11,21}, same CFM checkpoint) under the new
+geometry: **ikmargin 0/9, consensus 6/9 (67%)** -- same direction as the
+original finding (6% vs 68%), if anything cleaner in this small sample. The
+consensus-selection mechanism itself appears orientation-independent, as
+expected (it's about candidate-pose robustness, not arm mounting) -- good
+early signal, but this is n=9, not the n=50 the paper cites.
+
+**Can support**: the rotation is mechanically sound (FK/IK verified,
+end-to-end episode completes, tray reachable) and the core consensus finding
+survives it directionally in a quick check.
+
+**Cannot support**: any exact number from before this change
+(`PAPER_A_CLEAN_SUMMARY.md`'s baseline 79.1% / OT-CFM 69.1% / EBM v2 74.0%,
+the Pear ikmargin 6.0%/consensus 68.0% finding, or anything else) without
+re-running under the new geometry -- all of it was computed under the old,
+unrotated mount and old tray position. **Before citing any Paper A number
+going forward, check whether it predates this change** (this entry's
+timestamp: 2026-07-10, same day as the round 1-5 real-robot pilots). A full
+re-verification (n=50/condition, matching the original protocol) has NOT
+been run yet -- only the n=9 directional check above.
+
+**Also unblocking**: real hardware can now, in principle, replicate the
+sim's pick geometry directly (no more `--spawn-xy` workaround needed) --
+next step is physically re-mounting the real SO-ARM101's base (rotate ~90
+deg so its own pan=0 also points into the table instead of along its edge),
+then re-running the shoulder_pan=0 calibration check against the NEW
+physical orientation before any further real-hardware trial.
+
+## ❌ Phase 3 real-robot pilot, round 4 (2026-07-10): found the actual root cause -- the physical marker was placed ~10cm away from where the trajectory's grasp target actually is
+
+Direct follow-up to round 3. That live attempt (slowed-down approach, feedback
+close) still found nothing at the closing point. User's report pinpointed why:
+"转到左边才闭合抓夹，根本不可能抓到正前方的物品" (it turned to the left before
+closing the gripper -- there's no way it could grasp something directly in
+front). This doesn't match either round 2's orientation-deviation explanation
+or round 3's approach-speed explanation -- it points to something more basic:
+the arm closing far from where the object physically is.
+
+Now that the torch/CUDA environment is fixed (see below), re-ran
+`record_consensus_grasp.py` for this exact episode (orient_seed=3,
+gen_seed_base=1, consensus) with full stdout captured. The actual printed
+grasp target: `approach → xy=(-0.001, -0.323) z=0.787 yaw=0.089`, with
+`pre-close metrics: jaw_obj_xy_gap=0.02` confirming the IK successfully
+landed within 2cm of the object's real simulated position -- i.e. **the
+object's true position for this episode is y≈-0.32, not y≈-0.17** as
+recorded in this session's own earlier notes (the value used to justify
+placing the physical marker at x=0, y=-0.20).
+
+Independently reproduced by directly loading a single Pear the same way
+`ui.py` does for a 1-object pool (`env.load_isolated_obj(..., pos=[0.0,
+-0.30, OBJECT_INIT_HEIGHT])`, 100 settle steps -- this is the actual,
+deterministic spawn convention for n=1 objects; earlier notes assumed the
+`pos=None` random-uniform convention, which does not apply here) and reading
+back the settled CoM directly: **(-0.005, -0.297, 0.766)** for orient_seed=3,
+**(-0.004, -0.295, 0.766)** for orient_seed=5 -- fully deterministic
+(reproduced exactly on a repeat run), and essentially seed-independent
+because the deterministic spawn xy dominates over the small
+orientation-seeded rolling variance.
+
+**Root cause of rounds 1-3's failures, corrected**: the object's real
+position for this single-Pear setup is consistently **x≈0, y≈-0.30** (30cm
+in front of the arm base along the marked axis), not y≈-0.20 where the
+physical marker was actually placed. That's a ~10cm placement error -- large
+relative to a pear's size and the gripper's tolerance -- present in every
+real-hardware trial so far (rounds 1-3 all used the same marker position).
+This alone is sufficient to explain "grasped from the bottom," "gripper
+tilted upward," "turned left with nothing in front of it," and the empty
+`Present_Load` readings in rounds 3-4's feedback-close attempts: the arm was
+never closing anywhere near the real object to begin with, independent of
+the (still real, still worth fixing eventually) orientation-IK and
+weld-signal issues documented in the round-2 entry below.
+
+**Can support**: a clear, concrete, correctable next step -- move the
+physical marker to (x=0, y=-0.30) measured from the arm base's mounting
+point, not (x=0, y=-0.20). This should be checked before attributing any
+further failure to orientation/weld/speed mechanisms.
+
+**Cannot support**: any conclusion about whether the round-2/round-3
+mechanisms (unconstrained IK orientation, sim-only weld closing signal,
+approach-speed collision risk) are still practically relevant once object
+placement is corrected -- they were never cleanly isolated from this larger
+placement error. Re-test with the corrected marker position before deciding
+whether those are still live issues or were secondary to this one.
+
+### Aside: torch/CUDA environment was fully broken this session, now fixed
+
+Unrelated to the sim-to-real work above but blocked it directly (couldn't
+re-run `record_consensus_grasp.py` for hours): `torch` (2.10.0) could not be
+imported at all (`undefined symbol: cuptiActivityEnableDriverApi`, then
+`undefined symbol: ncclCommShrink`) because ~10 `nvidia-cuda-*-cu12` packages
+and `triton` were pinned to old versions (leftover from a prior incomplete
+torch upgrade), not matching what torch 2.10.0 actually requires. Fixed by
+`pip install`-ing the exact versions torch's own package metadata declares
+(`nvidia-cublas/cufft/curand/cusolver/cusparse/nccl/nvjitlink/nvtx/cuda-nvrtc/
+cuda-runtime/cudnn-cu12` + `triton`, versions read from `importlib.metadata`).
+Hit `OSError: [Errno 28] No space left on device` mid-install (root
+filesystem was at 99%, 2.4GB free) -- freed ~12GB via pip/npm cache purges,
+disabled old snap revisions, and a 7-day journal vacuum (all safe, reversible
+caches; deliberately did NOT run `apt autoremove`, which a dry-run showed
+would remove the entire wine-staging install backing this machine's MT4/MT5
+trading setup, and did NOT purge old kernels, which triggered an unwanted
+NVIDIA driver/kernel upgrade as a side effect in a dry-run). `torch` and the
+full `tango.policy` import chain confirmed working after the fix.
+
+## ⚠️ Phase 3 real-robot pilot, round 3 (2026-07-10): feedback-driven closing fix built and validated, but exposed a new (safety-relevant) failure mode -- fast approach replay physically knocked the object away before closing ever started
+
+Direct follow-up to round 2's fix. Built
+`paperA_data/scripts/real_hw_replay_feedback_close.py`: replays joint_pos +
+gripper faithfully only through an auto-detected pre-close settled pose (the
+end of the longest near-constant run in the gripper channel before its
+global minimum -- validated to land on the same index, 1401/2530, across
+three independent trajectory files, which cross-checks against
+`_settle_at_pose`'s fixed 400-step structure), then closes the real gripper
+in small increments driven by real Feetech `Present_Load` feedback (read via
+`backend.bus`, not exposed by `SOARMRealBackend`'s public API) plus a
+position-stall backup, stopping on genuine contact resistance instead of
+blindly replaying the sim-only "closed to ~0" signal documented in the round
+2 entry below.
+
+**Calibration (`real_hw_calibrate_load.py`)**: closing the real gripper fully
+with nothing between the jaws gave a clean, low, consistent baseline
+(`Present_Load` magnitude 32-48 through most of the travel, rising to 68 only
+at full mechanical closure) with tight position tracking throughout (no
+stall). Set `--load-threshold 120` (~2x the empty-close ceiling) for the live
+attempt.
+
+**Live attempt** (same trajectory/marker setup as round 2, `--speed 0.5`):
+replay executed without error, but the feedback-close phase saw a load
+profile *indistinguishable from the empty-jaws calibration* (32-52, rising to
+68 at full closure, no stop triggered) -- i.e., nothing was between the jaws
+by the time closing started. User's direct report explains why: "运动过程太快，
+东西刚碰到被甩出去了，碰到东西没有抓起来只甩臂" (the motion was too fast --
+the arm made contact with the object and flung it away before ever grasping
+it). No damage / no one hurt (confirmed with user).
+
+**Interpretation**: the object wasn't missing from the start (round 2's
+orientation-deviation finding is still real and likely contributed to the
+approach being off-target), but the dominant proximate cause of *this*
+specific failure is that the pre-close **approach** segment (idx 0-1401,
+replayed at 0.5x recorded sim speed) swept the arm through/near the object's
+actual real-world position fast enough to physically knock it away, rather
+than settling near it -- by the time the new load-feedback closing logic
+started monitoring, there was nothing left to detect. This is a new,
+safety-relevant failure mode distinct from both round 1 (calibration/
+placement) and round 2 (sim-only closing/orientation shortcuts): **naive-
+speed replay of a trajectory computed for a slightly different real object
+position is not just imprecise, it can be an unsafe collision risk at the
+approach phase**, independent of whatever happens at the gripper.
+
+**Can support**: the feedback-driven closing mechanism itself works as
+designed -- it correctly reported "no resistance detected" rather than
+falsely claiming a successful grasp, which is exactly the failure mode round
+2 flagged trajectory replay as prone to. The auto-detected pre-close index
+heuristic is validated and reusable.
+
+**Cannot support**: a working end-to-end real-hardware grasp yet. Before the
+next attempt: replay the pre-close (approach) segment substantially slower
+than 0.5x -- possibly much slower, e.g. 0.1-0.15x -- so any incidental
+proximity to a not-quite-correctly-placed real object is gentle enough to
+observe and abort rather than a fast sweep-through. This is now a prerequisite
+for safety, not just precision.
+
+## ❌ Phase 3 real-robot pilot, round 2 (2026-07-10): fixture controlled for object placement, grasp still failed -- root cause is NOT calibration/placement, it's two sim-only shortcuts baked into the recorded trajectory itself
+
+Follow-up to the round-1 pilot below, after ruling out shoulder_pan calibration
+and setting up a physical marker/fixture (user-confirmed placement, x=0,
+y=-0.20 in simulation coordinates) to control for the object-placement
+confound. Replayed a second consensus trajectory chosen specifically because
+its simulated Pear settled-CoM position was the closest match to the marker
+(orient_seed=3, gen_seed_base=1, `trajs/pear_consensus_orient3_gen1.json`,
+`success=True` in sim). Replay executed technically without error (2530
+points, clean disconnect). **Physical result**: user's direct observation --
+"没有，他不是从上往下抓的，是从底部抓的，而且我没有放置托盘" (did not grasp;
+approach was not top-down, it grasped from the bottom) and, on follow-up,
+"机械抓夹是向上翘的" (the gripper was tilted upward).
+
+Controlling for object placement did not fix the failure, which rules out
+"imprecise manual object placement" as the dominant explanation this time
+(round 1's leading hypothesis) and points to something wrong with the
+recorded trajectory itself. Diagnosed by reading the trajectory JSON directly
+(`trajs/pear_consensus_orient3_gen1.json`) against `tango_robot/env_soarm.py`
+source -- no new simulation run needed. Found two distinct, real, and
+previously undocumented mechanisms, both sim-only shortcuts with no
+real-hardware analog:
+
+**1. The final descent IK does not constrain gripper orientation to
+top-down.** At the trajectory's actual grasp point (idx≈1138-1265, the
+lowest-z hold, confirmed distinct from the later tray-placement point at
+idx≈2450-2529 which matches `TARGET_ZONE_POS=(0.20,0.25)` exactly),
+`shoulder_lift+elbow_flex+wrist_flex = +25.3°`, versus `0°` for `HOME_QPOS` /
+a strict top-down pose. `_settle_at_pose`'s descent phase uses
+`_solve_ik_jaw_pos_only` (position-only IK), and the code's own comment
+explains why: "jaw_topdown was tested and reverted twice ... the orientation
+constraint corrupts jaw centering at SO-ARM101 reach limits, causing
+symmetric objects (**Pear**) to regress catastrophically" (`env_soarm.py`
+~line 1737-1741). This is a deliberate, documented design choice for
+simulation success-rate reasons -- but it means the actual deployed grasp
+orientation for Pear is **not** guaranteed to match the "roll=π, pitch=0,
+fixed top-down" assumption stated in `paper_final.tex`'s Limitations section.
+This trajectory's IK solution happened to converge to a +25° pitch deviation,
+which replayed on real hardware as the visually-reported "gripper tilted
+upward."
+
+**2. `GRASP_MODE_PHYSICS_WELD`'s post-close behavior has no real-hardware
+analog.** Per `env_soarm.py`'s own design comment (~line 97-109): bilateral
+contact at the moment of closing gates a kinematic weld that then teleports
+the object to follow the end-effector during lift/transport, because "6mm
+sphere colliders cannot generate sufficient friction force to lift ~0.15kg
+objects against gravity." The bilateral-contact gate at close time is a real
+physical check, but once the weld engages, the object's simulated position is
+decoupled from true jaw width -- and the recorded gripper-opening channel
+keeps commanding full closure (0.001, near `GRIP_CLOSED`) through the entire
+transport phase (idx≈1600-2150 in this trajectory) regardless. Replaying that
+"closed to 0.001" command sequence on the real gripper, which has no
+kinematic weld to fall back on and must hold the object by genuine friction
+alone, is not the same physical event as what produced a `success=True` label
+in simulation.
+
+**Can support**: the mechanism (record in sim, replay on hardware) still
+executes technically without error -- this is an execution-fidelity finding,
+not an infrastructure failure. Both root causes are readable directly from
+already-recorded data and existing source comments, no new hardware trials
+needed to confirm them.
+
+**Cannot support**: naive joint-space trajectory replay of a
+`physics_weld_after_bilateral` grasp as a valid sim-to-real transfer method
+for this project's real-hardware validation plan, as currently designed. The
+round-1 pilot's calibration/placement explanation is superseded for this
+specific failure mode -- shoulder_pan calibration and object placement were
+both controlled for in round 2, and the grasp still failed for reasons
+intrinsic to the recorded trajectory. Phase 3's real-robot plan
+(`/home/lina/.claude/plans/floating-crunching-yeti.md`) needs to be revisited
+before further hardware trials: either avoid relying on the weld-assisted
+close/transport signal (e.g., replay only through the pre-close settled pose
+and let the real gripper's own contact/current feedback drive closure), or
+scope the real-hardware claim down to what trajectory replay can actually
+validate (arm reaches the intended pre-grasp pose) rather than full
+pick-success reproduction.
+
+## ⚠️ Phase 3 real-robot pilot, round 1 (2026-07-10): mechanism works, open-loop replay does not transfer precisely -- confirms the anticipated sim-to-real gap
 
 First physical-hardware test of the year-long roadmap
 (`/home/lina/.claude/plans/floating-crunching-yeti.md`, Phase 3): validated
