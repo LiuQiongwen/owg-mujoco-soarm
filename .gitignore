@@ -51,12 +51,16 @@ data/transitions/
 # Grows with every trial/episode collected; not source, not a small result.
 data/lerobot/
 trajs/
+paperA_data/lerobot_datasets/
+tango_robot/piper_robosuite/piper_trajs/
 
 # ---- Build byproducts: LaTeX / console logs (do NOT commit) ----
 # Regenerated on every compile/run; not meant to be diffed or reviewed.
 *.aux
 *.log
 *.out
+*.fdb_latexmk
+*.fls
 MUJOCO_LOG.TXT
 
 # ---- Pose-visualization renders (do NOT commit) ----
