@@ -18,7 +18,7 @@ camera:
   fov: 40
 
 policy:
-  config_path: './config/pyb/OWG.yaml'
+  config_path: './config/pyb/TANGO.yaml'
   verbose: True
   vis: True
   use_grasp_ranker: False
