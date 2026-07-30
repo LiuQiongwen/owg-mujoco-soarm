@@ -1,0 +1,24 @@
+{
+  "git_hash": "be61883dad64ec19552107a72bf36be075ec3d67",
+  "command": "scripts/collect_recovery_data.py --objects cracker,mustard,drill --n-trials 60 --base-seed 500 --perturb-std 0.05 --perturb-prob 0.3 --out-dir results/risk_gated_vla/recovery_base500_20260730 --quiet",
+  "objects": [
+    "cracker",
+    "mustard",
+    "drill"
+  ],
+  "n_trials_per_object": 60,
+  "base_seed": 500,
+  "perturb_std": 0.05,
+  "perturb_prob": 0.3,
+  "perturb_throttle_fps": 20,
+  "critic_model_dir": "results/risk_gated_vla/counterfactual_models_20260730",
+  "critic_variant": "object_counterfactual",
+  "eval_centre_y": -0.3,
+  "ik_topdown_bias": "0.1",
+  "perturbation_count_expected_range": [
+    3,
+    100
+  ],
+  "consecutive_no_contact_limit": 10,
+  "started_at": 1785416358.2730854
+}
