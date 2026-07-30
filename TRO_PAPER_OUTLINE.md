@@ -35,6 +35,21 @@ given the arm isn't connected).
      independently tested mechanisms across candidate generation, candidate selection,
      execution-control, active human-in-the-loop calibration, and world-model sim-to-real
      transfer, each ruled out with a paired-trial significance test. See `RULED_OUT_METHODS.md`.
+  6. **A third, prospective application of the causal-validity criterion** (§4.5, added
+     2026-07-30, merged in from the standalone `paper_risk_gated_vla_draft.md` line rather than
+     submitted separately — see that file's header note): an object-relative counterfactual
+     grasp-candidate critic, built causally-admissible from the start rather than audited after
+     the fact, that significantly outperforms a geometric baseline on two disjoint, fully
+     held-out MuJoCo test batches (dev-test +15.6pp, McNemar p=0.00258, n=90; frozen confirmatory
+     +14.0pp, p=3.24e-4, n=150) — while a chance-level stale checkpoint (AUROC=0.4996) evaluated
+     under the SAME corrected harness demonstrates why the discipline matters even when nothing
+     about the *criterion* itself is violated (that checkpoint's failure traces to two separate,
+     non-causal-validity bugs: a seed-coupling defect that broke the paired evaluation design, and
+     a success criterion that counted transient contact as success). Complements §4.2-4.3's
+     retrospective mistake-catching with a case where applying the discipline prospectively
+     produces a working, validated result, not just a caught mistake. Full negative/incomplete
+     results (uncertainty risk gate: no benefit; small-data ACT pilot: fails online) reported
+     alongside it, not omitted. See `results/risk_gated_vla/final_report.md` and `audit.md`.
 
 ## 2. Related Work
 - Composite/hybrid grasp controllers; robosuite/MuJoCo-based manipulation benchmarks.
@@ -84,6 +99,47 @@ given the arm isn't connected).
 - **4.4 — Automated tagging** (`AUTO_TAGGER_ALGORITHM.md`): the algorithm itself, its validation
   against real code, and the re-verified empirical result after removing `grasp_yaw`
   (§4.3-corrected: accuracy 0.8236 → 0.1327, qualitative null finding unchanged).
+- **4.5 — Prospective application: an object-relative counterfactual grasp critic** (merged
+  2026-07-30 from the standalone `paper_risk_gated_vla_draft.md` draft — see that file's header
+  note; source data/results in `results/risk_gated_vla/`, not re-derived here). Where §4.2-4.3
+  show the criterion catching mistakes *after* they were made, this subsection shows applying it
+  *from the start*:
+  - A predecessor critic pipeline (`world_model/`, pre-dating `causal_validity_audit/` entirely)
+    reported +15.6pp over geometry. Diagnosed as invalid on two independent grounds, neither of
+    which is itself a causal-validity violation: (a) its evaluation harness's RNG seed encoded
+    the compared method identity, so paired trials never shared a scene or candidate pool
+    (`audit.md` §4, directly reproduced: 0/250 paired trials shared even the executed candidate
+    position); (b) its success criterion counted transient post-close gripper contact as success
+    regardless of whether the object was ever lifted (saturates to 150/150 regardless of pose).
+  - Rebuilt as a causally-admissible-by-construction critic (object-relative pose + point-cloud
+    stats + object identity — every field registered `PRE_EXECUTION` in `provenance.py`, verified
+    by the same gate as §4's other pipelines) plus a from-scratch paired evaluation harness fixing
+    both defects above.
+  - The corrected pipeline also surfaces a **fourth self-correction-adjacent finding, this time
+    in shared project infrastructure rather than in the audit tooling itself**: the production
+    `physics_weld_after_bilateral` grasp primitive's weld-attach gate accepted single-jaw contact,
+    not the bilateral contact its name and documented protocol require — found only because this
+    study executes the primitive far more densely (13x/scene) than prior usage. Fixed in
+    `tango_robot/env_soarm.py`; flagged as possibly affecting other `physics_weld_after_bilateral`
+    results project-wide, explicitly out of scope to re-verify here.
+  - **Result**: re-evaluated under the corrected harness, the stale checkpoint fails a
+    pre-registered gate outright (AUROC=0.4996 on 1,500 real per-candidate labels — chance level).
+    A freshly-trained, causally-admissible critic, evaluated on two scene batches disjoint from
+    training/model-selection and from each other (independently key-intersection-verified, not
+    asserted), beats geometry: dev-test +15.6pp (McNemar p=0.00258, n=90), frozen confirmatory
+    +14.0pp (27 wins/6 losses, p=3.24e-4, n=150) — live-executed paired outcomes, not an offline
+    re-scoring (see `final_report.md`'s methodology note on a small, physically-real
+    non-determinism footnote: ~0.6-1% of repeated identical-pose executions flip their boolean
+    outcome, MuJoCo's contact solver is not bit-reproducible on marginal grasps).
+  - **Negative/incomplete results, reported with equal rigor, not omitted**: an ensemble-
+    uncertainty risk gate calibrated on held-out data adds no measurable benefit over the ungated
+    critic (coverage 98.7% — it almost never fires); whether the within-scene pairwise loss term
+    is independently responsible for the gain vs. object-relative features alone is unresolved
+    (object-relative BCE vs. the full counterfactual variant: p=1.0, not distinguishable at this
+    n); a small-data (15-demo) ACT imitation-policy pilot integrates end-to-end but fails its
+    first closed-loop rollout. Real-hardware validation is designed
+    (`results/risk_gated_vla/PHASE3_REAL_HARDWARE_PROTOCOL.md`) but not yet executed — folds into
+    Section 6 rather than duplicating it.
 
 ## 5. The Gripper-Controller Bug (supporting case study)
 - Pull directly from `GRIPPER_BUG_METHODOLOGY.md`: the bug, how found, two fix attempts (one
@@ -132,4 +188,13 @@ given the arm isn't connected).
 - [ ] Page-budget pass once a full draft exists (T-RO does not have RA-L's 8-page hard limit, but
       should still be checked against T-RO's own submission length norms) — Section 4 is now the
       largest section and may need trimming (4.3's self-correction narrative is valuable but
-      could compress to a paragraph rather than three subsections).
+      could compress to a paragraph rather than three subsections). §4.5 (added 2026-07-30) makes
+      this more pressing, not less — it is the longest subsection in the outline.
+- [ ] §4.5 merged in from `paper_risk_gated_vla_draft.md` (2026-07-30) rather than converted
+      directly to LaTeX — Related Work for §4.5's specific angle (learned grasp-candidate scoring
+      literature, risk-aware/uncertainty-gated action selection) still needs a real literature
+      pass before Section 2 can cite anything; do not fabricate citations to fill this in.
+- [ ] Real-hardware validation for §4.5 (`PHASE3_REAL_HARDWARE_PROTOCOL.md`) is designed, not
+      executed — decide before submission whether Section 6 needs it to be at least a pilot-scale
+      result, or whether "designed, explicitly future work" (this outline's existing framing for
+      the Piper hardware backend) is an acceptable posture for §4.5's claim too.
