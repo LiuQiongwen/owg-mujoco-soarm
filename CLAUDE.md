@@ -113,7 +113,18 @@ GRIP_OPEN   = 1.0                    # internal angle (radians)
 GRIP_CLOSED = 0.05
 HOME_QPOS   = [0.0, -0.4, 0.8, -0.4, 0.0]   # arm home (radians)
 ARM_JOINTS  = [shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll]
+ROBOT_BASE_EULER = "0 0 -1.5707963267948966"   # -90° about Z, added 2026-07-10
+TARGET_ZONE_POS  = [0.25, -0.30, TABLE_TOP_Z]  # tray position, changed 2026-07-10
 ```
+
+**⚠️ `ROBOT_BASE_EULER`/`TARGET_ZONE_POS` are a breaking geometry change (2026-07-10, Phase 3 real-robot
+work)**: the arm mount used to have no rotation (HOME reached toward world +X, parallel to `table_top`'s
+edge rather than into it) and the tray sat at `(0.20, 0.25)`. Both were changed so HOME reaches into the
+table (needed for real-hardware trajectory replay to stay within a physically safe rotation range — see
+`paperA_data/README.md`'s "🔧 BREAKING CHANGE" entry). **Every success-rate number in `paper_final.tex` and
+`paperA_data/formal_results/` was computed under the OLD geometry** and does not necessarily still hold —
+only a quick n=9/strategy directional check has been re-run under the new geometry so far. Do not assume old
+numbers transfer; re-verify before citing them in new work.
 
 ## Grasp modes
 
@@ -178,5 +189,16 @@ Parsed from demo.py stdout. The benchmark logger writes per-trial JSONL to `resu
 - Do not use `GRASP_MODE_DEMO_ATTACH` in any evaluation — results are invalid.
 - Do not `import robots` from inside `tango_robot/` or `tango/` — circular imports.
 - Do not call `env._step_hook` directly; only `MujocoBackend.execute_grasp()` sets it.
-- Do not edit `paper_final.tex` without checking `paper_final.pdf` diff — it is the live submission draft.
-  - Target venue: RA-L. Hard limit: **8 pages** (references excluded). Currently **exactly 8 pages total, including all 18 references** (verified 2026-07-10 with `latexmk -pdf -interaction=nonstopmode -halt-on-error paper_final.tex && pdfinfo paper_final.pdf`, zero undefined refs/citations) — this is after the full rewrite reflecting the seeding-bug discovery, the confirmed OT-CFM regression (−10.0pp vs. baseline, p=0.0025), and the EBM v1→v2 (adversarial negative mining) story. Zero headroom left within the paper body; any further additions require cuts elsewhere. Re-verify page count with `latexmk -pdf paper_final.tex && pdfinfo paper_final.pdf` after any substantial edit rather than trusting this note; it has gone stale before (multiple times).
+- Do not edit `paper_final.tex` — **submitted to RA-L 2026-07-11** (Editor-in-Chief: Tamim Asfour). This is
+  the actual manuscript on file with the journal; do not modify it further while under review. If reviewer
+  revisions are requested later, treat that as a distinct, deliberate edit pass, not a routine change.
+  - Compiled length at submission: **7 pages** (max allowed with overlength fee is 8; base free limit is 6),
+    18 references, double-anonymous compliant (no author block, no institution names, no self-citing links —
+    verified by grep before submission). Page count was reduced from an earlier 8-page draft by trimming
+    prose (Related Work, Discussion, Scissors/Limitations/Future Work/Conclusion) and fixing a misplaced
+    `\balance` command — no results, tables, or statistics were cut.
+  - If ever asked to produce a revised/resubmitted version, recompile with
+    `latexmk -pdf -interaction=nonstopmode -halt-on-error paper_final.tex && pdfinfo paper_final.pdf` and
+    re-verify page count rather than trusting this note — it has gone stale before (multiple times), and note
+    "revised version must retain the same keywords and in the exact same order as the previously rejected
+    version" per RA-L's own submission form if this ever becomes a resubmission.
