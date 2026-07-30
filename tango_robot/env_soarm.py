@@ -47,9 +47,33 @@ _MANIFEST_PATH = os.path.join(_PROJ_ROOT, "configs", "objects", "ycb_mujoco_mani
 TABLE_TOP_Z         = 0.785
 GRASP_Z_TABLE_MARGIN = 0.020  # min offset above obj CoM: half_jaw_span(10mm)+sphere_r(6mm)+safety(4mm)
 ROBOT_BASE_POS = "0 0 0.785"
+# Rotation applied to the arm's mount body (2026-07-10, Phase 3 round 5 fix):
+# with no rotation, HOME's natural reach direction (pan=0 -> world +X) runs
+# PARALLEL to table_top's edge (table_top spans y in [-0.90, 0.00], robot
+# mounted exactly at y=0, i.e. the table's edge) rather than INTO the table
+# (world -Y) -- confirmed both by direct FK (HOME eef = (0.337, ~0, 0.96))
+# and by a real-hardware pilot where the recorded grasp trajectory required
+# ~90-100 deg of shoulder_pan from HOME to reach the object, exceeding this
+# project's physical workspace's safe rotation range. -90 deg about Z makes
+# pan=0 point toward -Y (into the table) instead of +X (along its edge).
+# See paperA_data/README.md, "Phase 3 real-robot pilot, round 5" -- this is a
+# deliberate, invalidating change to scene geometry: all prior paper-reported
+# numbers (baseline/OT-CFM/EBM v2/consensus) were computed under the old,
+# unrotated mount and must be re-verified, not assumed to still hold.
+ROBOT_BASE_EULER = "0 0 -1.5707963267948966"
 CAM_POS        = "0.05 -0.52 1.9"
 CAM_EULER      = "0 0 0"   # with angle="radian" compiler, default orientation looks -Z (down)
-TARGET_ZONE_POS = [0.20, 0.25, TABLE_TOP_Z]   # within arm workspace (x,y ≤ 0.4)
+TARGET_ZONE_POS = [0.25, -0.30, TABLE_TOP_Z]
+# Repositioned 2026-07-10 alongside ROBOT_BASE_EULER above: the old
+# (0.20, 0.25) was only reachable under the old, unrotated mount (pan~-57 deg
+# there); under the new -90 deg mount rotation its jaw-pos IK fails outright
+# (ok=False, pe=21.8cm, would need pan~-110 deg, likely past the joint's
+# reachable range). Verified via direct _solve_ik_jaw_pos_only sweep that
+# (0.25, -0.30) is cleanly reachable (pe<1mm, pan~-44 deg) under the new
+# mount and still sits on table_top's own footprint (x in [-0.45,0.45],
+# y in [-0.90, 0.00]) -- the old position (0.20, 0.25) never actually did
+# (y=0.25 is outside table_top's y range), which the old mount's geometry
+# happened to make reachable anyway but was already a bit odd.
 
 ARM_JOINTS  = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll"]
 GRIP_JOINT  = "gripper"
@@ -471,7 +495,7 @@ def _build_scene_xml(obj_names: List[str]) -> str:
 
     <camera name="overhead" pos="{CAM_POS}" euler="{CAM_EULER}" fovy="{FOVY}"/>
 
-    <body name="robot_base_mount" pos="{ROBOT_BASE_POS}">
+    <body name="robot_base_mount" pos="{ROBOT_BASE_POS}" euler="{ROBOT_BASE_EULER}">
       {so_wbody}
     </body>
 
@@ -814,14 +838,50 @@ class EnvironmentSoArm:
 
     # ── position-only IK (legacy) ─────────────────────────────────────────────
 
-    def _ik_step(self, target_pos: np.ndarray) -> bool:
-        """Damped least-squares IK — position only (xyz)."""
+    def _ik_step(self, target_pos: np.ndarray, topdown_bias: float = 0.0) -> bool:
+        """Damped least-squares IK — position only (xyz).
+
+        topdown_bias (2026-07-10, Phase 3 round 6, opt-in, default 0.0 =
+        unchanged behaviour): a redundant 5-DOF arm solving a 3-DOF position
+        target has 2 DOF of leftover null-space freedom -- this nudges that
+        freedom toward aligning the EEF site's Z-axis (the jaw
+        approach/closing direction) with world -Z (straight down), via a
+        standard null-space secondary task using the rotational Jacobian,
+        WITHOUT sacrificing position accuracy (the nudge is projected out of
+        anything that would change the primary position error). This is
+        deliberately different from the topdown-CONSTRAINED IK mode that was
+        tried and reverted for corrupting jaw centering on symmetric objects
+        (Pear) -- a hard constraint can trade away position accuracy for
+        orientation, a null-space nudge structurally cannot.
+
+        Correction (same day): an earlier version of this targeted
+        (shoulder_lift+elbow_flex+wrist_flex) -> 0, assuming that matched
+        HOME_QPOS's own top-down orientation. Verified false by directly
+        checking HOME_QPOS's own EEF Z-axis via FK: it is
+        [-0.05, 0, 0.999] -- HOME points nearly straight UP, not down, so
+        that proxy target was wrong (and made real-hardware grasps worse,
+        not better -- see paperA_data/README.md, "Phase 3 real-robot pilot,
+        round 6"). This version targets the actual Z-axis direction instead.
+        """
         jacp = np.zeros((3, self.model.nv))
-        mujoco.mj_jacSite(self.model, self.data, jacp, None, self._eef_site_id)
+        jacr = np.zeros((3, self.model.nv))
+        mujoco.mj_jacSite(self.model, self.data, jacp, jacr, self._eef_site_id)
         cols = [self.model.joint(n).dofadr[0] for n in ARM_JOINTS]
         J    = jacp[:, cols]
         err  = target_pos - self._get_eef_pos()
-        dq   = J.T @ np.linalg.solve(J @ J.T + IK_DAMPING * np.eye(3), err)
+        JJt_inv = np.linalg.inv(J @ J.T + IK_DAMPING * np.eye(3))
+        dq   = J.T @ JJt_inv @ err
+
+        if topdown_bias != 0.0:
+            Jr = jacr[:, cols]
+            z_cur = self._get_eef_rot()[:, 2]
+            z_des = np.array([0.0, 0.0, -1.0])
+            rot_err = np.cross(z_cur, z_des)   # small-angle rotation-vector error
+            JrJrt_inv = np.linalg.inv(Jr @ Jr.T + IK_DAMPING * np.eye(3))
+            grad = Jr.T @ JrJrt_inv @ rot_err
+            null_proj = np.eye(5) - J.T @ JJt_inv @ J
+            dq = dq + topdown_bias * (null_proj @ grad)
+
         for i, adr in enumerate(self._arm_qpos_adr):
             lo = self.model.jnt_range[self._arm_jnt_ids[i], 0]
             hi = self.model.jnt_range[self._arm_jnt_ids[i], 1]
@@ -1016,6 +1076,7 @@ class EnvironmentSoArm:
         n_outer:        int   = 8,
         reset_to_home:  bool  = True,
         silent:         bool  = False,
+        topdown_bias:   float = 0.0,
     ) -> Tuple[bool, float, float]:
         """Position-only IK targeting the jaw GEOM midpoint with natural arm orientation.
 
@@ -1043,7 +1104,7 @@ class EnvironmentSoArm:
             offset   = self._get_eef_pos() - self._get_jaw_geom_midpoint()
             adjusted = target_jaw_mid + offset
             for _ in range(iters_per):
-                if self._ik_step(adjusted):
+                if self._ik_step(adjusted, topdown_bias=topdown_bias):
                     break
         geom_pos = self._get_jaw_geom_midpoint()
         pe = float(np.linalg.norm(geom_pos - target_jaw_mid))
@@ -1745,7 +1806,14 @@ class EnvironmentSoArm:
         obj_target = np.array([x, y, z])
         # Start IK from hover state (not HOME) so the arm stays in the same
         # workspace and the gripper closing motion sweeps toward the object.
-        ok_ik, pe_ik, _ = self._solve_ik_jaw_pos_only(obj_target, reset_to_home=False)
+        # IK_TOPDOWN_BIAS (opt-in, 2026-07-10, Phase 3 round 6): null-space
+        # secondary task nudging orientation toward topdown WITHOUT trading
+        # away position accuracy -- see _ik_step's docstring for why this is
+        # safe where the old hard topdown constraint (mentioned above) was
+        # not. Off by default (0.0, byte-identical to prior behaviour).
+        _topdown_bias = float(os.environ.get("IK_TOPDOWN_BIAS", "0.0"))
+        ok_ik, pe_ik, _ = self._solve_ik_jaw_pos_only(obj_target, reset_to_home=False,
+                                                        topdown_bias=_topdown_bias)
         q_grasp = np.array([self.data.qpos[adr] for adr in self._arm_qpos_adr])
 
         if self._jaw_fixed_geom_id >= 0:
