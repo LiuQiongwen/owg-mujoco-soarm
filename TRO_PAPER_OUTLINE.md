@@ -50,6 +50,11 @@ given the arm isn't connected).
      produces a working, validated result, not just a caught mistake. Full negative/incomplete
      results (uncertainty risk gate: no benefit; small-data ACT pilot: fails online) reported
      alongside it, not omitted. See `results/risk_gated_vla/final_report.md` and `audit.md`.
+     A complementary, explicitly offline mechanistic analysis (§4.6, added 2026-07-30) decomposes
+     the same critic into contact/lift/success/failure-type heads to explain *where* it works
+     (drill is measurably harder than cracker/mustard) and *why* (a specific, actionable
+     success/no_contact confusion pattern) — kept clearly separate from the live-executed primary
+     result, not merged with it.
 
 ## 2. Related Work
 - Composite/hybrid grasp controllers; robosuite/MuJoCo-based manipulation benchmarks.
@@ -140,6 +145,48 @@ given the arm isn't connected).
     first closed-loop rollout. Real-hardware validation is designed
     (`results/risk_gated_vla/PHASE3_REAL_HARDWARE_PROTOCOL.md`) but not yet executed — folds into
     Section 6 rather than duplicating it.
+- **4.6 — Mechanistic analysis: multi-head contact/lift/success decomposition** (added
+  2026-07-30, source: `results/risk_gated_vla/phase1/multitask_outcome_critic/C3_RESULT.md`).
+  §4.5 establishes *that* the corrected critic beats geometry (live-executed, the paper's primary
+  quantitative claim); this subsection asks *why and where it works*, via a second, complementary,
+  explicitly **offline re-scoring** experiment — must never be merged with or presented as
+  confirming §4.5's live-executed numbers.
+  - Same causally-admissible features as §4.5, decomposed into four prediction heads instead of
+    one: `bilateral_contact`, `lifted`, `success` (binary), and a 3-class `failure_type`
+    (`success`/`no_contact`/`weld_no_lift` — the two additional classes originally specified,
+    `contact_no_weld` and `lifted_then_dropped`, were confirmed **structurally absent** from every
+    collected batch — the weld gate is currently identical to bilateral contact by construction,
+    and the `fell_off` threshold never triggers within the post-grasp settle window — so the
+    3-class scheme is what was actually trained, with the 6-class taxonomy kept only as documented
+    future schema, not a current claim).
+  - Trained on the same base-100/dev-200/confirmatory-300 split chain as §4.5, checkpoint and
+    loss-weighting choice frozen on dev-200 only, confirmatory-300 read exactly once (audit trail:
+    `confirmatory_run_log.jsonl` confirms a single run).
+  - **Result (offline, confirmatory-300)**: the success head alone, used for top-1 selection, beats
+    geometry pooled +10.7pp (46.0% vs. 35.3%, McNemar p=0.0052) — directionally and in rough
+    magnitude consistent with §4.5's live-executed +14.0pp, reported as separate, complementary
+    evidence for the same claim, not pooled or averaged with it. All three heads reach AUROC
+    0.90–0.93 with ECE ≈0.04 (reasonably calibrated).
+  - **The interpretability payoff**: the failure-type confusion matrix exposes a specific,
+    actionable asymmetry a single-head success critic cannot show — 92.2% recall on true
+    `no_contact`, but 32% of true successes are mis-classified as `no_contact` (the model is
+    conservative/under-confident on success, not dangerously over-confident on failure).
+  - **Explicit limitation, load-bearing, not a footnote**: `weld_no_lift` support is 100%
+    drill-attributed (118/118) — with drill excluded, training support for that class collapses to
+    1 example. This must be reported as a within-drill measurement, not a demonstrated
+    cross-object failure-mode generalization capability. A genuine leave-one-object-out test (to
+    become §C.4-style future work) was not run in this pass.
+  - **A methodological note worth keeping, not hiding**: the `equal` vs. `success_weighted`
+    loss-weighting ablation produced measurably different trained weights (confirmed by direct
+    parameter comparison) but *identical* argmax-based top-1 accuracy at every one of 5 seeds on
+    the small internal validation split used during training — only the larger dev-200 batch's
+    continuous AUROC distinguished them. Worth a sentence in the paper's own methods discussion:
+    coarse top-1 metrics can be an insufficiently sensitive selection criterion for this kind of
+    ablation at small validation-set scale; this was caught by cross-checking, not silently
+    reported as "no difference."
+  - Neither this subsection nor §4.5 licenses a risk-gate or VLA-policy improvement claim (§4.5's
+    own negative results on both stand unchanged) — AUROC/interpretability gains here are about
+    the critic's own outputs, not about downstream gating or imitation-policy performance.
 
 ## 5. The Gripper-Controller Bug (supporting case study)
 - Pull directly from `GRIPPER_BUG_METHODOLOGY.md`: the bug, how found, two fix attempts (one
@@ -188,13 +235,23 @@ given the arm isn't connected).
 - [ ] Page-budget pass once a full draft exists (T-RO does not have RA-L's 8-page hard limit, but
       should still be checked against T-RO's own submission length norms) — Section 4 is now the
       largest section and may need trimming (4.3's self-correction narrative is valuable but
-      could compress to a paragraph rather than three subsections). §4.5 (added 2026-07-30) makes
-      this more pressing, not less — it is the longest subsection in the outline.
-- [ ] §4.5 merged in from `paper_risk_gated_vla_draft.md` (2026-07-30) rather than converted
-      directly to LaTeX — Related Work for §4.5's specific angle (learned grasp-candidate scoring
-      literature, risk-aware/uncertainty-gated action selection) still needs a real literature
-      pass before Section 2 can cite anything; do not fabricate citations to fill this in.
-- [ ] Real-hardware validation for §4.5 (`PHASE3_REAL_HARDWARE_PROTOCOL.md`) is designed, not
+      could compress to a paragraph rather than three subsections). §4.5+§4.6 (added 2026-07-30)
+      make this more pressing, not less — together they are now the longest part of the outline;
+      §4.6 in particular may compress to a short paragraph + one figure (the confusion matrix) in
+      the actual submission rather than the full itemized list kept here for working reference.
+- [x] §4.5's literature pass done: `results/risk_gated_vla/LITERATURE_AND_NOVELTY_PLAN.md`, 19
+      independently verified papers (6 with author lists confirmed via direct WebFetch) across
+      world models, counterfactual/critic evaluation, VLA verifiers, uncertainty/conformal
+      methods, DAgger/recovery data, adaptive chunking, and grasp success prediction — that
+      document's own §B.5 is also where the "object-centric executable action verifier" naming
+      (used in §4.5/§4.6 above) was decided, externally grounded rather than asserted. Section 2's
+      actual prose still needs writing from this material, but the literature itself is no longer
+      an open gap.
+- [ ] Real-hardware validation for §4.5/§4.6 (`PHASE3_REAL_HARDWARE_PROTOCOL.md`) is designed, not
       executed — decide before submission whether Section 6 needs it to be at least a pilot-scale
       result, or whether "designed, explicitly future work" (this outline's existing framing for
-      the Piper hardware backend) is an acceptable posture for §4.5's claim too.
+      the Piper hardware backend) is an acceptable posture for §4.5/§4.6's claims too.
+- [ ] §4.6's own natural follow-up (a real leave-one-object-out retraining ablation, not just the
+      lighter "support without drill" reporting done in the current pass) is scoped in
+      `LITERATURE_AND_NOVELTY_PLAN.md` §C.4 — not started, needs a decision on whether it's worth
+      the new-data-collection cost before submission or stays future work.
