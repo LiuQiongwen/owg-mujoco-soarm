@@ -74,6 +74,15 @@ def main():
     ap.add_argument("--strategy", choices=["consensus", "ikmargin"], default="consensus")
     ap.add_argument("--ensemble-n", type=int, default=10)
     ap.add_argument("--cfm-ckpt", default="grasp_6dof/models/cfm_allobj_ot.pt")
+    ap.add_argument("--spawn-xy", type=float, nargs=2, default=None, metavar=("X", "Y"),
+                     help="Override the object's spawn xy after ui.py's default single-object "
+                          "placement (0, -0.30) -- see paperA_data/README.md, Phase 3 round 4/5: "
+                          "the default spawn direction requires ~90-100 deg of shoulder_pan from "
+                          "HOME to reach, which exceeded this project's physical workspace's safe "
+                          "rotation range (~60 deg). Use this to record a trajectory whose grasp "
+                          "point stays within a physically safe pan angle -- e.g. (0.20, -0.20) "
+                          "empirically gives ~50 deg. Real-hardware-pilot-only override, does not "
+                          "affect any paper-reported evaluation protocol.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -108,6 +117,22 @@ def main():
 
     demo = RobotEnvUI(cfg, backend="mujoco")
     demo.user_input = cfg.prompt
+
+    if args.spawn_xy is not None:
+        import mujoco
+        sx, sy = args.spawn_xy
+        oid = demo.env.obj_ids[0]
+        slot = demo.env._obj_pool_slot(oid)
+        jnt = demo.env.model.joint(f"obj_joint_{slot}")
+        adr, vadr = jnt.qposadr[0], jnt.dofadr[0]
+        z = demo.env.data.qpos[adr + 2]  # keep current height, only override xy
+        demo.env.data.qpos[adr:adr + 2] = [sx, sy]
+        demo.env.data.qvel[vadr:vadr + 6] = 0.0
+        mujoco.mj_forward(demo.env.model, demo.env.data)
+        demo.env.dummy_simulation_steps(100)  # same settle convention as ui.py's own spawn
+        settled = demo.env.get_obj_pos(oid)
+        print(f"[record-consensus] spawn override -> requested=({sx},{sy}), "
+              f"settled CoM={settled}")
 
     recorder = TrajectoryRecorder()
     backend_adapter = _EnvAsBackend(demo.env)
