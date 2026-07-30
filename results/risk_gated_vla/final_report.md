@@ -302,3 +302,35 @@ The shortest defensible paper path is:
 - `results/risk_gated_vla/act_v2_online_smoke_n1.json`
 - `audit.md` (Phase 0 audit + Addendum: the two project-wide bugs, item 8 above)
 - `phase1/RESULT.md`, `phase1/EXPLORATORY_counterfactual_critic.md` (superseded exploratory line, item 2-3 above)
+
+## C.3 addendum — multi-head contact/lift/success critic (frozen, do not re-run confirmatory-300)
+
+Full writeup: `phase1/multitask_outcome_critic/{DATA_AUDIT,C3_RESULT}.md`. Six points that must
+travel with any citation of this result, restated here so they can't be dropped when this report
+is skimmed rather than read in full:
+
+1. **Offline re-scoring, not live-executed.** This checkpoint was never the live-selected
+   `world_critic` during any `scenes.jsonl` collection run. Every number below comes from
+   re-scoring `oracle_per_candidate` after the fact.
+2. **+10.7pp (pooled, confirmatory-300, McNemar p=0.0052) is separate evidence, not a replacement
+   for or an addition to the live +14.0pp primary result.** Report both, never summed or averaged.
+3. **Head quality**: bilateral_contact AUROC 0.934, lifted 0.902, success 0.903; ECE ≈0.04 for all
+   three (reasonably calibrated). Drill is measurably harder than cracker/mustard for
+   `lifted`/`success` specifically (AUROC 0.788 vs. 0.977/0.92) — within-distribution
+   heterogeneity, not an OOD claim.
+4. **Interpretability payoff**: the failure_type confusion matrix shows 92.2% recall on true
+   `no_contact` but 32% of true successes mis-classified as `no_contact` — the model is
+   conservative (under-confident on success), not dangerously over-confident on failure. This is
+   the specific, citable evidence for "more interpretable than a single success score."
+5. **`weld_no_lift` is 100% drill-attributed** (118/118; support collapses to 1 example with drill
+   excluded). Do not describe this class as a demonstrated cross-object failure-mode capability.
+6. **`retained_grasp`/`dropped_after_lift` have not been validated against real post-settle
+   labels.** `retained_grasp_proxy` (=`weld_triggered`) is a diagnostic alias only, never trained,
+   never in any loss term or headline number — confirmed collinear with `bilateral_contact` in
+   100% of currently-collected data, which is itself why it isn't informative as an independent
+   signal yet. A genuine post-settle retention check (re-verify grasp is still held N steps after
+   the weld-attach decision, distinct from the weld signal itself) does not exist in this
+   codebase's current execution primitive and would need new instrumentation, not just new data,
+   before `retained_grasp` could mean what its name implies.
+
+**Confirmatory-300 was read exactly once for this result** (`multitask_outcome_critic/confirmatory_run_log.jsonl` records `confirmatory_run_count: 1`) — do not re-run it to chase a different number.
