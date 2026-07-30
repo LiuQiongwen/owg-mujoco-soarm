@@ -147,6 +147,86 @@ class GC_LGGSN(nn.Module):
         return self.scorer(gated_geom, query_id)
 
 
+class EmbodimentLGGSN(nn.Module):
+    """
+    Cross-embodiment LGGSN (2026-07-15) -- for the Piper/SO-ARM101 transfer
+    study in EXPERIMENT_PLAN.md's Stage 0. Supports the three conditioning
+    modes compared by the pilots in IDEA_REPORT.md's Direction 2
+    (xembod_pilot.py / v2 / v3_pairwise), reimplemented here on the real
+    LGGSN architecture instead of the toy logistic-regression proxy those
+    pilots used:
+
+      mode="none"       -- embodiment identity is not given to the model at
+                            all (the "pooled, no embodiment feature"
+                            condition; consistently the best-performing
+                            baseline against zero-shot transfer across
+                            every pilot so far).
+      mode="additive"    -- embodiment one-hot concatenated onto the
+                            geometric features, same as LGGSN's own
+                            query_id concatenation pattern. Tested 3x in
+                            the pilots, null every time (p=0.81, 0.057,
+                            0.16) -- kept here for completeness/ablation,
+                            not because it is expected to help.
+      mode="interaction" -- reuses the existing GatingNetwork
+                            (GC_LGGSN's mechanism) but conditions the gate
+                            on embodiment identity instead of episode
+                            geometric context -- i.e. the embodiment
+                            signal MODULATES how geometric features are
+                            interpreted (a soft per-feature mask), rather
+                            than just shifting a bias term. This is the
+                            condition that flipped sign across pilot
+                            feature-set choices (significantly positive at
+                            n=150/3-feat, significantly negative at
+                            n=150/5-feat) -- genuinely unresolved, this
+                            class exists so Stage 1/2 of the experiment
+                            plan can test it properly with more data
+                            rather than continue guessing from small pilots.
+
+    n_embodiments: number of distinct platforms (2 for SO-ARM101 + Piper).
+    """
+
+    def __init__(
+        self,
+        n_queries: int,
+        geom_dim: int = 14,
+        n_embodiments: int = 2,
+        mode: str = "none",
+        query_dim: int = 0,
+        hidden_dim: int = 40,
+        dropout: float = 0.0,
+    ):
+        super().__init__()
+        assert mode in ("none", "additive", "interaction"), f"unknown mode {mode!r}"
+        self.mode = mode
+        self.n_embodiments = n_embodiments
+
+        scorer_geom_dim = geom_dim
+        if mode == "additive":
+            scorer_geom_dim = geom_dim + n_embodiments
+        self.scorer = LGGSN(n_queries=n_queries, geom_dim=scorer_geom_dim,
+                             query_dim=query_dim, hidden_dim=hidden_dim, dropout=dropout)
+
+        if mode == "interaction":
+            self.gate = GatingNetwork(context_dim=n_embodiments, feat_dim=geom_dim)
+        else:
+            self.gate = None
+
+    def forward(self, geom: torch.Tensor, query_id: torch.Tensor, embodiment_onehot: torch.Tensor):
+        """
+        geom: [B, geom_dim]
+        query_id: [B]
+        embodiment_onehot: [B, n_embodiments]
+        """
+        if self.mode == "none":
+            x = geom
+        elif self.mode == "additive":
+            x = torch.cat([geom, embodiment_onehot], dim=-1)
+        else:  # interaction
+            gate = self.gate(embodiment_onehot)  # [B, geom_dim], values in (0,1)
+            x = gate * geom
+        return self.scorer(x, query_id)
+
+
 class LGGSNVision(nn.Module):
     """
     LGGSN + SAM visual feature (simple concatenation).
