@@ -69,6 +69,54 @@ There are two separate critic experiments and they must not be combined.
 The methodological warning in
 `phase1/EXPLORATORY_counterfactual_critic.md` is correct for this experiment.
 
+## Complete experiment inventory and evidence status
+
+The following inventory prevents pilot, contaminated, and confirmatory numbers
+from being mixed in the manuscript.
+
+| Batch | Scenes | Purpose | Main outcome | Manuscript status |
+|---|---:|---|---|---|
+| `smoke/` | 6 | import, determinism, pool identity | harness checks only | diagnostic, do not cite as performance |
+| `pilot_prod_n10_20260730/` | 30 | early production-primitive sanity check | geometry 80%, critic 56.7% | diagnostic; superseded by strict protocol |
+| `pilot_bilateral_bias01_n10_20260730/` | 30 | strict bilateral/contact sanity check | geometry 53.3%, critic 33.3% | diagnostic; small pilot |
+| `phase1/` base-42 | 150 | pre-registered stale-critic gate | stale critic 20.7%, AUROC 0.4996 | citable only as the negative stale-checkpoint result |
+| `counterfactual_train_n40_20260730/` base-100 | 120 | critic training + scene-grouped validation | training source | never an evaluation result |
+| `counterfactual_test_n30_20260730/` base-200 | 90 | independent development test | live critic 48.9% vs geometry 33.3%, +15.6pp, p=.00258 | citable independent result |
+| `confirmatory_n50_seed300_20260730/` base-300 | 150 | frozen confirmatory test | live critic 50.0% vs geometry 36.0%, +14.0pp, p=3.24e-4 | primary citable result |
+| `phase1/critic_ckpts/` full-population eval | 150 | exploratory retraining on phase1 population | 61.3% vs 34.0% | contaminated; never cite |
+| `risk_gate.json` | 150 | frozen uncertainty threshold test | coverage 98.7%, no gain | negative ablation |
+| ACT invalid pilot | 30 demos | recorder audit | all five arm actions were zero | invalid; exclude |
+| ACT v2 pilot | 15 demos | corrected recorder + ACT | offline MAE .087, online 0/1 | incomplete pilot; negative online result |
+| Phase 3 hardware protocol | 0 trials | safety and transfer design | no physical execution | design only; no hardware claim |
+
+The primary quantitative claim therefore uses only the base-200 and base-300
+rows. All scene populations are disjoint by `(object, scene_seed)`, and the
+base-100 checkpoint train/validation keys have zero overlap with either test
+population.
+
+## Integrated research story
+
+The study has four logically ordered claims:
+
+1. **Audit diagnosis:** the predecessor result cannot be trusted because its
+   method-dependent seed breaks pairing and its contact-at-close label does not
+   require lifting; the stale critic consequently has AUROC 0.4996 under the
+   corrected harness.
+2. **Prospective reconstruction:** using only pre-execution, object-relative
+   features and strict live execution, the rebuilt critic selects better grasp
+   candidates than geometry on two independent batches (+15.6pp and +14.0pp).
+3. **Boundary characterization:** pairwise BPR is not independently separated
+   from object-relative BCE; ensemble uncertainty does not improve selection;
+   marginal MuJoCo outcomes have a small ~0.6--1% flip rate.
+4. **Deployment readiness boundary:** the corrected ACT pipeline is runnable
+   but 15 demonstrations/object are insufficient for closed-loop recovery, and
+   real hardware has only been specified, not executed.
+
+The resulting T-RO framing is therefore an audit-and-reconstruction paper with
+one prospective world-critic case study, not a completed VLA or sim-to-real
+paper. The critic improvement is the main result; risk gating and ACT define
+the honest limits of the current evidence.
+
 ### B. Strict independent train/test/confirmation chain
 
 The later experiment uses disjoint scene populations:
