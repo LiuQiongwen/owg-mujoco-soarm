@@ -180,6 +180,160 @@ def _ebm_sample_candidates(model, stats, obj_name: str, n: int,
     return grasps
 
 
+# ── Geometry-Conditioned EBM (2026-07-12) ────────────────────────────────────
+# Set env var GEO_EBM_CKPT to enable this in place of the raw-pose EBM v2
+# above. Same InfoNCE + self-mined-hard-negative recipe (train_geo_ebm_grasp.py
+# is a direct descendant of train_ebm_grasp.py), but the energy function scores
+# the 6-dim object-relative geometric/affordance feature subset (width, H,
+# local_point_density, normal_consistency, contact_width_ratio, pe_ik) instead
+# of raw (x, y, sin(yaw), cos(yaw)) -- motivated by a same-session diagnostic
+# finding that raw pose carries near-chance success signal for several objects
+# (scene-grouped CV, not a leakage artifact) while these geometric features
+# carry strong signal. See train_geo_ebm_grasp.py's module docstring and
+# paperA_data/README.md for the full rationale and offline validation chain.
+_GEO_PCD_DIR = "grasp_6dof/dataset/lggsn_object_pointclouds"
+
+
+def _load_geo_ebm_model(ckpt_path: str):
+    """Load the geometry-conditioned EBM + its per-object reference point
+    clouds/normals (same ones used during training's uniform/hard-negative
+    live featurisation -- reusing a fixed per-object reference cloud at
+    inference, instead of a live per-trial point cloud, matches the existing
+    EBM v2 precedent of using one fixed mean_vis_per_obj rather than a live
+    per-trial visual embedding; also avoids the ~1min/object Open3D normal-
+    estimation cost this session found is infeasible to pay per trial)."""
+    if not ckpt_path or not os.path.isfile(ckpt_path):
+        return None, None, None
+    stats_path = ckpt_path.replace(".pt", "_stats.json")
+    if not os.path.isfile(stats_path):
+        print(f"[Geo-EBM] stats file not found: {stats_path}")
+        return None, None, None
+    try:
+        import torch, json as _json
+        from train_geo_ebm_grasp import EnergyNet, GEOM_DIM
+        stats = _json.load(open(stats_path))
+        model = EnergyNet(hidden=256)
+        sd = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+        model.load_state_dict(sd)
+        model.eval()
+        dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = model.to(dev)
+
+        pcd_cache = {}
+        for obj in stats["mean_vis_per_obj"]:
+            npz_path = os.path.join(_GEO_PCD_DIR, f"{obj}.npz")
+            if os.path.exists(npz_path):
+                d = np.load(npz_path)
+                pcd_cache[obj] = (d["points"], d["normals"], d["ref_xy"])
+        print(f"[Geo-EBM] Loaded {ckpt_path} — objects: {list(stats['mean_vis_per_obj'].keys())} "
+              f"— point clouds cached: {list(pcd_cache.keys())}")
+        return model, stats, pcd_cache
+    except Exception as e:
+        print(f"[Geo-EBM] Failed to load: {e}")
+        return None, None, None
+
+
+def _geo_ebm_sample_candidates(model, stats, pcd_cache, obj_name: str, n: int,
+                                gx: float, gy: float, gz: float, pe: float,
+                                rng: np.random.Generator,
+                                pop_size: int = 64, n_iters: int = 6, elite_frac: float = 0.2):
+    """CEM search over (x, y, yaw, width), scored via LIVE geometric features
+    computed against the object's cached reference point cloud (same
+    live_geom_feats_batch math used during training). Returns grasp dicts in
+    the same shape as _ebm_sample_candidates/_cfm_sample_candidates."""
+    import torch
+    from train_geo_ebm_grasp import live_geom_feats_batch
+
+    key = obj_name.lower().replace("ycb", "").replace(" ", "")
+    vis_map = stats["mean_vis_per_obj"]
+    obj_key = None
+    for k in vis_map:
+        if k in key or key.startswith(k):
+            obj_key = k
+            break
+    if obj_key is None or obj_key not in pcd_cache:
+        return None
+
+    cond_vec = vis_map[obj_key]
+    rg = stats["obj_ranges"][obj_key]
+    pcd_ref, normals, ref_xy = pcd_cache[obj_key]
+    # Recentre the cached reference cloud onto THIS trial's live CoM (gx, gy)
+    # -- the cached cloud's absolute coordinates are only valid for the one
+    # fixed scene used to build the cache, not this trial's actual object
+    # placement (which may follow a different spawn RNG stream than the
+    # cache-generation replay).
+    pcd = pcd_ref + np.array([gx - float(ref_xy[0]), gy - float(ref_xy[1]), 0.0], dtype=np.float32)
+    geom_mean = np.array(stats["geom_mean"], dtype=np.float32)
+    geom_std = np.array(stats["geom_std"], dtype=np.float32)
+
+    dev = next(model.parameters()).device
+    cond_t = torch.tensor(cond_vec, dtype=torch.float32, device=dev)
+
+    yaw_lo, yaw_hi = -np.pi / 2, np.pi / 2
+    # CEM population centred on the object's LIVE CoM (gx, gy), spanning the
+    # same relative offset range the training data itself covered.
+    x_span = (rg["x_hi"] - rg["x_lo"]) / 2.0
+    y_span = (rg["y_hi"] - rg["y_lo"]) / 2.0
+    pop_x = rng.uniform(gx - x_span, gx + x_span, size=pop_size).astype(np.float32)
+    pop_y = rng.uniform(gy - y_span, gy + y_span, size=pop_size).astype(np.float32)
+    pop_yaw = rng.uniform(yaw_lo, yaw_hi, size=pop_size).astype(np.float32)
+    pop_w = rng.uniform(rg["w_lo"], rg["w_hi"], size=pop_size).astype(np.float32)
+
+    def _score(px, py, pyaw, pw):
+        feats = live_geom_feats_batch(px, py, pyaw, pw, rg["H"], rg["pe_ik"], pcd, normals)
+        feats_n = (feats - geom_mean) / geom_std
+        feat_t = torch.tensor(feats_n, dtype=torch.float32, device=dev)
+        cond_b = cond_t.unsqueeze(0).expand(len(px), -1)
+        with torch.no_grad():
+            return model(feat_t, cond_b).cpu().numpy()
+
+    _debug = os.environ.get("GEO_EBM_CEM_DEBUG", "") == "1"
+    if _debug:
+        print(f"  [Geo-EBM CEM] gx,gy=({gx:.4f},{gy:.4f})")
+    for it in range(n_iters):
+        logits = _score(pop_x, pop_y, pop_yaw, pop_w)
+        elite_n = max(2, int(pop_size * elite_frac))
+        elite_idx = np.argsort(-logits)[:elite_n]
+
+        mean_x, std_x = pop_x[elite_idx].mean(), max(0.01, pop_x[elite_idx].std())
+        mean_y, std_y = pop_y[elite_idx].mean(), max(0.01, pop_y[elite_idx].std())
+        elite_yaw = pop_yaw[elite_idx]
+        yaw_mean = float(np.arctan2(np.sin(elite_yaw).mean(), np.cos(elite_yaw).mean()))
+        yaw_std = max(0.1, float(elite_yaw.std()))
+        mean_w, std_w = pop_w[elite_idx].mean(), max(0.005, pop_w[elite_idx].std())
+
+        if _debug:
+            dist_to_obj = ((mean_x - gx) ** 2 + (mean_y - gy) ** 2) ** 0.5
+            print(f"    iter {it}: elite_mean=({mean_x:.4f},{mean_y:.4f})  "
+                  f"dist_to_obj={dist_to_obj*100:.1f}cm  "
+                  f"elite_logit_range=[{logits[elite_idx].min():.2f},{logits[elite_idx].max():.2f}]  "
+                  f"std=({std_x:.4f},{std_y:.4f})")
+
+        pop_x = rng.normal(mean_x, std_x, size=pop_size).astype(np.float32)
+        pop_y = rng.normal(mean_y, std_y, size=pop_size).astype(np.float32)
+        pop_yaw = np.clip(rng.normal(yaw_mean, yaw_std, size=pop_size), yaw_lo, yaw_hi).astype(np.float32)
+        pop_w = np.clip(rng.normal(mean_w, std_w, size=pop_size), rg["w_lo"], rg["w_hi"]).astype(np.float32)
+
+    logits = _score(pop_x, pop_y, pop_yaw, pop_w)
+    top_idx = np.argsort(-logits)[:n]
+    if _debug:
+        for i in top_idx:
+            d = ((pop_x[i] - gx) ** 2 + (pop_y[i] - gy) ** 2) ** 0.5
+            print(f"  [Geo-EBM CEM] final candidate xy=({pop_x[i]:.4f},{pop_y[i]:.4f}) "
+                  f"dist_to_obj={d*100:.1f}cm score={logits[i]:.3f}")
+
+    grasps = []
+    for i in top_idx:
+        grasps.append({
+            "position": [float(pop_x[i]), float(pop_y[i]), gz],
+            "rpy":      [np.pi, 0.0, float(pop_yaw[i])],
+            "width":    float(pop_w[i]),
+            "score":    float(logits[i]),
+            "_metrics": {"H": rg["H"], "dz": 0.0, "dz_lift": 0.0, "need_dz": 0.0, "pe_ik": pe},
+        })
+    return grasps
+
+
 def _cfm_sample_candidates(model, stats, obj_name: str, n: int,
                             gx: float, gy: float, gz: float, pe: float,
                             rng: np.random.Generator):
@@ -375,6 +529,8 @@ class RobotEnvUI:
         # Read CFM_CKPT at __init__ time (not module level) so demo.py can set it before UI creation
         self._cfm_model, self._cfm_stats = _load_cfm_model(os.environ.get("CFM_CKPT", ""))
         self._ebm_model, self._ebm_stats = _load_ebm_model(os.environ.get("EBM_CKPT", ""))
+        self._geo_ebm_model, self._geo_ebm_stats, self._geo_ebm_pcd = _load_geo_ebm_model(
+            os.environ.get("GEO_EBM_CKPT", ""))
 
         if self.backend == "mujoco":
             # ── MuJoCo / SO-ARM101 backend ─────────────────────────────────
@@ -635,7 +791,14 @@ class RobotEnvUI:
                         if obj_id in self.env.obj_ids and self.env.obj_names
                         else "")
             cfm_grasps = None
-            if self._ebm_model is not None:
+            if self._geo_ebm_model is not None:
+                cfm_grasps = _geo_ebm_sample_candidates(
+                    self._geo_ebm_model, self._geo_ebm_stats, self._geo_ebm_pcd, obj_name,
+                    n=len(use_idx), gx=gx, gy=gy, gz=gz, pe=pe, rng=rng,
+                )
+                if cfm_grasps is not None:
+                    print(f"  [Geo-EBM] Generated {len(cfm_grasps)} candidates for '{obj_name}'")
+            elif self._ebm_model is not None:
                 cfm_grasps = _ebm_sample_candidates(
                     self._ebm_model, self._ebm_stats, obj_name,
                     n=len(use_idx), gx=gx, gy=gy, gz=gz, pe=pe, rng=rng,
