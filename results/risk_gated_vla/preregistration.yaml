@@ -1,0 +1,32 @@
+# Risk-Gated VLA -- pre-registered gates
+# Written before inspecting the formal-scale (n=50/object) Phase 1 results, per rule:
+# "不要为了得到正面结果而进行事后挑对象、挑seed或挑阈值". Thresholds match exactly what was
+# stated to the user in this session's initial 8-step plan, restated here for the record.
+
+phase1:
+  comparison: world_critic vs geometry (pooled across CrackerBox, MustardBottle, PowerDrill)
+  gate:
+    pooled_effect_pp_min: 8.0        # pooled success-rate delta >= +8pp
+    mcnemar_p_max: 0.05              # scipy.stats.binomtest exact McNemar
+    min_objects_same_direction: 2    # of 3 objects tested
+    no_causal_leakage: true          # verified in audit.md before Phase 1 ran
+    no_post_hoc_threshold_selection: true
+  on_fail: "stop -- do not proceed to Phase 2 with this critic; report honestly"
+  critic_under_test: world_model/mlp_predictor.pkl (2026-05-15 checkpoint)
+  known_caveat: >
+    This checkpoint was trained on labels collected under the same lenient
+    contact-only success criterion and pre-rotation workspace center documented
+    in audit.md's addendum. A gate failure for THIS checkpoint does not by itself
+    settle whether a freshly-trained critic (on Phase 1's own corrected data) could
+    pass -- that is a distinct, secondary question, not pre-registered as a gate here.
+
+phase2:
+  comparison: policy+world-critic risk gate (D) vs policy-only (A)
+  gate:
+    d_vs_a_pp_min: 10.0
+    d_beats_c_confidence_only_gate: true
+    coverage_min_pct: 40.0
+    false_safe_rate: "significantly lower than policy-only"
+    min_objects_same_direction: 2
+  on_fail: "stop -- report honestly, do not proceed to Phase 3 scale-up"
+  precondition: "Phase 1 gate must PASS before Phase 2 starts"
