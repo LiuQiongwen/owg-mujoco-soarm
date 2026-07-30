@@ -1,0 +1,114 @@
+%% Advanced Robotics (Taylor & Francis) submission -- CR-CFM honest systems/diagnosis paper
+%% Template class verified 2026-07-19 (WebSearch): `interact` is the real, standard Taylor & Francis
+%% LaTeX class used across their journals, including Advanced Robotics specifically.
+%% NOT verified: this journal's specific fee/OA policy and review-turnaround claims -- check the
+%% actual "Instructions for Authors" page on tandfonline.com directly before submitting (automated
+%% fetch attempts here returned 403 -- their site blocks non-browser access, so this could not be
+%% confirmed from this environment).
+%%
+%% STATUS (2026-07-19): skeleton only. Every [Real Data] placeholder below is unfilled -- do not
+%% treat any number in this file as reported until the actual experiments run:
+%%   1. Repeat-based (not single-run) N=30 scale-up eval -- single-run-per-trial was found to have a
+%%      real ~12.5% instability rate (README, "1005-vs-1006 correction" entry), so any future eval
+%%      MUST use repeats + majority vote per trial_id, not one sample each.
+%%   2. Two ablation arms: vanilla open-loop CFM (no RHC), 12-dim absolute-coordinate conditioning
+%%   3. The "1005-vs-1006 micro-trajectory" investigation planned for Sec. 4.2 is CANCELLED -- verified
+%%      2026-07-19 that this was a run-to-run nondeterminism artifact (repeated runs of trial 1006 show
+%%      stable success, contradicting the single "failure" report the paradox was built on), not a real,
+%%      reproducible phenomenon. Do not write this subsection from the earlier framing. If Sec. 4.2 is
+%%      kept, it should instead report the ~12.5% single-run instability finding itself, which IS real
+%%      and IS worth reporting honestly as a limitation of the evaluation protocol.
+%% See tango_robot/piper_robosuite/README.md's CR-CFM entries for the full, dated history this paper
+%% is drawn from -- read the LATEST entries first, since at least one earlier finding in that file was
+%% itself later corrected (exactly the discipline this paper's own Sec. 4 should demonstrate).
+
+\documentclass[]{interact}
+
+\usepackage{epstopdf}
+\usepackage[caption=false]{subfig}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{booktabs}
+\usepackage{graphicx}
+
+\begin{document}
+
+\title{An Honest Evaluation of Low-Capacity Flow Matching Policies for Resource-Constrained Closed-Loop Robotic Manipulation}
+
+\author{
+\name{Author A}
+\affil{Department, University}
+}
+
+\maketitle
+
+\begin{abstract}
+We investigate whether a resource-constrained (49K-parameter, single-GPU) flow-matching policy can
+replace hand-designed execution-control rules for contact-robust descent in robotic grasping. Through
+six sequential, empirically-verified diagnostic fixes -- addressing run-to-run reproducibility, a
+rejected over-regularization hypothesis, receding-horizon control instability, a training-distribution
+conditioning gap, and a second training-distribution gap in sub-segment coverage -- we raise success
+rate from 0\% to a held-out-validated 50\%. This remains below our own existing interpolation-based
+baseline (75\%), and we report that honestly rather than obscure it. We isolate the primary remaining
+bottleneck to approach-angle data sparsity in the training distribution, and document a specific,
+unresolved counter-example (two near-identical approach configurations with opposite outcomes) that
+rules out a purely angle-deterministic explanation and motivates future work in micro-scale contact
+sensing.
+\end{abstract}
+
+\begin{keywords}
+Imitation Learning; Flow Matching; Receding Horizon Control; Failure Analysis; Low-Capacity Policies
+\end{keywords}
+
+% =============================================================================
+\section{Introduction}
+% Edge-deployed manipulation needs small models; small models attempting generative trajectory
+% synthesis (flow matching / diffusion) face distribution-shift and dynamic-instability failure
+% modes not visible at large-model scale. Frame this as a systems/diagnosis contribution: a rigorous,
+% falsifiable account of what breaks and why when you try this at 49K-parameter scale, not a SOTA claim.
+
+\section{Methodology and Closed-Loop Architecture}
+\subsection{Baseline Pipeline (Interpolation / \texttt{descend\_refresh})}
+\subsection{Translation-Invariant 6-DoF Conditioning Space}
+\subsection{Receding-Horizon Control (RHC) Defense Against Open-Loop Instability}
+\subsection{Sub-Segment Training Augmentation}
+
+\section{Experimental Design and Ablation Setup}
+% N=30 scale-up protocol; two ablation arms (open-loop CFM, 12-dim absolute-coordinate conditioning);
+% fresh, untouched probe range for final validation (both existing ranges are tuning-contaminated
+% across 6 sequential decisions -- state this explicitly, do not reuse them for headline numbers).
+
+\subsection{Comparative Evaluation}
+
+\begin{table}[ht]
+\tbl{Success rate and kinematic metrics across $N=30$ evaluation trials (Cracker object).}
+{\begin{tabular}{lcccc} \toprule
+Architecture Variant & Success Rate (\%) & Max Terminal Vel. & Final Z-Residual (cm) & XY Residual $\sigma$ (cm) \\ \midrule
+Interpolation Baseline   & \textbf{[Real Data]} & [Real Data] & [Real Data] & [Real Data] \\
+Vanilla CFM (Open-Loop)  & [Real Data] & [Real Data] & [Real Data] & [Real Data] \\
+12-dim Conditioned + RHC & [Real Data] & [Real Data] & [Real Data] & [Real Data] \\
+CR-CFM (Proposed)        & [Real Data] & [Real Data] & [Real Data] & [Real Data] \\ \bottomrule
+\end{tabular}}
+\label{tab:main_results}
+\end{table}
+
+\section{Discussion: The Geometry of Failure}
+\subsection{Approach-Angle Data Sparsity}
+% The 82%/18% dominant-arc-vs-sparse-tail finding, and the necessary-but-not-sufficient result
+% (9/9 successes inside the dense arc, 4/7 failures also inside it).
+
+\subsection{Evaluation Protocol Reliability: Single-Run Instability}
+% REPLACES the earlier-planned "1005-vs-1006 paradox" subsection -- that specific counter-example was
+% verified 2026-07-19 to be a run-to-run nondeterminism artifact, not a real phenomenon (repeated runs
+% of the "failing" trial showed stable success). Report the ACTUAL, real finding instead: ~12.5%
+% (2/16) of single-run trial classifications disagreed across repeats, concentrated in one probe range
+% and absent in the other. Frame honestly as a limitation of single-run evaluation protocols for this
+% class of system, motivating repeat-based (majority-vote) evaluation as standard practice going
+% forward -- this is a genuine, useful methodological contribution in its own right, distinct from (and
+% more defensible than) the originally-planned micro-trajectory dissection.
+
+\section{Conclusion and Future Work}
+% Honest summary: a resource-constrained learned policy does not yet match a simple existing
+% baseline, but the diagnostic process isolates precisely where and why, with each claim backed by
+% a specific, falsified-or-confirmed hypothesis rather than assumption.
+
+\end{document}
