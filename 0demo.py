@@ -1,5 +1,5 @@
-from owg_robot.ui import RobotEnvUI
-from owg.utils.config import load_config
+from tango_robot.ui import RobotEnvUI
+from tango.utils.config import load_config
 import argparse
 import os, sys
 
@@ -9,7 +9,7 @@ if grconvnet_path not in sys.path:
     sys.path.insert(0, grconvnet_path)
 
 # ========== ✅ 新增命令行参数 ==========
-parser = argparse.ArgumentParser(description="Run OWG demo without Tkinter popup.")
+parser = argparse.ArgumentParser(description="Run TANGO demo without Tkinter popup.")
 parser.add_argument('--n_objects', type=int, help='Number of objects to load', default=None)
 parser.add_argument('--seed', type=int, help='Random seed', default=None)
 parser.add_argument('--vis', type=int, help='Enable PyBullet visualizer', default=None)
