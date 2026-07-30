@@ -1,0 +1,94 @@
+<mujoco model="piper_gripper">
+    <!-- Gripper-only split of robot.xml (upstream soulde/Piper_mujoco):
+         link7/link8 (the two finger slide joints) extracted into
+         RoboSuite's expected gripper-module convention (root body named
+         "right_gripper", matching robosuite/models/assets/grippers/
+         panda_gripper.xml's pattern). Finger body pos/quat are UNCHANGED
+         from the original file (they were already defined relative to the
+         link6 attachment point, which is now this file's own root frame).
+         Joint7/joint8 had NO actuators in the original upstream file (only
+         a passive equality constraint coupling them). Position actuators
+         added here since RoboSuite's GripperModel convention expects the
+         gripper module to be self-actuated (see PandaGripper for the
+         template followed). -->
+    <asset>
+        <material specular="0.5" shininess="0.25" name="linkgray" rgba="0.82 0.82 0.82 1"/>
+        <mesh name="link7" file="meshes/link7.STL"/>
+        <mesh name="link8" file="meshes/link8.STL"/>
+    </asset>
+
+    <actuator>
+        <!-- ctrlrange widened from -0.038 to -0.05 (2026-07-14): the
+             community-ported soulde/Piper_mujoco slide range (0.038m per
+             finger) was found to disagree with AgileX's own official Isaac
+             Lab asset (piper_gripper.urdf, gripper_joint1/2 range 0-0.05m
+             per finger), the same class of discrepancy already caught once
+             for joint2's range. True opening is closer to 0.10m than the
+             0.076m this model previously used, which matters a lot for
+             which YCB objects are geometrically graspable at all. -->
+        <position ctrllimited="true" ctrlrange="-0.05 -0.004" joint="joint7" kp="1000" name="gripper_finger_joint7" forcelimited="true" forcerange="-20 20"/>
+        <position ctrllimited="true" ctrlrange="-0.05 -0.004" joint="joint8" kp="1000" name="gripper_finger_joint8" forcelimited="true" forcerange="-20 20"/>
+    </actuator>
+
+    <worldbody>
+        <body name="right_gripper" pos="0 0 0" quat="1 0 0 0">
+            <site name="ft_frame" pos="0 0 0" size="0.01 0.01 0.01" rgba="1 0 0 1" type="sphere" group="1"/>
+            <body name="eef" pos="0 0 0" quat="1 0 0 0">
+                <site name="grip_site" pos="0 0 0" size="0.01 0.01 0.01" rgba="1 0 0 0.5" type="sphere" group="1"/>
+                <site name="ee_x" pos="0.1 0 0" size="0.005 .1" quat="0.707105 0 0.707108 0" rgba="1 0 0 0" type="cylinder" group="1"/>
+                <site name="ee_y" pos="0 0.1 0" size="0.005 .1" quat="0.707105 0.707108 0 0" rgba="0 1 0 0" type="cylinder" group="1"/>
+                <site name="ee_z" pos="0 0 0.1" size="0.005 .1" quat="1 0 0 0" rgba="0 0 1 0" type="cylinder" group="1"/>
+                <site name="grip_site_cylinder" pos="0 0 0" size="0.005 10" rgba="0 1 0 0.3" type="cylinder" group="1"/>
+            </body>
+            <body name="link7" pos="0 0 0" quat="1 1 1 1">
+                <!-- mass raised from the upstream 0.001kg (2026-07-14):
+                     with a 20N forcerange actuator, 0.001kg gives up to
+                     20000 units/s^2 acceleration, unstable at a 0.002s
+                     timestep (confirmed the actual QACC/NaN source via a
+                     qacc dump: both finger DOFs pinned at exactly -3990,
+                     with zero active contacts at the time, ruling out the
+                     finger-finger contact theory tried first). 0.02kg
+                     keeps the finger light but numerically sane. -->
+                <inertial mass="0.02"
+                          pos="-0.000277795893713934 -0.046767350270289 -0.00921029791141448"
+                          fullinertia="9.99782474142963E-06 6.17952362333486E-06 1.42102248648757E-05 -1.57547666236405E-07 2.71355834243046E-08 1.58939503259658E-06"/>
+                <joint name="joint7" range="-0.05 0" type="slide" damping="0.005" frictionloss="0.01"/>
+                <geom type="mesh" mesh="link7" material="linkgray" group="1" name="finger7_visual" contype="0" conaffinity="0"/>
+                <geom type="mesh" mesh="link7" group="0" name="finger7_collision" conaffinity="1" contype="1" condim="4" friction="1 0.005 0.0001"
+                      solimp="0.998 0.998 0.001" solref="0.002 1"/>
+            </body>
+            <body name="link8" pos="0 0 0" quat="1 -1 -1 1">
+                <inertial mass="0.02"
+                          pos="0.000277795911672651 0.0467673513153836 -0.00921029799058583"
+                          fullinertia="9.99782474142963E-06 6.17952362333486E-06 1.42102248648757E-05 -1.57547666236405E-07 2.71355834243046E-08 1.58939503259658E-06"/>
+                <joint name="joint8" range="-0.05 0" type="slide" damping="0.005" frictionloss="0.01"/>
+                <geom type="mesh" mesh="link8" material="linkgray" group="1" name="finger8_visual" contype="0" conaffinity="0"/>
+                <geom type="mesh" mesh="link8" group="0" name="finger8_collision" conaffinity="1" contype="1" condim="4" friction="1 0.005 0.0001"
+                      solimp="0.998 0.998 0.001" solref="0.002 1"/>
+            </body>
+        </body>
+    </worldbody>
+
+    <equality>
+        <joint name="gripper_slide_joint_eq" joint1="joint7" joint2="joint8"/>
+    </equality>
+
+    <!-- finger7/finger8 meshes touch/overlap near their base regardless of
+         slide position (confirmed: contact present even at the "half-open"
+         init_qpos, dist about 0, not just at fully closed). Likely a mesh
+         placement artifact inherited from the combined upstream robot.xml,
+         which never ran gripper-closing dynamics to expose it (only a
+         passive equality constraint, no actuators, in the original file).
+         Softening solimp/solref and widening the ctrlrange gap did not
+         resolve the resulting QACC/NaN instability; excluding this specific
+         pair does, and finger-vs-OBJECT contact (the actual grasp) is
+         unaffected since only this one pair is excluded. Added 2026-07-14. -->
+    <contact>
+        <exclude body1="link7" body2="link8"/>
+    </contact>
+
+    <sensor>
+        <force name="force_ee" site="ft_frame"/>
+        <torque name="torque_ee" site="ft_frame"/>
+    </sensor>
+</mujoco>

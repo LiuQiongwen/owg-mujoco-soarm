@@ -1,0 +1,492 @@
+[
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.4521070093675899,
+    "spawn_pos": [
+      -0.14563458381739436,
+      0.11242901053053886,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.14448262871345735,
+      0.1141744877668761,
+      0.856857867262062
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0026886765311792274,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0032391381671751213,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.003393293125111935,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925665,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114423,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092573,
+        "seed_source": "primary"
+      }
+    },
+    "trial_id": 0
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.24841769586807352,
+    "spawn_pos": [
+      0.004561621495212442,
+      -0.0213846046320065,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      0.0075550151111706,
+      -0.021402315824571645,
+      0.8577305274664203
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.001774568497026118,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0030163355351183747,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.004188186195974414,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925665,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114458,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092572,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 1
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.298455028882256,
+    "spawn_pos": [
+      -0.06075590641710715,
+      -0.014738348416836515,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.05067907112864286,
+      -0.013509238242445267,
+      0.857727556581334
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0041220910324682464,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0007923955898319546,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.002468198260165767,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.146527705516117,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144752,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1465277055161534,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 2
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.46133751697566033,
+    "spawn_pos": [
+      -0.0895727949290918,
+      0.17692784950991639,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.08698027814447486,
+      0.17893662069287325,
+      0.8577440790621838
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.001337276823079315,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.002020059675839599,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0031066906960060354,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092569,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144335,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092573,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 3
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.4198681964681379,
+    "spawn_pos": [
+      -0.0380945643542821,
+      0.16287390697953785,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.0351978513020235,
+      0.16436595515703611,
+      0.8577243243505152
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0017419586480221792,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.002794430014013771,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.003989374284975321,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.060892896437496,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114424,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.060892896437513,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 4
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.4624732051750534,
+    "spawn_pos": [
+      -0.1400270606615625,
+      0.134968492301638,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.13674748722663857,
+      0.1372881682798275,
+      0.8577195200219953
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.004124190683638428,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0038245498818584456,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.003305784717556414,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092576,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144188,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092571,
+        "seed_source": "primary"
+      }
+    },
+    "trial_id": 5
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.4963874326029856,
+    "spawn_pos": [
+      -0.11661895975801947,
+      0.20096689850712218,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.11501613399022415,
+      0.20161925546612391,
+      0.8577349412685729
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0034128827201512797,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.003435095442985158,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0035073509812780872,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092593,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144588,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925576,
+        "seed_source": "primary"
+      }
+    },
+    "trial_id": 6
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.4138728828047426,
+    "spawn_pos": [
+      -0.04411199938318405,
+      0.1517304106718692,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.04242573253607968,
+      0.1524456774090965,
+      0.8577335837833046
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0007719854014037316,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0021258932836698942,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0035509570719860282,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092538,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144403,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092575,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 7
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.3305078729173595,
+    "spawn_pos": [
+      -0.02800626556013938,
+      0.06033189163162014,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.02490137823670606,
+      0.0611032689797599,
+      0.8577431308472208
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0010635434792698837,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0025596617326400853,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0034791939304616346,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092572,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144495,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092564,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 8
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.2999198263514298,
+    "spawn_pos": [
+      -0.05776936724955664,
+      -0.016164802214819522,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.05442256028389488,
+      -0.016191155970308665,
+      0.8577295786819733
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0015970739077588187,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0027085229348642456,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0031561147223844645,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092582,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541143986,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925763,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 9
+  }
+]

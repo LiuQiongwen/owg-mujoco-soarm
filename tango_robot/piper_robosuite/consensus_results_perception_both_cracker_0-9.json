@@ -1,0 +1,2002 @@
+[
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.42444597079057383,
+    "spawn_pos": [
+      -0.10013845076589531,
+      0.12327814025011449,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.10398731340476779,
+      0.11614676493048151,
+      0.9084505568880183
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.40059163899333944,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.003972380004549838,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.40059163899334493,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092581,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144215,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925576,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 7,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.09950979966042835,
+          0.12261761593365798
+        ],
+        [
+          -0.09361845054024462,
+          0.1280135450657607
+        ],
+        [
+          -0.11176360463908948,
+          0.12218418193045176
+        ],
+        [
+          -0.09808029808402464,
+          0.12849070709732788
+        ],
+        [
+          -0.09562109985763627,
+          0.12374820173891887
+        ],
+        [
+          -0.10518654168358899,
+          0.12223226237575593
+        ],
+        [
+          -0.103407593812987,
+          0.12263007208165065
+        ],
+        [
+          -0.09340907364698378,
+          0.12718469725361664
+        ],
+        [
+          -0.09113027641656468,
+          0.12985365907378635
+        ],
+        [
+          -0.10658025808464308,
+          0.12525375055102453
+        ]
+      ]
+    },
+    "trial_id": 0,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.38713443532417247,
+    "spawn_pos": [
+      -0.03247058082217563,
+      0.13299751845303612,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.03010651157211637,
+      0.12847479425744146,
+      0.9084917383311459
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.7088021769488095,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.006311745492324461,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.7088021769488337,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092603,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114408,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925745,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 5,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.030742659861851703,
+          0.1371056091705419
+        ],
+        [
+          -0.03515534699897706,
+          0.1359031089740179
+        ],
+        [
+          -0.03615285125718397,
+          0.13218296871307086
+        ],
+        [
+          -0.036380123133959844,
+          0.13171155724994177
+        ],
+        [
+          -0.046026393217005475,
+          0.12355245222319776
+        ],
+        [
+          -0.02188138704692039,
+          0.1274374146395747
+        ],
+        [
+          -0.03504061268061295,
+          0.12475714259875785
+        ],
+        [
+          -0.03283079922081177,
+          0.12827376033773222
+        ],
+        [
+          -0.02950184046324652,
+          0.13745335322444777
+        ],
+        [
+          -0.028074777730735703,
+          0.1276385813686489
+        ]
+      ]
+    },
+    "trial_id": 1,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.36120019117871754,
+    "spawn_pos": [
+      -0.04550117332266733,
+      0.08948109800420871,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.04215710370427375,
+      0.08671042139244622,
+      0.908474567159292
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.4817398961274217,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.005167233998656206,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.4817398961273939,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092564,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541143975,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925212,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 8,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.044555906413699664,
+          0.08686735579680498
+        ],
+        [
+          -0.04712828750700645,
+          0.09335013093784703
+        ],
+        [
+          -0.04714529284295714,
+          0.08552036422741421
+        ],
+        [
+          -0.04486703408710798,
+          0.08501972778705975
+        ],
+        [
+          -0.050554960823434004,
+          0.0933970029849291
+        ],
+        [
+          -0.04129387885539733,
+          0.09012467629157905
+        ],
+        [
+          -0.04634997581128301,
+          0.09382339906026627
+        ],
+        [
+          -0.049323493901269326,
+          0.084085795708524
+        ],
+        [
+          -0.05486382091069745,
+          0.0951237137137111
+        ],
+        [
+          -0.045061578111119716,
+          0.09447960511496761
+        ]
+      ]
+    },
+    "trial_id": 2,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.3563015818936729,
+    "spawn_pos": [
+      -0.08417867387739784,
+      0.03859859032821891,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.08348335180309167,
+      0.03838054546410053,
+      0.9085043293925291
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.3576808278419143,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004685969699343226,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.3576808278419126,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925727,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144186,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925807,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 6,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.07397407827047194,
+          0.025820265171648003
+        ],
+        [
+          -0.0942786045231341,
+          0.037438928439997965
+        ],
+        [
+          -0.08558511096815459,
+          0.035258358597674164
+        ],
+        [
+          -0.07938988036259903,
+          0.03759957968288601
+        ],
+        [
+          -0.08509286875038652,
+          0.04130121598699292
+        ],
+        [
+          -0.08861097359320078,
+          0.03713998916601959
+        ],
+        [
+          -0.09831948541161666,
+          0.04370512441571931
+        ],
+        [
+          -0.08640251115581177,
+          0.03321656112771487
+        ],
+        [
+          -0.08320959564607475,
+          0.044156756354338876
+        ],
+        [
+          -0.08525281843303212,
+          0.034684547438399084
+        ]
+      ]
+    },
+    "trial_id": 3,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.4099854099729986,
+    "spawn_pos": [
+      -0.11952369465575154,
+      0.0733174015617131,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.12085052635461087,
+      0.07732000796010226,
+      0.9084963055128875
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.9410355253764021,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.00568057430255017,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.9410355253763955,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092537,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114446,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092599,
+        "seed_source": "primary"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 2,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.12278265041880998,
+          0.07244381510008421
+        ],
+        [
+          -0.12264101336069351,
+          0.07406055917797323
+        ],
+        [
+          -0.11794046957339202,
+          0.0758701348702013
+        ],
+        [
+          -0.12117321502512078,
+          0.06891416897207411
+        ],
+        [
+          -0.11211083884058225,
+          0.06416938144448635
+        ],
+        [
+          -0.12124216640624894,
+          0.07436826619839361
+        ],
+        [
+          -0.11472777036237898,
+          0.06841812872983971
+        ],
+        [
+          -0.12307211900929496,
+          0.07028141563543644
+        ],
+        [
+          -0.10923312231326299,
+          0.07078538326278094
+        ],
+        [
+          -0.11945710224994648,
+          0.07718813129679943
+        ]
+      ]
+    },
+    "trial_id": 4,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.38564258758807723,
+    "spawn_pos": [
+      -0.08133052281953819,
+      0.08745180909909916,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.07443889533736256,
+      0.09069961879985376,
+      0.9084607059174379
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.3732580173438666,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.005147376719162883,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.37325801734384745,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1156117645793837,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144561,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1156117645794,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 7,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.08534017994580542,
+          0.08083001412095844
+        ],
+        [
+          -0.08409375942221935,
+          0.08352790732237778
+        ],
+        [
+          -0.08612184884671864,
+          0.09545190454409472
+        ],
+        [
+          -0.08447696328984597,
+          0.08501177998271488
+        ],
+        [
+          -0.07928233368675261,
+          0.09160108563440579
+        ],
+        [
+          -0.08777761655330749,
+          0.08755526106928713
+        ],
+        [
+          -0.08678716732801674,
+          0.08067576536807547
+        ],
+        [
+          -0.0913196062817868,
+          0.08881245344616161
+        ],
+        [
+          -0.08249763543836704,
+          0.0861728589421022
+        ],
+        [
+          -0.08298697728303778,
+          0.0832494432569881
+        ]
+      ]
+    },
+    "trial_id": 5,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.3855134660785474,
+    "spawn_pos": [
+      -0.07220973400420364,
+      0.09640536691606225,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.06508909953244427,
+      0.09905048664138595,
+      0.9084567214568887
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.39388366609434616,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.005598014828903329,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.39388366609432734,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1248371993687254,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144443,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1248371993687205,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 4,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.06694415523176984,
+          0.10528782343514721
+        ],
+        [
+          -0.0689407920821226,
+          0.10389095617900143
+        ],
+        [
+          -0.076442878835395,
+          0.0983032881461009
+        ],
+        [
+          -0.07234010319192649,
+          0.10332391569762203
+        ],
+        [
+          -0.08020467563356107,
+          0.08775174596818032
+        ],
+        [
+          -0.07067381095781465,
+          0.09744758005701089
+        ],
+        [
+          -0.07333472259082191,
+          0.0930028409397043
+        ],
+        [
+          -0.0740283041479006,
+          0.09582386804794199
+        ],
+        [
+          -0.07171575731605435,
+          0.089086398581745
+        ],
+        [
+          -0.07971631467390124,
+          0.0887906070635741
+        ]
+      ]
+    },
+    "trial_id": 6,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.3449924714983214,
+    "spawn_pos": [
+      -0.05486746799691068,
+      0.05737016970813376,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.04557228937871442,
+      0.06204265882463487,
+      0.9084716493055939
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.4108635639770818,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004122735658596442,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.4108635639770907,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.0834757918800144,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144597,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.0834757918800517,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 3,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.05486131723012327,
+          0.05886389739567611
+        ],
+        [
+          -0.05456674998392349,
+          0.06407124593590642
+        ],
+        [
+          -0.05434039675192119,
+          0.052717829484592735
+        ],
+        [
+          -0.06437358169591491,
+          0.050922481009208875
+        ],
+        [
+          -0.054083712563789556,
+          0.05643551498498399
+        ],
+        [
+          -0.06251814682443765,
+          0.054981403327964105
+        ],
+        [
+          -0.055030076521638285,
+          0.06179211904504963
+        ],
+        [
+          -0.06099274712899915,
+          0.0577508708600188
+        ],
+        [
+          -0.05807481996744679,
+          0.06737225243984588
+        ],
+        [
+          -0.05581137862366443,
+          0.060784721044109785
+        ]
+      ]
+    },
+    "trial_id": 7,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.3420573405230792,
+    "spawn_pos": [
+      -0.11431918456324994,
+      0.03932760366976616,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.06704170888494584,
+      0.03568292824054835,
+      0.9084549854118191
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 1.322965328204577,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0036262078755481594,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 1.3229653282045657,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925563,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144221,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092538,
+        "seed_source": "primary"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 4,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.12301051655573435,
+          0.0326443897038605
+        ],
+        [
+          -0.11910533070373167,
+          0.04379560459441606
+        ],
+        [
+          -0.11002021461853038,
+          0.04685500945168538
+        ],
+        [
+          -0.11850365966373415,
+          0.03781987062193853
+        ],
+        [
+          -0.1149116730608348,
+          0.03812886442375835
+        ],
+        [
+          -0.11862639292969278,
+          0.028120764378829724
+        ],
+        [
+          -0.10653447455810705,
+          0.035013944084209284
+        ],
+        [
+          -0.12187257201450263,
+          0.03263913029949642
+        ],
+        [
+          -0.11898042967572867,
+          0.03854381017618267
+        ],
+        [
+          -0.10370207489348675,
+          0.039489548111893764
+        ]
+      ]
+    },
+    "trial_id": 8,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.45672867872346334,
+    "spawn_pos": [
+      -0.13691161136105193,
+      0.12184436587011153,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.1418158082526427,
+      0.12384606953429587,
+      0.908423578148246
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 1.0268321303546164,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.005212231953467763,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 1.0268321303545986,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.135249029104751,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": true,
+        "err_cm": 0.002215441491319503,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1352490291047617,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 7,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.1409257960409663,
+          0.12305861540550654
+        ],
+        [
+          -0.13475918263328038,
+          0.12309902871553244
+        ],
+        [
+          -0.1371497725470136,
+          0.1344560029238587
+        ],
+        [
+          -0.13944305693344586,
+          0.12969411153134952
+        ],
+        [
+          -0.13738174050771995,
+          0.11991879792481772
+        ],
+        [
+          -0.13418540250357536,
+          0.11662373467403252
+        ],
+        [
+          -0.1368032557760552,
+          0.1243915983509563
+        ],
+        [
+          -0.1378272655490696,
+          0.11803412983996714
+        ],
+        [
+          -0.14280443349993924,
+          0.11643636795310966
+        ],
+        [
+          -0.14094611330103565,
+          0.12009040580546405
+        ]
+      ]
+    },
+    "trial_id": 9,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "consensus",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.3686437893651987,
+    "spawn_pos": [
+      -0.06545227857105677,
+      0.08239552084176939,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.06425288051822077,
+      0.076933917263656,
+      0.908382306934823
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.4451424554711386,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004623539040464166,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.44514245547113845,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092517,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144448,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092548,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 4,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.06482362746558981,
+          0.08173499652531288
+        ],
+        [
+          -0.05893227834540609,
+          0.0871309256574156
+        ],
+        [
+          -0.07707743244425094,
+          0.08130156252210666
+        ],
+        [
+          -0.06339412588918611,
+          0.08760808768898277
+        ],
+        [
+          -0.06093492766279773,
+          0.08286558233057377
+        ],
+        [
+          -0.07050036948875045,
+          0.08134964296741082
+        ],
+        [
+          -0.06872142161814847,
+          0.08174745267330555
+        ],
+        [
+          -0.05872290145214525,
+          0.08630207784527152
+        ],
+        [
+          -0.056444104221726146,
+          0.08897103966544125
+        ],
+        [
+          -0.07189408588980455,
+          0.08437113114267943
+        ]
+      ]
+    },
+    "trial_id": 0,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "consensus",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.3319761452049919,
+    "spawn_pos": [
+      -0.04668719637631895,
+      0.04261979660894621,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.04494288173542907,
+      0.04454211414374621,
+      0.908501246994311
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.4624080904818078,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004878366922205151,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.4624080904818069,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925514,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144508,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925976,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 7,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.044959275415995016,
+          0.046727887326452
+        ],
+        [
+          -0.049371962553120374,
+          0.04552538712992797
+        ],
+        [
+          -0.050369466811327285,
+          0.04180524686898095
+        ],
+        [
+          -0.05059673868810316,
+          0.04133383540585185
+        ],
+        [
+          -0.06024300877114879,
+          0.03317473037910784
+        ],
+        [
+          -0.0360980026010637,
+          0.0370596927954848
+        ],
+        [
+          -0.04925722823475626,
+          0.03437942075466795
+        ],
+        [
+          -0.04704741477495509,
+          0.03789603849364232
+        ],
+        [
+          -0.043718456017389835,
+          0.04707563138035785
+        ],
+        [
+          -0.04229139328487902,
+          0.03726085952455899
+        ]
+      ]
+    },
+    "trial_id": 1,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "consensus",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.36670648772615605,
+    "spawn_pos": [
+      -0.08636273934232648,
+      0.04774960424100476,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.08907517783555495,
+      0.04788798468293182,
+      0.908403731732358
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.3671464285950436,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.005002030491829177,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.3671464285950486,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925785,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144495,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925745,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 9,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.08541747243335882,
+          0.045135862033601024
+        ],
+        [
+          -0.0879898535266656,
+          0.051618637174643066
+        ],
+        [
+          -0.08800685886261629,
+          0.04378887046421027
+        ],
+        [
+          -0.08572860010676712,
+          0.04328823402385581
+        ],
+        [
+          -0.09141652684309315,
+          0.051665509221725144
+        ],
+        [
+          -0.08215544487505648,
+          0.0483931825283751
+        ],
+        [
+          -0.08721154183094215,
+          0.05209190529706231
+        ],
+        [
+          -0.09018505992092848,
+          0.04235430194532005
+        ],
+        [
+          -0.09572538693035659,
+          0.05339221995050715
+        ],
+        [
+          -0.08592314413077887,
+          0.05274811135176366
+        ]
+      ]
+    },
+    "trial_id": 2,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "consensus",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.40886468913751617,
+    "spawn_pos": [
+      -0.10706537566672447,
+      0.08287608253419393,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.11154088231188566,
+      0.08612212935237043,
+      0.9084644432473249
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.36159660797671345,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0046510414195759155,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.36159660797671345,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925425,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541143957,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925705,
+        "seed_source": "primary"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 9,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.09686078005979856,
+          0.07009775737762303
+        ],
+        [
+          -0.11716530631246072,
+          0.08171642064597298
+        ],
+        [
+          -0.10847181275748122,
+          0.07953585080364918
+        ],
+        [
+          -0.10227658215192566,
+          0.08187707188886102
+        ],
+        [
+          -0.10797957053971315,
+          0.08557870819296794
+        ],
+        [
+          -0.1114976753825274,
+          0.08141748137199462
+        ],
+        [
+          -0.12120618720094328,
+          0.08798261662169433
+        ],
+        [
+          -0.1092892129451384,
+          0.07749405333368989
+        ],
+        [
+          -0.10609629743540137,
+          0.08843424856031389
+        ],
+        [
+          -0.10813952022235875,
+          0.0789620396443741
+        ]
+      ]
+    },
+    "trial_id": 3,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "consensus",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.3842136747427394,
+    "spawn_pos": [
+      -0.11763180647780712,
+      0.06035229643836523,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.08235388494512678,
+      0.08100462950771917,
+      0.9084746529523613
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 1.4161991808287746,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0031340214729214852,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 1.4161991808287784,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925776,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144406,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.14718135309257,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 0,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.12089076224086556,
+          0.05947870997673635
+        ],
+        [
+          -0.12074912518274909,
+          0.06109545405462537
+        ],
+        [
+          -0.1160485813954476,
+          0.06290502974685344
+        ],
+        [
+          -0.11928132684717636,
+          0.05594906384872625
+        ],
+        [
+          -0.11021895066263783,
+          0.05120427632113848
+        ],
+        [
+          -0.11935027822830452,
+          0.061403161075045745
+        ],
+        [
+          -0.11283588218443456,
+          0.05545302360649185
+        ],
+        [
+          -0.12118023083135054,
+          0.057316310512088575
+        ],
+        [
+          -0.10734123413531857,
+          0.057820278139433086
+        ],
+        [
+          -0.11756521407200206,
+          0.06422302617345156
+        ]
+      ]
+    },
+    "trial_id": 4,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "consensus",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.3424254855174587,
+    "spawn_pos": [
+      -0.05857113196108195,
+      0.05379525215584672,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.049371764169271914,
+      0.05485990208761785,
+      0.9084549758500879
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.4188534661967347,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004239281161025846,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.41885346619672864,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1071255898847583,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144215,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.107125589884769,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 3,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.06258078908734918,
+          0.04717345717770599
+        ],
+        [
+          -0.06133436856376311,
+          0.04987135037912533
+        ],
+        [
+          -0.0633624579882624,
+          0.06179534760084228
+        ],
+        [
+          -0.06171757243138972,
+          0.05135522303946243
+        ],
+        [
+          -0.05652294282829636,
+          0.05794452869115334
+        ],
+        [
+          -0.06501822569485124,
+          0.053898704126034674
+        ],
+        [
+          -0.0640277764695605,
+          0.047019208424823024
+        ],
+        [
+          -0.06856021542333056,
+          0.05515589650290916
+        ],
+        [
+          -0.059738244579910796,
+          0.05251630199884976
+        ],
+        [
+          -0.06022758642458153,
+          0.049592886313735665
+        ]
+      ]
+    },
+    "trial_id": 5,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "consensus",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.2398711066450994,
+    "spawn_pos": [
+      -0.03962291642095217,
+      0.029739972553515424,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      0.06080624379883176,
+      0.012106707364643747,
+      0.9084602171707007
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.4810949365584548,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.005157528191234774,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.4810949365584642,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092525,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144157,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092586,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 7,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.03435733764851838,
+          0.03862242907260039
+        ],
+        [
+          -0.03635397449887114,
+          0.037225561816454616
+        ],
+        [
+          -0.04385606125214353,
+          0.03163789378355407
+        ],
+        [
+          -0.039753285608675026,
+          0.0366585213350752
+        ],
+        [
+          -0.04761785805030961,
+          0.021086351605633505
+        ],
+        [
+          -0.038086993374563186,
+          0.030782185694464066
+        ],
+        [
+          -0.04074790500757044,
+          0.02633744657715748
+        ],
+        [
+          -0.041441486564649126,
+          0.02915847368539517
+        ],
+        [
+          -0.03912893973280288,
+          0.022421004219198175
+        ],
+        [
+          -0.04712949709064977,
+          0.022125212701027276
+        ]
+      ]
+    },
+    "trial_id": 6,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "consensus",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.3257032578957239,
+    "spawn_pos": [
+      -0.031666732549407384,
+      0.04237963400811027,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.03707832396898131,
+      0.04349099979940732,
+      0.9084725217395373
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.5339285712947759,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0031516481491806413,
+        "seed_source": "fallback"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.5339285712947712,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092564,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114405,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925807,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 4,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.03166058178261997,
+          0.04387336169565262
+        ],
+        [
+          -0.03136601453642019,
+          0.04908071023588294
+        ],
+        [
+          -0.03113966130441789,
+          0.037727293784569245
+        ],
+        [
+          -0.0411728462484116,
+          0.035931945309185385
+        ],
+        [
+          -0.030882977116286257,
+          0.0414449792849605
+        ],
+        [
+          -0.039317411376934355,
+          0.039990867627940616
+        ],
+        [
+          -0.03182934107413499,
+          0.04680158334502614
+        ],
+        [
+          -0.03779201168149585,
+          0.04276033515999531
+        ],
+        [
+          -0.03487408451994349,
+          0.052381716739822386
+        ],
+        [
+          -0.03261064317616113,
+          0.0457941853440863
+        ]
+      ]
+    },
+    "trial_id": 7,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "consensus",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.4194802839535962,
+    "spawn_pos": [
+      -0.08289157232851763,
+      0.1197654533710113,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.08444924548087462,
+      0.127240161834482,
+      0.9083588336259294
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.405707172541374,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0040473751602716716,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.40570717254137456,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925483,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144206,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092562,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 3,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.09158290432100204,
+          0.11308223940510563
+        ],
+        [
+          -0.08767771846899935,
+          0.1242334542956612
+        ],
+        [
+          -0.07859260238379807,
+          0.1272928591529305
+        ],
+        [
+          -0.08707604742900184,
+          0.11825772032318367
+        ],
+        [
+          -0.08348406082610249,
+          0.11856671412500348
+        ],
+        [
+          -0.08719878069496047,
+          0.10855861408007486
+        ],
+        [
+          -0.07510686232337474,
+          0.11545179378545442
+        ],
+        [
+          -0.09044495977977032,
+          0.11307698000074157
+        ],
+        [
+          -0.08755281744099636,
+          0.1189816598774278
+        ],
+        [
+          -0.07227446265875444,
+          0.1199273978131389
+        ]
+      ]
+    },
+    "trial_id": 8,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "candidate_selection": "consensus",
+    "noise_model": "perception",
+    "success": false,
+    "dist_to_tray": 0.361969459295748,
+    "spawn_pos": [
+      -0.07610670075190308,
+      0.05932271400315857,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.07611284131094637,
+      0.05536879416965639,
+      0.9084785305537502
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.38416558694268205,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.005389863490726008,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.38416558694268843,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925816,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144137,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925794,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 4,
+      "noise_model": "perception",
+      "pool_xy": [
+        [
+          -0.08012088543181746,
+          0.06053696353855358
+        ],
+        [
+          -0.07395427202413153,
+          0.06057737684857948
+        ],
+        [
+          -0.07634486193786474,
+          0.07193435105690574
+        ],
+        [
+          -0.07863814632429701,
+          0.06717245966439657
+        ],
+        [
+          -0.0765768298985711,
+          0.05739714605786475
+        ],
+        [
+          -0.07338049189442652,
+          0.05410208280707956
+        ],
+        [
+          -0.07599834516690637,
+          0.06186994648400333
+        ],
+        [
+          -0.07702235493992074,
+          0.05551247797301418
+        ],
+        [
+          -0.08199952289079038,
+          0.053914716086156694
+        ],
+        [
+          -0.08014120269188682,
+          0.05756875393851109
+        ]
+      ]
+    },
+    "trial_id": 9,
+    "scene_objects": [
+      "cracker"
+    ]
+  }
+]

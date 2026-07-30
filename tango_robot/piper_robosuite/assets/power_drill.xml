@@ -1,0 +1,19 @@
+<mujoco model="power_drill">
+  <asset>
+    <mesh name="drill_vis_mesh" file="/lena/projects/OWG-main/tango_robot/assets/ycb_objects/YcbPowerDrill/textured_simple_reoriented.obj" scale="1 1 1"/>
+    <mesh name="drill_col_mesh" file="/lena/projects/OWG-main/tango_robot/assets/ycb_objects/YcbPowerDrill/collision_vhacd.obj" scale="1 1 1"/>
+    <texture name="tex-drill" type="2d" file="/lena/projects/OWG-main/tango_robot/assets/ycb_objects/YcbPowerDrill/texture_map.png"/>
+    <material name="mat-drill" texture="tex-drill" specular="0.2" shininess="0.2"/>
+  </asset>
+  <worldbody>
+    <body>
+      <body name="object">
+        <geom mesh="drill_vis_mesh" type="mesh" material="mat-drill" group="1" contype="0" conaffinity="0"/>
+        <geom mesh="drill_col_mesh" type="mesh" group="0" condim="4" friction="2.5 0.05 0.01" mass="0.895"/>
+      </body>
+      <site rgba="0 0 0 0" size="0.005" pos="0 0 -0.0037" name="bottom_site"/>
+      <site rgba="0 0 0 0" size="0.005" pos="0 0 0.1837" name="top_site"/>
+      <site rgba="0 0 0 0" size="0.005" pos="0.1180 0 0" name="horizontal_radius_site"/>
+    </body>
+  </worldbody>
+</mujoco>

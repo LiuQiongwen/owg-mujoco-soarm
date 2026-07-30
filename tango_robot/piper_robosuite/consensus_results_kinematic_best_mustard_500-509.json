@@ -1,0 +1,1072 @@
+[
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "kinematic",
+    "success": false,
+    "dist_to_tray": 0.18106061487668085,
+    "spawn_pos": [
+      0.014444968915082079,
+      0.18574345925010655,
+      0.8816047386779412
+    ],
+    "final_pos": [
+      0.17350092941302808,
+      -0.009692687532402466,
+      0.8317989898005747
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 1.2777436254959438,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.7138140512144442,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.00802735109591792,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.7138140512144281,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092564,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144113,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092582,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 2,
+      "noise_model": "kinematic",
+      "pool_xy": [
+        [
+          0.017934644799406877,
+          0.18140614509693706
+        ],
+        [
+          0.01757860060831444,
+          0.1954593825977915
+        ],
+        [
+          0.008698530891429489,
+          0.18756828711763637
+        ],
+        [
+          0.008199730084238813,
+          0.18997695503034007
+        ],
+        [
+          0.010478013373031003,
+          0.18688367924367813
+        ],
+        [
+          0.010888479311890763,
+          0.1740117955461106
+        ],
+        [
+          0.010744064752620085,
+          0.1846618360251322
+        ],
+        [
+          0.017066177299253714,
+          0.1905156624909698
+        ],
+        [
+          0.016708332680506397,
+          0.19117631703466695
+        ],
+        [
+          0.007923008033817342,
+          0.19327418434313262
+        ]
+      ]
+    },
+    "trial_id": 500,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "kinematic",
+    "success": false,
+    "dist_to_tray": 0.32046399426611905,
+    "spawn_pos": [
+      -0.0592102773813504,
+      0.012495110306823626,
+      0.8237786814152309
+    ],
+    "final_pos": [
+      -0.052384253610068876,
+      0.01963550563510225,
+      0.8206786509547633
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.6044549590379079,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.004198438414897275,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.008602154071122622,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.006633914260043098,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925976,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144148,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092573,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 0,
+      "noise_model": "kinematic",
+      "pool_xy": [
+        [
+          -0.06481814222860123,
+          0.013726672016278219
+        ],
+        [
+          -0.06055683998270246,
+          0.016121021484388258
+        ],
+        [
+          -0.05398029831012736,
+          0.010598440862108972
+        ],
+        [
+          -0.054740723752064145,
+          0.01838704974328389
+        ],
+        [
+          -0.06312936052464428,
+          0.011153402909407244
+        ],
+        [
+          -0.06462937949593074,
+          0.015729511907313354
+        ],
+        [
+          -0.054365728398199885,
+          0.011397154394445292
+        ],
+        [
+          -0.06410335914027304,
+          0.0034163371133809906
+        ],
+        [
+          -0.05679863315916377,
+          -0.002254486505876476
+        ],
+        [
+          -0.0680774039460317,
+          0.013999392703525368
+        ]
+      ]
+    },
+    "trial_id": 501,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "kinematic",
+    "success": false,
+    "dist_to_tray": 0.3666536204705665,
+    "spawn_pos": [
+      -0.11220334048505859,
+      0.016653561110709095,
+      0.8816047386778924
+    ],
+    "final_pos": [
+      -0.10420091517962393,
+      0.028816587377753226,
+      0.8815972859953003
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 2.439561869581229,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.27052825796616603,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0036746673056797428,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.2705282579661674,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925776,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144603,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925905,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 8,
+      "noise_model": "kinematic",
+      "pool_xy": [
+        [
+          -0.11161296130326377,
+          0.016411093195735943
+        ],
+        [
+          -0.11766881602497674,
+          0.0134714961591419
+        ],
+        [
+          -0.11463629749304961,
+          0.00533327768320448
+        ],
+        [
+          -0.11286320832229772,
+          0.013960885474684784
+        ],
+        [
+          -0.11116681558469821,
+          0.0252778413228541
+        ],
+        [
+          -0.10573183647999315,
+          0.015592131301241671
+        ],
+        [
+          -0.1093522433735444,
+          0.021137990985615585
+        ],
+        [
+          -0.11297528758385632,
+          0.018925923888181848
+        ],
+        [
+          -0.11943079199622393,
+          0.010250337678718455
+        ],
+        [
+          -0.11036780993103694,
+          0.02184417728589258
+        ]
+      ]
+    },
+    "trial_id": 502,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "kinematic",
+    "success": false,
+    "dist_to_tray": 0.2518723016021404,
+    "spawn_pos": [
+      0.0011109400096663542,
+      -0.020243061650790144,
+      0.8816047386779514
+    ],
+    "final_pos": [
+      0.024386802706918103,
+      -0.00023191733928938605,
+      0.8816062136975368
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.792860275614353,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.16889656352793353,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.011182895031328405,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.1688965635279328,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925785,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541143757,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925177,
+        "seed_source": "primary"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 5,
+      "noise_model": "kinematic",
+      "pool_xy": [
+        [
+          0.0024302601240769202,
+          -0.029699209811063654
+        ],
+        [
+          0.0001452303630597382,
+          -0.020872948524452324
+        ],
+        [
+          0.004746664685480858,
+          -0.024480375651757116
+        ],
+        [
+          0.01154992130781689,
+          -0.013985935934857387
+        ],
+        [
+          -0.0023118976553075698,
+          -0.014039214119156346
+        ],
+        [
+          -0.00919506636785943,
+          -0.02072941879994651
+        ],
+        [
+          0.0029265791927461137,
+          -0.023434080660037562
+        ],
+        [
+          0.0009741442408376033,
+          -0.022545348656337706
+        ],
+        [
+          0.0007490746671459656,
+          -0.020321615184460802
+        ],
+        [
+          -0.0005777415280252855,
+          -0.016489516653173896
+        ]
+      ]
+    },
+    "trial_id": 503,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "kinematic",
+    "success": false,
+    "dist_to_tray": 0.45061422375186155,
+    "spawn_pos": [
+      -0.12357799561367876,
+      0.17038688342028796,
+      0.8816047386778699
+    ],
+    "final_pos": [
+      -0.020023523377868956,
+      0.20867693471711962,
+      0.8205185824190507
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.6098130678657114,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0043951964051212,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.008778113624454058,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.009194793487348791,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092572,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144446,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925488,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 4,
+      "noise_model": "kinematic",
+      "pool_xy": [
+        [
+          -0.12397248461905483,
+          0.1682671424940031
+        ],
+        [
+          -0.12894506671457018,
+          0.17248117439811833
+        ],
+        [
+          -0.12761532783320714,
+          0.1738594349716927
+        ],
+        [
+          -0.12324172812359444,
+          0.1692414055610324
+        ],
+        [
+          -0.11812566083604528,
+          0.1709643178725999
+        ],
+        [
+          -0.1197111798840451,
+          0.1715225576630254
+        ],
+        [
+          -0.13103608169451927,
+          0.15984248095529724
+        ],
+        [
+          -0.11871905386100928,
+          0.1711741442986868
+        ],
+        [
+          -0.13213211268646752,
+          0.17248262972673295
+        ],
+        [
+          -0.1228885456503261,
+          0.173404130580306
+        ]
+      ]
+    },
+    "trial_id": 504,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "kinematic",
+    "success": false,
+    "dist_to_tray": 0.23830497097960415,
+    "spawn_pos": [
+      0.019012526641495005,
+      -0.016457220061969202,
+      0.8816047386779405
+    ],
+    "final_pos": [
+      0.023729713148082785,
+      -0.019285469558765627,
+      0.8816022048822949
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 1.0703785290613543,
+        "seed_source": "primary"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.47341742055333325,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0065935744754337935,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.4734174205533226,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925616,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144537,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925794,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 4,
+      "noise_model": "kinematic",
+      "pool_xy": [
+        [
+          0.025371717538026247,
+          -0.022718417377377523
+        ],
+        [
+          0.01087056311417742,
+          -0.017651551125316356
+        ],
+        [
+          0.022278491108582796,
+          -0.019719897282027304
+        ],
+        [
+          0.01429708845751802,
+          -0.01974701596912515
+        ],
+        [
+          0.02819919452241116,
+          -0.029076922040086037
+        ],
+        [
+          0.010397196660932308,
+          -0.016246134491074114
+        ],
+        [
+          0.024509581597353107,
+          -0.012805894114949565
+        ],
+        [
+          0.020985706839342408,
+          -0.011395576400122492
+        ],
+        [
+          0.01648187681330432,
+          -0.019065454125394867
+        ],
+        [
+          0.013008583072860735,
+          -0.013553768786022827
+        ]
+      ]
+    },
+    "trial_id": 505,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "kinematic",
+    "success": false,
+    "dist_to_tray": 0.3207442664600513,
+    "spawn_pos": [
+      -0.019789026334243356,
+      0.1791861023643595,
+      0.8816047386779029
+    ],
+    "final_pos": [
+      0.08915934767916651,
+      0.11447996207715397,
+      0.8203746910510586
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 1.086084611197028,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.007174440101480205,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0063167833613218686,
+        "seed_source": "fallback"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.007174440101465612,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925727,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114417,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925776,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 8,
+      "noise_model": "kinematic",
+      "pool_xy": [
+        [
+          -0.018529116515519875,
+          0.17784280894739862
+        ],
+        [
+          -0.022910042655321507,
+          0.1821990199798428
+        ],
+        [
+          -0.02453815648990295,
+          0.17439018183640365
+        ],
+        [
+          -0.020518283265605862,
+          0.17561483024073798
+        ],
+        [
+          -0.01297871773538897,
+          0.17703769792432023
+        ],
+        [
+          -0.025032425895620797,
+          0.18184911948688867
+        ],
+        [
+          -0.02093994250361846,
+          0.17852870305694754
+        ],
+        [
+          -0.018342341650826696,
+          0.18313733493455986
+        ],
+        [
+          -0.014659292171457984,
+          0.1816643451890922
+        ],
+        [
+          -0.016473115373434537,
+          0.1824791414663023
+        ]
+      ]
+    },
+    "trial_id": 506,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "kinematic",
+    "success": false,
+    "dist_to_tray": 0.1445247089143805,
+    "spawn_pos": [
+      -0.025445426776701988,
+      0.012345960573178124,
+      0.8816047386779057
+    ],
+    "final_pos": [
+      0.10833960071230203,
+      -0.07075667450561375,
+      0.8821260596858685
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.718544226040823,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0059998955447366515,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.008689795432600001,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.05865291141902197,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925625,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144106,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092593,
+        "seed_source": "primary"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 7,
+      "noise_model": "kinematic",
+      "pool_xy": [
+        [
+          -0.027250940894123898,
+          0.020277757427100446
+        ],
+        [
+          -0.01353135240098141,
+          0.0113554762114746
+        ],
+        [
+          -0.029092664076260863,
+          0.008104758795393258
+        ],
+        [
+          -0.020011621338587145,
+          0.012722901110588335
+        ],
+        [
+          -0.02583093690458743,
+          0.009511804595743904
+        ],
+        [
+          -0.030784494834282805,
+          0.010325268382910544
+        ],
+        [
+          -0.024457413828595558,
+          0.015764269040187427
+        ],
+        [
+          -0.029596708235613185,
+          0.017083557275078234
+        ],
+        [
+          -0.024010630184288877,
+          0.017368378418147826
+        ],
+        [
+          -0.02689310991936364,
+          0.014688745925599078
+        ]
+      ]
+    },
+    "trial_id": 507,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "kinematic",
+    "success": false,
+    "dist_to_tray": 0.42378336139387174,
+    "spawn_pos": [
+      -0.052767526395275065,
+      0.1725380008449744,
+      0.8816047386779373
+    ],
+    "final_pos": [
+      -0.04482394101006905,
+      0.16277479235737424,
+      0.8816153011349105
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.7940161707433196,
+        "seed_source": "primary"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.14943919140941692,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.010594603785685719,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.24026000600895622,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925767,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144257,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925217,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 2,
+      "noise_model": "kinematic",
+      "pool_xy": [
+        [
+          -0.04601363770229434,
+          0.16667848824321535
+        ],
+        [
+          -0.04991920617664111,
+          0.17745305065807543
+        ],
+        [
+          -0.056322158977715336,
+          0.16871888216374814
+        ],
+        [
+          -0.05687103525120994,
+          0.18473722309698842
+        ],
+        [
+          -0.049511079693744076,
+          0.18146649047973368
+        ],
+        [
+          -0.0455708648529467,
+          0.18938459252606157
+        ],
+        [
+          -0.05478765391750667,
+          0.17910769022410333
+        ],
+        [
+          -0.05135665812208333,
+          0.1798963843161788
+        ],
+        [
+          -0.05122527342028569,
+          0.17461778618739443
+        ],
+        [
+          -0.04665370067001932,
+          0.1791336972819614
+        ]
+      ]
+    },
+    "trial_id": 508,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": "best",
+    "noise_model": "kinematic",
+    "success": false,
+    "dist_to_tray": 0.17029129921092861,
+    "spawn_pos": [
+      -0.0028962588763938963,
+      -0.01764151339408917,
+      0.8816047386778739
+    ],
+    "final_pos": [
+      0.0797532290863555,
+      -0.060212573451584275,
+      0.8427362933865095
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.6384762791092071,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.17910953245034975,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004651454019209447,
+        "seed_source": "fallback"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.17985028214752735,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925794,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144699,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925523,
+        "seed_source": "primary"
+      }
+    },
+    "candidates": {
+      "chosen_idx": 9,
+      "noise_model": "kinematic",
+      "pool_xy": [
+        [
+          -0.0030549825884119385,
+          -0.011976518153880976
+        ],
+        [
+          -0.002217779070091801,
+          -0.02223359194336255
+        ],
+        [
+          -0.004465850991715594,
+          -0.019489435339871224
+        ],
+        [
+          0.002921479542823416,
+          -0.016686097922693693
+        ],
+        [
+          -0.00020523423435576558,
+          -0.01400294796239035
+        ],
+        [
+          0.00020813606729827745,
+          -0.022015311658941914
+        ],
+        [
+          -0.0019228905729590158,
+          -0.018228476902760898
+        ],
+        [
+          -0.004041587015349461,
+          -0.012718927726630205
+        ],
+        [
+          -0.008778558654586543,
+          -0.020633639486878696
+        ],
+        [
+          -0.008083363761756193,
+          -0.026686170282827194
+        ]
+      ]
+    },
+    "trial_id": 509,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  }
+]

@@ -1,0 +1,262 @@
+[
+  {
+    "object": "banana",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.4241984442698574,
+    "spawn_pos": [
+      -0.11456657994645486,
+      0.09954844105396149,
+      0.8335
+    ],
+    "final_pos": [
+      -0.11784924957674602,
+      0.10184441001328373,
+      0.8057330499589307
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.003316019232166186,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004026383297671486,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.002819096531218217,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 1.9506249667128512,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4951804550031822,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 1.9506249667127968,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 0,
+    "scene_objects": [
+      "banana"
+    ]
+  },
+  {
+    "object": "banana",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.4113878217066424,
+    "spawn_pos": [
+      -0.12018013815995227,
+      0.07911837090291479,
+      0.8335
+    ],
+    "final_pos": [
+      -0.1221101613208482,
+      0.07800594592062741,
+      0.8057950298652458
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0014298657676352928,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.00266013347192883,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0023699796669821526,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925195,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114443,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092572,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 1,
+    "scene_objects": [
+      "banana"
+    ]
+  },
+  {
+    "object": "banana",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.40158545232277343,
+    "spawn_pos": [
+      -0.06454464637883416,
+      0.12019947977296014,
+      0.8335
+    ],
+    "final_pos": [
+      -0.06641288558420191,
+      0.11906845135611867,
+      0.8055366137303703
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0010203567011250923,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0017785991440490002,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0024140277486283993,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925776,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.49986785411444,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092604,
+        "seed_source": "primary"
+      }
+    },
+    "trial_id": 2,
+    "scene_objects": [
+      "banana"
+    ]
+  },
+  {
+    "object": "banana",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.42687484620764654,
+    "spawn_pos": [
+      -0.09860391086118443,
+      0.11680617075749998,
+      0.8335
+    ],
+    "final_pos": [
+      -0.10102819832258678,
+      0.1222894844625912,
+      0.8057722940905525
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0020603552783551343,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0031268985249964893,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.002643223210607106,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.135401007457001,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144723,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.135401007457084,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 3,
+    "scene_objects": [
+      "banana"
+    ]
+  },
+  {
+    "object": "banana",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.3857043908471483,
+    "spawn_pos": [
+      -0.05688869522715462,
+      0.10566996546154254,
+      0.8335
+    ],
+    "final_pos": [
+      -0.05863004134109028,
+      0.10487451511023715,
+      0.8056196667227683
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0008715685255161599,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0018328460423124846,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.002446176299741435,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925576,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144321,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925914,
+        "seed_source": "primary"
+      }
+    },
+    "trial_id": 4,
+    "scene_objects": [
+      "banana"
+    ]
+  }
+]

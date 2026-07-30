@@ -1,0 +1,1302 @@
+[
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": false,
+    "dist_to_tray": 0.16555215172975002,
+    "spawn_pos": [
+      -0.05135308477617574,
+      0.058694821812765884,
+      0.8816047386778808
+    ],
+    "final_pos": [
+      0.20153968473723918,
+      -0.024850520380731118,
+      0.8898524467991062
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.6534747742418154,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0031459307439414778,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.007235639328570562,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.7166556890656065,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.0013551147127957822,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.08826172994596718,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.120091345286505,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114466,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1200913452864873,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": 2.1192984613542,
+    "object_H": 0.1075,
+    "trial_id": 5000
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.02144889607433006,
+    "spawn_pos": [
+      -0.05943584579892055,
+      0.18442650356658818,
+      0.8816047386778965
+    ],
+    "final_pos": [
+      0.20752608130908554,
+      -0.17763506503232895,
+      0.8947219824891002
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.8366009962802722,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.1885346155428288,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.011792138902835524,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.8233410458610172,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.0037502641112408504,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.2891310635225561,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092587,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144135,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092572,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": -2.526966536790183,
+    "object_H": 0.1075,
+    "trial_id": 5001
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.02730650312412651,
+    "spawn_pos": [
+      -0.0008907989863439431,
+      0.07354888746642806,
+      0.8816047386779126
+    ],
+    "final_pos": [
+      0.16878010285518785,
+      -0.17281392778929625,
+      0.8820703427295118
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.9131677095976272,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.28430485940422656,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.005360959662106042,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.4994998207067803,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.003423913200922707,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.34187582650371634,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925448,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144068,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092572,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": -1.727824638870448,
+    "object_H": 0.1075,
+    "trial_id": 5002
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.030321790509463806,
+    "spawn_pos": [
+      -0.0376658202340131,
+      0.05942323626629262,
+      0.8816047386779391
+    ],
+    "final_pos": [
+      0.21551496539052659,
+      -0.17361715773072206,
+      0.8956893861208383
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.6728906958656065,
+        "seed_source": "primary"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.003055685468218661,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.007210426010863604,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.874879457671806,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.001483445659949963,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.2024088838101455,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092571,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144506,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925923,
+        "seed_source": "primary"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": -3.1400275890100615,
+    "object_H": 0.1075,
+    "trial_id": 5003
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.017312110977855955,
+    "spawn_pos": [
+      -0.13770587071791737,
+      0.08470851909502902,
+      0.8816047386778351
+    ],
+    "final_pos": [
+      0.20445799279086083,
+      -0.18047762472021728,
+      0.887050513113954
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 2.582730993260947,
+        "seed_source": "primary"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.3305423768195292,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004253441441015116,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 1.1741267815397136,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.0013548124288517388,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.004241205887021249,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925745,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144135,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925643,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": -0.7014368422947673,
+    "object_H": 0.1075,
+    "trial_id": 5004
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.02640574836695171,
+    "spawn_pos": [
+      -0.1286193855809213,
+      -0.020345799176215148,
+      0.8816047386779116
+    ],
+    "final_pos": [
+      0.19032875701836596,
+      -0.16359629825873562,
+      0.8876149977554534
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 2.981710010636258,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.6095046975942853,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004294593741653512,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.9934343407644345,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.0021795569247170903,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.25511108424037643,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925905,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541145116,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925825,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": 0.9998123734513572,
+    "object_H": 0.1075,
+    "trial_id": 5005
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.04068828927985671,
+    "spawn_pos": [
+      -0.13440276842375481,
+      0.1079757903248678,
+      0.8816047386778968
+    ],
+    "final_pos": [
+      0.21175702547295305,
+      -0.15561731937311207,
+      0.9008210488239778
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 1.7706218067570783,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.04270899958009081,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.00997904864569589,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.6547007171284663,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.0012358875371004726,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.004127588827660426,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092567,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144677,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925634,
+        "seed_source": "primary"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": 0.7304335689990266,
+    "object_H": 0.1075,
+    "trial_id": 5006
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.0302533180343367,
+    "spawn_pos": [
+      -0.03262189052461478,
+      -0.02145958734515297,
+      0.881604738677889
+    ],
+    "final_pos": [
+      0.21676401537317963,
+      -0.20410498965582488,
+      0.887603988498877
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.7066960189341818,
+        "seed_source": "primary"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.005822978064250189,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.008652534116017433,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.6943561151747462,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.0018192427002974908,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.19035054813984514,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925776,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144623,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925665,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": -1.0438352229796635,
+    "object_H": 0.1075,
+    "trial_id": 5007
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.051913719962727825,
+    "spawn_pos": [
+      -0.15170458407674087,
+      0.013934006528978934,
+      0.8816047386778894
+    ],
+    "final_pos": [
+      0.14853066384678948,
+      -0.1587697505712722,
+      0.8958366669945932
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 4.426296856730963,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 1.926420054550108,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0037325784664255105,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.8477113310938388,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.00140950497180978,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 1.534931403598534,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925368,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541143944,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925163,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": -2.3323182067139583,
+    "object_H": 0.1075,
+    "trial_id": 5008
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": false,
+    "dist_to_tray": 0.14207768747884608,
+    "spawn_pos": [
+      0.007989155518128314,
+      0.07932541859092193,
+      0.8816047386778839
+    ],
+    "final_pos": [
+      0.17610425629819412,
+      -0.048603473924178825,
+      0.8816062757093575
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.9769792253168024,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.36455793246265644,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.007129994277656488,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.49016513073469065,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.004406309066598553,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.4342508345245257,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1268945533473946,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144603,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.126894553347425,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": 2.047213912652708,
+    "object_H": 0.1075,
+    "trial_id": 5009
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.026448484555408026,
+    "spawn_pos": [
+      -0.06108692685259903,
+      0.02251467994682522,
+      0.8816047386778904
+    ],
+    "final_pos": [
+      0.21619056418619145,
+      -0.18631534494333016,
+      0.8876059030670308
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.6136248877738125,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0044543587057915114,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.008744528802368479,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.7030924563628406,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.001467905362718793,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.008921506116090635,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925865,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144144,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092571,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": -0.7689735715097313,
+    "object_H": 0.1075,
+    "trial_id": 5010
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.021069738900008406,
+    "spawn_pos": [
+      -0.15336114281325008,
+      0.01294593196766498,
+      0.881604738677904
+    ],
+    "final_pos": [
+      0.2013693653382829,
+      -0.17226101950169687,
+      0.8954456796988458
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 4.52795920141659,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 2.019824112372625,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0038494686999721965,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.6346411796058072,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.001515473611208086,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 1.715170623264282,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925434,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114453,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925816,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": -2.862239430543176,
+    "object_H": 0.1075,
+    "trial_id": 5011
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": false,
+    "dist_to_tray": 0.45214274132813354,
+    "spawn_pos": [
+      0.020415613282746915,
+      0.11452342462276456,
+      0.8816047386779763
+    ],
+    "final_pos": [
+      -0.06789617825804185,
+      0.18137934753512583,
+      0.8205716640133375
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 1.1178026915757684,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.5468779196264735,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0014465267073388872,
+        "seed_source": "fallback"
+      },
+      "pre_close_drift_cm": 8.386633693705242,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.0015891134007241367,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.009553698574755552,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925745,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114423,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925994,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": 2.9169827363136127,
+    "object_H": 0.1075,
+    "trial_id": 5012
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.03657310834772849,
+    "spawn_pos": [
+      -0.11377170684877261,
+      0.11830947855066413,
+      0.8816047386779077
+    ],
+    "final_pos": [
+      0.22419334658000403,
+      -0.1770228160267948,
+      0.895557606352551
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.5631029950940925,
+        "seed_source": "primary"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0012277559535958434,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.007959466093816115,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 1.0226577908304275,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.000939556258522584,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.007558073074937913,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925705,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144028,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925803,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": -2.8907578431687964,
+    "object_H": 0.1075,
+    "trial_id": 5013
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": false,
+    "dist_to_tray": 0.17113156535922078,
+    "spawn_pos": [
+      -0.08422203150125199,
+      0.08790418819344845,
+      0.8816047386778982
+    ],
+    "final_pos": [
+      0.2111642617951072,
+      -0.020182195618464623,
+      0.8901209088429328
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.5940541033977944,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.002888751454006597,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.007855761053348228,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.8747925928406937,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.0014196408967575708,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.008808128185645785,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1141545457929194,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144583,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.114154545792954,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": 2.170602541731766,
+    "object_H": 0.1075,
+    "trial_id": 5014
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.03309850984281167,
+    "spawn_pos": [
+      -0.02335870671500026,
+      0.14648755642836583,
+      0.8816047386778652
+    ],
+    "final_pos": [
+      0.21851336422332435,
+      -0.17319228110412516,
+      0.8957790653178715
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.9209652643341498,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.2938926347760045,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0055646275746863115,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.7294843234055078,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.004066250211472006,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.38061556349109005,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925643,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144443,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925634,
+        "seed_source": "primary"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": -2.8514508993930363,
+    "object_H": 0.1075,
+    "trial_id": 5015
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": false,
+    "dist_to_tray": 0.20999760231880232,
+    "spawn_pos": [
+      0.006655239587133744,
+      0.027260898150597235,
+      0.8816047386779512
+    ],
+    "final_pos": [
+      0.2076246432800515,
+      0.019256696258200517,
+      0.8439747790573278
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.9090093467724464,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.29159869926095056,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.005515716092625484,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.5466970021543245,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.003649682853079595,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.370472461033977,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.0920420517498783,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144106,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.092042051749872,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": 2.3115669510591457,
+    "object_H": 0.1075,
+    "trial_id": 5016
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": false,
+    "dist_to_tray": 0.4044539427410368,
+    "spawn_pos": [
+      -0.00039672392429956254,
+      0.1122708376507818,
+      0.8816047386778707
+    ],
+    "final_pos": [
+      0.10476965899416585,
+      0.2053716995066783,
+      0.8360956359206531
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.9367021298547926,
+        "seed_source": "primary"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.36737799375578,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0038819515244624134,
+        "seed_source": "fallback"
+      },
+      "pre_close_drift_cm": 4.714362761805656,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.001476623566100073,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.8466072829460214,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 1.8437518844527843,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4485361247591533,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 1.8437518844527483,
+        "seed_source": "primary"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": 2.8920754568892164,
+    "object_H": 0.1075,
+    "trial_id": 5017
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.031230972424722333,
+    "spawn_pos": [
+      -0.009971710854459997,
+      0.11406226949461733,
+      0.881604738677906
+    ],
+    "final_pos": [
+      0.21438369978155192,
+      -0.1704856764514649,
+      0.8957307479180338
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.9252727683136905,
+        "seed_source": "fallback"
+      },
+      "approach": {
+        "converged": false,
+        "err_cm": 0.29917779794862726,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.005677758836573,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.7527046421051147,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.004212804357589541,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.39492713047781824,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530926025,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144672,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925825,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": -2.7636844313556197,
+    "object_H": 0.1075,
+    "trial_id": 5018
+  },
+  {
+    "object": "mustard",
+    "strategy": "oriented",
+    "candidate_selection": null,
+    "noise_model": null,
+    "success": true,
+    "dist_to_tray": 0.049113429385446966,
+    "spawn_pos": [
+      -0.04681862519244951,
+      -0.008258951700924048,
+      0.8816047386779011
+    ],
+    "final_pos": [
+      0.1561571152310905,
+      -0.15440803325864672,
+      0.8987864436615318
+    ],
+    "phases": {
+      "transit_high": {
+        "converged": false,
+        "err_cm": 0.6503512961507792,
+        "seed_source": "primary"
+      },
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0021130989087162614,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.007115085479986689,
+        "seed_source": "primary"
+      },
+      "pre_close_drift_cm": 0.5741420029293107,
+      "descend_refresh": {
+        "converged": true,
+        "err_cm": 0.0009472830700481888,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.008869213527657167,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.14718135309257,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144443,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925585,
+        "seed_source": "fallback"
+      }
+    },
+    "candidates": null,
+    "grasp_yaw": 0.935523688041859,
+    "object_H": 0.1075,
+    "trial_id": 5019
+  }
+]

@@ -1,0 +1,262 @@
+[
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.4223911168662757,
+    "spawn_pos": [
+      -0.13753967753716875,
+      0.07515471682857916,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.13774544115996112,
+      0.07645296284035234,
+      0.9084793908127562
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 2.1366370447825194,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0006903090953655695,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 2.136637044782512,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092537,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144406,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092577,
+        "seed_source": "primary"
+      }
+    },
+    "trial_id": 0,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.37222887222487244,
+    "spawn_pos": [
+      -0.08735301307295268,
+      0.05825027389084582,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.08881258164165415,
+      0.05661280914850386,
+      0.9084815193319935
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.36681073156060257,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0049936696922017,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.3668107315606016,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092547,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114427,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092589,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 1,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.5279785699743416,
+    "spawn_pos": [
+      -0.028878790916857314,
+      0.10627221680980344,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.17903823641396183,
+      0.18758727523133434,
+      0.8583899889028813
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.618694524210566,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.002921032959084678,
+        "seed_source": "fallback"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.6186945242105838,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 1.9875031782147663,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144843,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925816,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 2,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.3978110452755396,
+    "spawn_pos": [
+      -0.07618342862020662,
+      0.10691860164613613,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.0731074428745189,
+      0.10837577188379283,
+      0.9083587707907309
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.4223592490614487,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004290395219029632,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.4223592490614191,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1447182306857298,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144335,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925825,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 3,
+    "scene_objects": [
+      "cracker"
+    ]
+  },
+  {
+    "object": "cracker",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.3708806875843844,
+    "spawn_pos": [
+      -0.13748800279020254,
+      0.035911260610575334,
+      0.9416000000000001
+    ],
+    "final_pos": [
+      -0.08447045613115464,
+      0.05943627068696661,
+      0.9084025177084784
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 2.746999545949676,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0010322685379633703,
+        "seed_source": "fallback"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 2.7469995459496674,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.138748378392891,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541145025,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1387483783928745,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 4,
+    "scene_objects": [
+      "cracker"
+    ]
+  }
+]

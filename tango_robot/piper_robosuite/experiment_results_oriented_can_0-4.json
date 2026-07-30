@@ -1,0 +1,272 @@
+[
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.33289972093587417,
+    "spawn_pos": [
+      -0.08556083823200944,
+      0.001579666197946701,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.08062084116100006,
+      0.0038725987046536554,
+      0.8577304254573039
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.002775647548417955,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0031063615751730084,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.003136983396214039,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925887,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144788,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092606,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 0,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.532043527367648,
+    "spawn_pos": [
+      -0.17306730672463708,
+      0.19856154265193401,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.17205404277014325,
+      0.1998553387188695,
+      0.8577199516077948
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.002376637824790921,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.002776025504556483,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0030348686013161,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925408,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144614,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925665,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 1,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.3263345853243101,
+    "spawn_pos": [
+      -0.07863720856172451,
+      -0.002611343618168588,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.07705480278073933,
+      -0.0024473570153439226,
+      0.8577351991500334
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0012452236727813538,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.002498332051620767,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0029850382866746126,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925856,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144312,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092571,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 2,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.4759945928987979,
+    "spawn_pos": [
+      -0.1058974517904904,
+      0.18495373020684477,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.10381502574282425,
+      0.18449109884833828,
+      0.8577374533019277
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0016393112034559663,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0028328226643307497,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0033138143316541646,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.143075459076627,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144355,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.143075459076661,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 3,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  },
+  {
+    "object": "can",
+    "strategy": "oriented",
+    "success": false,
+    "dist_to_tray": 0.33606036257613964,
+    "spawn_pos": [
+      -0.1862885508066664,
+      -0.031807428481195874,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.11232273450057716,
+      -0.04324329146883957,
+      0.857727129880237
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 1.287173465615181,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.00344496847841022,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 1.2871734656151903,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.136779115266914,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144725,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1367791152669118,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 4,
+    "scene_objects": [
+      "pear",
+      "can",
+      "mustard"
+    ]
+  }
+]

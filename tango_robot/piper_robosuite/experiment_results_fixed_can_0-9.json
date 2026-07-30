@@ -1,0 +1,492 @@
+[
+  {
+    "object": "can",
+    "strategy": "fixed",
+    "success": false,
+    "dist_to_tray": 0.29314383777407277,
+    "spawn_pos": [
+      -0.007247521309757643,
+      0.028142079125091417,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.0056051511681566345,
+      0.028339035587763094,
+      0.8577387396061056
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.005589477031626819,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004235079712896533,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.004359017664674493,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092543,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144534,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925643,
+        "seed_source": "primary"
+      }
+    },
+    "trial_id": 0
+  },
+  {
+    "object": "can",
+    "strategy": "fixed",
+    "success": false,
+    "dist_to_tray": 0.5293145906124799,
+    "spawn_pos": [
+      -0.169207741476664,
+      0.19826942144894688,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.1678123304459774,
+      0.2000567548653348,
+      0.8577193884844915
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.005056096233333681,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0031025860897313886,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.002915894730055978,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925767,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144344,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092565,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 1
+  },
+  {
+    "object": "can",
+    "strategy": "fixed",
+    "success": false,
+    "dist_to_tray": 0.35450083045089087,
+    "spawn_pos": [
+      -0.17530252487182457,
+      -0.015715240287251644,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.11994477539060341,
+      -0.017938746376647316,
+      0.8577295676570472
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 1.1651161422060003,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004330724390890535,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 1.165116142206025,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925714,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144446,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925554,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 2
+  },
+  {
+    "object": "can",
+    "strategy": "fixed",
+    "success": false,
+    "dist_to_tray": 0.3932899856551512,
+    "spawn_pos": [
+      -0.07050990133403306,
+      0.10586121369593199,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.06885407798266092,
+      0.10609386877876335,
+      0.8577199985705238
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.004092485202549266,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.003657184606782187,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.003513636440061473,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.14718135309258,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541143986,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925763,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 3
+  },
+  {
+    "object": "can",
+    "strategy": "fixed",
+    "success": false,
+    "dist_to_tray": 0.46203133160704407,
+    "spawn_pos": [
+      -0.1264299198184809,
+      0.1465669997175997,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.1251055154811464,
+      0.1479074806806433,
+      0.8577287051923647
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0041740117807703295,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0029250658049363317,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0029420086478599413,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925377,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144457,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925545,
+        "seed_source": "primary"
+      }
+    },
+    "trial_id": 4
+  },
+  {
+    "object": "can",
+    "strategy": "fixed",
+    "success": false,
+    "dist_to_tray": 0.49895272193097473,
+    "spawn_pos": [
+      -0.18905660714676334,
+      0.13444081890419365,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.18638411797917695,
+      0.13754971295265334,
+      0.8577442939848239
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.493008574593481,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.004782281179701852,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.4930085745934801,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.1471813530925883,
+        "seed_source": "fallback"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.499867854114446,
+        "seed_source": "primary"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925794,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 5
+  },
+  {
+    "object": "can",
+    "strategy": "fixed",
+    "success": false,
+    "dist_to_tray": 0.5136478502544763,
+    "spawn_pos": [
+      -0.1744594279362654,
+      0.17142455460636333,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.17248687864660803,
+      0.17391946482715692,
+      0.8577218058758953
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.005022734852750883,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0031226197554406164,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.0008427400920022188,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092528,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144157,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092571,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 6
+  },
+  {
+    "object": "can",
+    "strategy": "fixed",
+    "success": false,
+    "dist_to_tray": 0.4625956551088391,
+    "spawn_pos": [
+      -0.11263118950266203,
+      0.15966680230306154,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.1113231730829147,
+      0.16099727276550152,
+      0.8577267759284352
+    ],
+    "phases": {
+      "approach": {
+        "converged": true,
+        "err_cm": 0.0037051664961178714,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.003050956548893081,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": true,
+        "err_cm": 0.003117153847413624,
+        "seed_source": "primary"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092572,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144244,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.147181353092571,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 7
+  },
+  {
+    "object": "can",
+    "strategy": "fixed",
+    "success": false,
+    "dist_to_tray": 0.37525076569830473,
+    "spawn_pos": [
+      -0.13082577344418223,
+      0.009543299385115361,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.12771389377067124,
+      0.009677286796076528,
+      0.8568421569865716
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 0.24951424697042657,
+        "seed_source": "primary"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.002438764504511672,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 0.24951424697042543,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092582,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144381,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925665,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 8
+  },
+  {
+    "object": "can",
+    "strategy": "fixed",
+    "success": false,
+    "dist_to_tray": 0.5028470215163791,
+    "spawn_pos": [
+      -0.17632511027781905,
+      0.05348099646527572,
+      0.8883000000000001
+    ],
+    "final_pos": [
+      -0.17902418612017376,
+      0.1515790934852968,
+      0.8361256872139424
+    ],
+    "phases": {
+      "approach": {
+        "converged": false,
+        "err_cm": 1.0637794321349208,
+        "seed_source": "fallback"
+      },
+      "descend": {
+        "converged": true,
+        "err_cm": 0.0038669485766412762,
+        "seed_source": "primary"
+      },
+      "lift": {
+        "converged": false,
+        "err_cm": 1.0637794321349305,
+        "seed_source": "fallback"
+      },
+      "transit_above_tray": {
+        "converged": false,
+        "err_cm": 2.147181353092599,
+        "seed_source": "primary"
+      },
+      "lower_into_tray": {
+        "converged": false,
+        "err_cm": 1.4998678541144408,
+        "seed_source": "fallback"
+      },
+      "retract": {
+        "converged": false,
+        "err_cm": 2.1471813530925745,
+        "seed_source": "fallback"
+      }
+    },
+    "trial_id": 9
+  }
+]
