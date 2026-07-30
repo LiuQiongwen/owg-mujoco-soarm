@@ -1,0 +1,18 @@
+{
+  "object": "mustard",
+  "n_trials": 60,
+  "failure_type_distribution": {
+    "no_contact": 36,
+    "success": 24
+  },
+  "n_perturbed_success": 24,
+  "n_recovery_triggered": 36,
+  "n_recovery_success": 30,
+  "recovery_success_rate": 0.8333333333333334,
+  "n_abnormal_termination": 0,
+  "perturbation_count_stats": {
+    "min": 12,
+    "max": 29,
+    "mean": 20.45
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "object": "cracker",
+  "n_trials": 13,
+  "failure_type_distribution": {
+    "no_contact": 11,
+    "weld_no_lift": 2
+  },
+  "n_perturbed_success": 0,
+  "n_recovery_triggered": 13,
+  "n_recovery_success": 0,
+  "recovery_success_rate": 0.0,
+  "n_abnormal_termination": 0,
+  "perturbation_count_stats": {
+    "min": 8,
+    "max": 24,
+    "mean": 18.76923076923077
+  }
+}

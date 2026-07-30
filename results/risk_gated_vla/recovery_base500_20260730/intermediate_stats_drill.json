@@ -1,0 +1,19 @@
+{
+  "object": "drill",
+  "n_trials": 60,
+  "failure_type_distribution": {
+    "success": 20,
+    "no_contact": 28,
+    "weld_no_lift": 12
+  },
+  "n_perturbed_success": 20,
+  "n_recovery_triggered": 40,
+  "n_recovery_success": 17,
+  "recovery_success_rate": 0.425,
+  "n_abnormal_termination": 0,
+  "perturbation_count_stats": {
+    "min": 13,
+    "max": 28,
+    "mean": 20.033333333333335
+  }
+}
