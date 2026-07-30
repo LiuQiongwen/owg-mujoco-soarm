@@ -1262,6 +1262,24 @@ class EnvironmentSoArm:
             return len(cf) > 0 and len(cm) > 0
         return len(cf) > 0 or len(cm) > 0
 
+    def update_policy_grasp_attachment(self, obj_id: int) -> bool:
+        """Apply the production bilateral-contact attachment during raw policy control.
+
+        ``env.grasp()`` performs this check inside its scripted primitive. ACT
+        and VLA policies bypass that primitive and command joints directly, so
+        their rollouts must call this after physics steps. Contacts are required
+        between *both* jaws and the same target object; jaw-table or contacts on
+        different objects cannot trigger attachment.
+        """
+        if self._welded_obj_id == obj_id:
+            return True
+        obj_body = self.model.body(f"obj_{self._obj_pool_slot(obj_id)}").id
+        fixed = self._contacts_on_bodies([self._jaw_body_id], {obj_body})
+        moving = self._contacts_on_bodies([self._jaw_mv_body_id], {obj_body})
+        if fixed and moving:
+            return self._attach_obj(obj_id)
+        return False
+
     def check_target_reached(self, obj_id: int) -> bool:
         qpos = self._obj_qpos(self._obj_pool_slot(obj_id))
         x, y = qpos[0], qpos[1]
@@ -2030,8 +2048,13 @@ class EnvironmentSoArm:
                       f"  dist={_c.dist:.4f}")
 
         contact_ids  = self.check_grasped_id()
-        contact      = bool(contact_ids)
         metrics_post = self.get_grasp_debug_metrics()
+        # check_grasped_id() reports contact with either jaw.  The documented
+        # physics-weld protocol requires both jaws to contact the object before
+        # kinematic attachment; otherwise a one-sided bump becomes a false
+        # successful grasp.  Use the explicit bilateral metric as the gate and
+        # retain contact_ids only to identify which object may be attached.
+        contact      = bool(metrics_post.get("bilateral_contacts", 0))
         print(f"  [grasp/physics_weld] post-close metrics: {metrics_post}")
 
         # Detect jaw-table contact (fixed jaw sphere touching table surface).
@@ -2048,7 +2071,7 @@ class EnvironmentSoArm:
         # Kinematic weld for lift: sphere colliders provide insufficient friction
         # to lift objects against gravity.  Attach kinematically when bilateral
         # contacts confirm the jaws straddle the object; release if lift fails.
-        weld_obj      = contact_ids[0] if contact_ids else None
+        weld_obj      = contact_ids[0] if contact and contact_ids else None
         weld_triggered = weld_obj is not None
         if weld_triggered:
             self._attach_obj(weld_obj)
