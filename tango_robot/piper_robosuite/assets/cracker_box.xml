@@ -1,0 +1,20 @@
+<mujoco model="cracker_box">
+  <asset>
+    <mesh name="cracker_vis_mesh" file="/lena/projects/OWG-main/tango_robot/assets/ycb_objects/YcbCrackerBox/textured_simple_reoriented.obj" scale="1 1 1"/>
+    <mesh name="cracker_col_mesh" file="/lena/projects/OWG-main/tango_robot/assets/ycb_objects/YcbCrackerBox/collision_vhacd.obj" scale="1 1 1"/>
+    <texture name="tex-cracker" type="2d" file="/lena/projects/OWG-main/tango_robot/assets/ycb_objects/YcbCrackerBox/texture_map.png"/>
+    <material name="mat-cracker" texture="tex-cracker" specular="0.1" shininess="0.1"/>
+  </asset>
+  <worldbody>
+    <body>
+      <body name="object">
+        <geom mesh="cracker_vis_mesh" type="mesh" material="mat-cracker" group="1" contype="0" conaffinity="0"/>
+        <geom mesh="cracker_col_mesh" type="mesh" group="0" condim="4" friction="1.8 0.05 0.01" mass="0.411"
+              solimp="0.998 0.998 0.001" solref="0.001 1"/>
+      </body>
+      <site rgba="0 0 0 0" size="0.005" pos="0 0 -0.1116" name="bottom_site"/>
+      <site rgba="0 0 0 0" size="0.005" pos="0 0 0.1019" name="top_site"/>
+      <site rgba="0 0 0 0" size="0.005" pos="0.1085 0 0" name="horizontal_radius_site"/>
+    </body>
+  </worldbody>
+</mujoco>
