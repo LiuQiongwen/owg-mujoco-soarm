@@ -35,6 +35,7 @@ from tango_robot.camera import Camera
 from tango_robot.env import Environment
 from tango_robot.objects import YcbObjects
 from third_party.grconvnet import load_grasp_generator
+from causal_validity_audit.commit_marker import CAUSAL_VALIDITY_COMMIT_POINT
 
 # ── experiment config ────────────────────────────────────────────────────────
 SEEDS        = list(range(1, 26))
@@ -294,6 +295,12 @@ def run_trial(
     ranking_changed_grasp = (stage == 4
                              and grasp_selected_idx is not None
                              and grasp_selected_idx != 0)
+
+    # CAUSAL VALIDITY COMMIT POINT: nothing above this line has executed a
+    # grasp attempt. obj_grasps/prompt/scene_id are all fixed as of here;
+    # `success` is not yet known -- it gets computed below from
+    # env.put_obj_in_tray(), the actual physical grasp/place attempt.
+    CAUSAL_VALIDITY_COMMIT_POINT()
 
     # execute
     grasped_obj_id   = None
