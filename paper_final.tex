@@ -123,33 +123,31 @@ failed, and what -- among several things we tried -- actually helped.
 
 We originally built a propose-then-rank pipeline combining
 \textbf{Optimal-Transport Conditional Flow Matching} (OT-CFM)
-\cite{lipman2022cfm,tong2023otcfm} as the candidate generator with an
-LGGSN geometric reranker, trained on 2{,}853 physically-executed successful
-grasps across seven YCB objects. An initial 175-trial evaluation
-(MuJoCo/SO-ARM101) appeared to show a large, significant gain over
-random-CoM sampling with the same reranker. Before finalizing this result we
-audited the evaluation harness end to end and found a genuine, silent bug:
-the generator's inference-time sampling call never received a per-trial
-random seed, so it drew from whatever state a module-level
-\texttt{torch.manual\_seed(42)} left behind at process import -- meaning
-every trial, regardless of its nominal \texttt{--seed}, executed close to
-the same candidate pose. Fixing this (\cref{sec:experiments}) and
-re-evaluating cleanly reversed the headline result: OT-CFM is
-\emph{significantly worse} than random-CoM sampling, not better.
+\cite{lipman2022cfm,tong2023otcfm} as the candidate generator with an LGGSN
+geometric reranker, trained on 2{,}853 physically-executed successful grasps
+across seven YCB objects. An initial 175-trial evaluation appeared to show a
+large, significant gain over random-CoM sampling with the same reranker.
+Before finalizing this we audited the harness end to end and found a
+genuine, silent bug: the generator's inference-time sampling call never
+received a per-trial random seed, so it drew from whatever state a
+module-level \texttt{torch.manual\_seed(42)} left behind at process import
+-- every trial, regardless of its nominal \texttt{--seed}, executed close to
+the same candidate pose. Fixing this and re-evaluating cleanly reversed the
+headline result: OT-CFM is \emph{significantly worse} than random-CoM
+sampling, not better.
 
 Rather than discard the pipeline, we used it as a diagnostic instrument.
 Controlled comparisons (\cref{sec:ablation}) isolate the cause to the OT
-coupling itself, not to conditional flow matching in general, and match a
-training/inference distribution-mismatch mechanism recently identified in
-the generative-modeling literature~\cite{cheng2025curse} -- to our knowledge
-the first demonstration that this mechanism degrades physically executed
-robot task success, rather than only a generation-quality proxy such as FID.
-We then tested an energy-based alternative motivated by Implicit Behavioral
+coupling itself, matching a training/inference distribution-mismatch
+mechanism recently identified in the generative-modeling
+literature~\cite{cheng2025curse} -- to our knowledge the first demonstration
+that this mismatch degrades physically executed task success, not only a
+generation-quality proxy such as FID. We then tested an energy-based
+alternative motivated by Implicit Behavioral
 Cloning~\cite{florence2021implicit}, found and fixed an analogous, textbook
-failure mode in our own first attempt (an inference-time search exploiting
-an undertrained model's blind spots), and show the corrected version reaches
-statistical parity with the baseline. Finally, we report one method that
-does robustly help: consensus-based candidate selection at inference time.
+failure in our own first attempt, and show the corrected version reaches
+statistical parity with baseline. Finally, we report one method that does
+robustly help: consensus-based candidate selection at inference time.
 
 \noindent\textbf{Contributions.}
 \begin{enumerate}
@@ -183,64 +181,48 @@ does robustly help: consensus-based candidate selection at inference time.
 \subsection{Grasp Quality Estimation and Generation}
 
 Classical grasp quality metrics such as those in Dex-Net~\cite{mahler2017dexnet}
-evaluate analytic contact stability, requiring known object geometry.
+evaluate analytic contact stability given known object geometry;
 GraspNet-1Billion~\cite{fang2020graspnet1b} and AnyGrasp~\cite{fang2023anygrasp}
-extend this to dense 3-D point clouds, but still assume access to full scene
-geometry at query time.
-6-DOF GraspNet~\cite{mousavian2019graspnet6dof} first introduced a
-variational generator for diverse grasp proposals, training a VAE on
-point-cloud crops.
-Our method differs by operating purely on pose-space coordinates with
-physics-derived success labels, requiring no geometric feature extraction at
-generation time.
+extend this to dense point clouds but still assume full scene geometry at
+query time. 6-DOF GraspNet~\cite{mousavian2019graspnet6dof} introduced a
+variational generator for diverse proposals from point-cloud crops. We
+instead operate purely on pose-space coordinates with physics-derived
+success labels, requiring no geometric feature extraction at generation time.
 
 \subsection{Generative Models for Grasping}
 
-GraspLDM~\cite{barad2023graspldm} applies latent diffusion in a VAE pose space,
-achieving diverse 6-DoF proposals from point clouds.
-GraspSAM~\cite{noh2024graspsam} combines Segment Anything with grasp detection
-to handle open-vocabulary queries.
-Neither work couples an explicit optimal-transport objective during
-training; we find, in contrast to what that design choice might suggest,
-that adding minibatch OT coupling is the specific change that hurts in our
-conditional, small-per-class setting, while removing it tracks the random
-baseline far more closely (\cref{sec:ablation}).
-Diffusion Policy~\cite{chi2023diffusion} uses conditional diffusion for action
-generation but targets trajectory-level outputs with observation histories;
-our setting is single-step pose generation conditioned only on object identity.
-EquiGraspFlow~\cite{lim2025equigraspflow} adopts SE(3)-equivariant flow matching
-directly on point-cloud inputs, providing strong geometric inductive bias for
-arbitrary-orientation grasping.
-Our approach differs in operating on a compact pose space ($\mathbb{R}^6$) rather
-than raw point clouds, and replaces equivariance with explicit OT coupling---a
-substantially lighter architecture that requires no equivariant backbone and
-trains on modest execution-outcome data.
+GraspLDM~\cite{barad2023graspldm} applies latent diffusion in a VAE pose
+space; GraspSAM~\cite{noh2024graspsam} combines Segment Anything with grasp
+detection for open-vocabulary queries. Neither couples an explicit
+optimal-transport objective during training; we find, in contrast to what
+that design choice might suggest, that adding minibatch OT coupling is the
+specific change that hurts in our conditional, small-per-class setting,
+while removing it tracks the random baseline far more closely
+(\cref{sec:ablation}). Diffusion Policy~\cite{chi2023diffusion} targets
+trajectory-level action outputs with observation histories; our setting is
+single-step pose generation conditioned only on object identity.
+EquiGraspFlow~\cite{lim2025equigraspflow} is a concurrent approach applying
+SE(3)-equivariant flow matching directly to point clouds; we instead operate
+on a compact pose space ($\mathbb{R}^6$) and use explicit OT coupling in
+place of equivariance -- a substantially lighter architecture needing no
+equivariant backbone.
 
-\subsection{Flow Matching}
+\subsection{Flow Matching and Grasp Reranking}
 
-Lipman~et~al.~\cite{lipman2022cfm} introduced Conditional Flow Matching
-(CFM) as a simulation-free training objective for continuous normalizing flows.
-Tong~et~al.~\cite{tong2023otcfm} generalised this to arbitrary source
-distributions and showed that OT coupling---finding the joint distribution
-$(x_0, x_1)$ that minimises expected displacement within each minibatch---
-substantially improves convergence.
-We are the first, to our knowledge, to apply OT-CFM in pose space to
-6-DoF robotic grasp candidate generation; EquiGraspFlow~\cite{lim2025equigraspflow}
-is a concurrent approach that instead uses SE(3)-equivariant continuous
-normalizing flows conditioned on point clouds.
-
-\subsection{Grasp Reranking}
-
-Geometric reranking of grasp candidates from learned features has been explored
-in DexGraspNet~2.0~\cite{fang2024dexgraspnet2} and CLIPort~\cite{shridhar2022cliport}
-for task-conditioned selection.
-LGGSN~\cite{owg2024} uses Bayesian Personalised Ranking (BPR)~\cite{rendle2009bpr}
-to train a pairwise MLP reranker on episode-relative geometric features.
-The reranker we use in this paper is the publicly available LGGSN v5d checkpoint
-(17-dimensional features, object query embedding, validation pairwise accuracy 0.750).
-Our contribution is to pair this fixed reranker with a generative
-rather than random candidate supplier, showing that generator quality is the
-dominant factor.
+Lipman~et~al.~\cite{lipman2022cfm} introduced Conditional Flow Matching as a
+simulation-free training objective for continuous normalizing flows.
+Tong~et~al.~\cite{tong2023otcfm} generalised this with minibatch OT
+coupling -- finding the joint $(x_0,x_1)$ distribution minimising expected
+displacement per minibatch -- which substantially improves convergence on
+\emph{unconditional} generation. We are, to our knowledge, first to apply
+OT-CFM in pose space to 6-DoF grasp candidate generation. For reranking,
+DexGraspNet~2.0~\cite{fang2024dexgraspnet2} and
+CLIPort~\cite{shridhar2022cliport} explore task-conditioned candidate
+selection; LGGSN~\cite{owg2024} instead trains a pairwise MLP via Bayesian
+Personalised Ranking~\cite{rendle2009bpr} on episode-relative geometric
+features. We use the public LGGSN v5d checkpoint (17-dim features, object
+query embedding, validation pairwise accuracy 0.750) unmodified throughout,
+isolating candidate-generator quality as the variable of interest.
 
 % =============================================================================
 \section{Method}
@@ -250,7 +232,7 @@ dominant factor.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\columnwidth]{figures/pipeline.pdf}
+  \includegraphics[width=0.85\columnwidth]{figures/pipeline.pdf}
   \caption{OT-CFM + LGGSN pipeline. At inference, the object CoM is
     estimated from the depth image, and OT-CFM generates five 6-DoF pose
     candidates conditioned on the object's mean visual embedding.
@@ -350,14 +332,11 @@ The best checkpoint is selected by lowest training loss.
 
 \noindent\textbf{Top-down constraint.}
 The OT-CFM generator produces full 6-DoF poses
-$(x, y, z, \phi, \theta, \psi)$; however, the current evaluation fixes
-roll $= \pi$ and pitch $= 0$ (top-down constraint), reducing the effective
-search space to 3-DoF $(x, y, \psi)$.
-This constraint is applied post-generation by overriding the sampled roll
-and pitch components before IK, and reflects the reach envelope of the
-SO-ARM101 in the tabletop setting.
-Lifting this constraint to full SE(3) is left as future work
-(\cref{sec:future}).
+$(x, y, z, \phi, \theta, \psi)$; the current evaluation fixes roll $=\pi$
+and pitch $=0$ (top-down constraint), reducing the effective search space to
+3-DoF $(x,y,\psi)$, applied post-generation by overriding the sampled roll
+and pitch before IK, reflecting the SO-ARM101's tabletop reach envelope.
+Lifting this to full SE(3) is left as future work (\cref{sec:future}).
 
 At inference, we draw $N{=}5$ noise samples $x_0^{(i)} \sim \mathcal{N}(0, I_6)$
 and integrate the learned ODE for 20 Euler steps:
@@ -383,23 +362,19 @@ The vertical coordinate $z$ uses the live CoM height plus a fixed approach margi
 
 Having found that OT coupling specifically degrades candidate generation
 (\cref{sec:experiments}), we tested a different paradigm rather than only
-patching the flow-matching training recipe: an implicit, energy-based model
-(EBM) that scores candidate poses directly, motivated by Implicit
-Behavioral Cloning~\cite{florence2021implicit} and its grasp-specific
-descendant~\cite{singh2024cgdf}, both of which report that implicit/EBM
-policies are more sample-efficient than explicit generators on small,
-multimodal, discontinuous action distributions -- exactly our regime
-($\sim$400 examples/object).
-
-\noindent\textbf{Why an EBM sidesteps the OT-coupling failure.} An explicit
-generator (CFM, diffusion) must learn a full noise-to-data \emph{trajectory}
-that is well-behaved across the whole conditioning set; minibatch OT
-coupling is one way of regularizing that trajectory, and \cref{sec:ablation}
-shows it backfires under our small per-condition data budget. An EBM instead
-only needs to learn a scalar compatibility score
-$E_\theta(\text{pose}, c) \in \mathbb{R}$ from contrastive
-success/failure labels -- no noise-to-data pairing of any kind is involved,
-so there is no coupling mechanism to get wrong.
+patching the flow-matching recipe: an implicit, energy-based model (EBM)
+that scores candidate poses directly, motivated by Implicit Behavioral
+Cloning~\cite{florence2021implicit} and its grasp-specific
+descendant~\cite{singh2024cgdf}, both reporting implicit/EBM policies more
+sample-efficient than explicit generators on small, multimodal,
+discontinuous action distributions -- exactly our regime ($\sim$400
+examples/object). An EBM sidesteps the OT-coupling failure structurally: an
+explicit generator must learn a full noise-to-data \emph{trajectory}
+regularized (in part) by OT coupling, which \cref{sec:ablation} shows
+backfires under our small per-condition budget; an EBM instead only learns a
+scalar compatibility score $E_\theta(\text{pose}, c) \in \mathbb{R}$ from
+contrastive labels -- no noise-to-data pairing, so no coupling mechanism to
+get wrong.
 
 \noindent\textbf{Model and training data.} $E_\theta$ is a 4-layer MLP
 scoring $(x, y, \sin\psi, \cos\psi, c) \in \mathbb{R}^{260}$ (the same
@@ -409,22 +384,21 @@ label$=$1 (physically successful) rows as positives and 4{,}147 label$=$0
 (failed) rows as one negative source -- no new data collection.
 
 \noindent\textbf{A documented failure mode, and its fix.} A first version
-trained with plain binary cross-entropy against the static positive/negative
-labels, then sampled at inference via cross-entropy-method (CEM) search over
+trained with plain binary cross-entropy against static positive/negative
+labels, sampled at inference via cross-entropy-method (CEM) search over
 $(x,y,\psi)$ guided by $E_\theta$. This failed catastrophically (0--16\%
-physical success across three objects tested, \cref{sec:ablation}) --
-markedly worse than every other method we tried. Direct inspection showed
-why: CEM converged to a normalised pose $\sim$1.7 standard deviations from
-the training mean, where the model assigned an artificially high score
-(99\% confident) despite this joint region being essentially unconstrained
-by training data -- each marginal dimension looked plausible in isolation,
-but the specific combination was never taught to be low-scoring. This is
-precisely the failure Implicit Behavioral Cloning's training recipe is
-designed to prevent, and our naive version omitted the relevant piece: IBC
-does not train against a fixed negative set, but against negatives
-\emph{mined from the model's own current beliefs during training}, so any
-region the model starts to over-score is explicitly corrected before
-training ends.
+physical success across three objects, \cref{sec:ablation}) -- markedly
+worse than every other method tried. Direct inspection showed why: CEM
+converged to a normalised pose $\sim$1.7 standard deviations from the
+training mean, where the model assigned an artificially high score (99\%
+confident) despite this joint region being essentially unconstrained by
+training data -- each marginal dimension looked plausible in isolation, but
+the specific combination was never taught to be low-scoring. This is
+precisely the failure Implicit Behavioral Cloning's recipe is designed to
+prevent: IBC trains against negatives \emph{mined from the model's own
+current beliefs during training}, not a fixed set, so any region the model
+starts to over-score is explicitly corrected before training ends -- the
+piece our naive version omitted.
 
 We re-trained $E_\theta$ with this mechanism: an InfoNCE-style loss
 (softmax cross-entropy over $\{\text{positive}, \text{negatives}\}$ with the
@@ -447,13 +421,9 @@ from any change to the sampling algorithm itself.
 
 \subsection{LGGSN Reranker}
 
-We use the LGGSN v5d reranker~\cite{owg2024} without modification.
-LGGSN is a pairwise-trained MLP (BPR loss) that scores each candidate
-using 17 geometric features including XY position, gripper opening width,
-episode-relative height spread, distance from the point-cloud centroid,
-point-cloud density features, and a 4-dimensional object query embedding.
-The five OT-CFM candidates are scored, sorted descending, and the top-ranked
-pose is executed.
+We use the public LGGSN v5d reranker~\cite{owg2024} (\cref{sec:related})
+without modification: the five OT-CFM candidates are scored, sorted
+descending, and the top-ranked pose is executed.
 
 % =============================================================================
 \section{Experiments}
@@ -475,20 +445,18 @@ same LGGSN v5d reranker) produces 5 candidates per episode.
 
 \noindent\textbf{A confirmed evaluation bug, and how we responded to it.}
 An earlier version of this evaluation (175 trials, 25 seeds/object) never
-passed a per-trial seed into the generator's inference-time sampling call.
-Because that call imports \texttt{train\_cfm\_grasp}, which set
+passed a per-trial seed into the generator's inference-time sampling call;
+because that call imports \texttt{train\_cfm\_grasp}, which set
 \texttt{torch.manual\_seed(42)} at \emph{module} level, every trial in a
 freshly started process drew noise from whatever state that fixed seed left
-behind at import time, independent of the trial's nominal \texttt{--seed} --
+behind at import time, regardless of the trial's nominal \texttt{--seed} --
 so 25 nominally distinct trials per object executed close to the same
 candidate. Random-CoM sampling was unaffected (it draws from
-\texttt{numpy}'s properly-seeded generator, not the generator network), which
-is why, in retrospect, only the learned-generator conditions showed the
-suspiciously narrow, high success rates reported in an earlier draft of this
-paper. We moved the seed into the sampling call itself, re-ran every
-condition at $n{=}50$/object under the fixed code, and report only the
-corrected numbers throughout this paper; \cref{sec:experiments} and
-\cref{sec:ablation} are a direct account of what changed and why.
+\texttt{numpy}'s properly-seeded generator, not the generator network),
+which is why only the learned-generator conditions showed the suspiciously
+narrow, high success rates in an earlier draft. We moved the seed into the
+sampling call itself and re-ran every condition at $n{=}50$/object under the
+fixed code; we report only the corrected numbers throughout.
 
 \noindent\textbf{Statistics.}
 We report Wilson score 95\% confidence intervals (CI) and two-sided
@@ -515,16 +483,13 @@ OT-CFM + LGGSN & 69.1\% & [64.1, 73.8] & $-10.0$ & $-3.02$ & $0.0025$$^{**}$ \\
 \end{table}
 
 \cref{tab:main} reports the primary comparison, on the corrected,
-per-trial-seeded harness.
-OT-CFM + LGGSN achieves 69.1\% (242/350) versus the baseline's 79.1\%
-(277/350) -- a statistically significant \emph{decrease} of $-10.0$\,pp
-($z{=}-3.02$, $p{=}0.0025$).
-This is the opposite conclusion from the $+12.0$\,pp gain reported under
-the unfixed, unseeded harness, and the 95\% Wilson confidence intervals are
-disjoint in the opposite direction: the learned generator's candidates are
-reliably \emph{worse}, not better, than uniform random sampling around the
-object's center of mass, once the generator is actually resampled per trial
-instead of executing a near-constant candidate.
+per-trial-seeded harness. OT-CFM + LGGSN achieves 69.1\% (242/350) versus
+baseline's 79.1\% (277/350) -- a statistically significant \emph{decrease}
+of $-10.0$\,pp ($z{=}-3.02$, $p{=}0.0025$), the opposite conclusion from the
+$+12.0$\,pp gain reported under the unfixed, unseeded harness, with 95\%
+Wilson CIs disjoint in the opposite direction: the learned generator's
+candidates are reliably \emph{worse}, not better, than uniform random
+sampling around the object's CoM, once actually resampled per trial.
 
 \cref{sec:ablation} isolates why: the failure is specific to OT coupling,
 not to learned candidate generation in general, and \cref{sec:ebm} reports
@@ -563,51 +528,37 @@ PowerDrill     &  76.0\% &  72.0\% & $-4.0$  & 0.648        &  68.0\% & $-8.0$  
 \end{table}
 
 \cref{tab:perobject} shows every object's OT-CFM $\Delta$ is negative or
-zero, and 3 of 7 individually reach significance ($p{<}0.05$) in the
-\emph{harmful} direction (TomatoSoupCan, Pear) or trend that way
-(MustardBottle, CrackerBox, $p{<}0.15$). Only Banana and PowerDrill show
-small, non-significant drops. EBM v2 is more mixed: it significantly
-\emph{beats} baseline on TomatoSoupCan, is directionally positive on Pear,
-and is directionally negative (not significant) on MustardBottle,
-CrackerBox, and PowerDrill---consistent with the pooled, non-significant
-$-3.7$\,pp. No per-object story we tried (OT-CFM's specific failure
-excepted) reaches a clean, uniform verdict across all seven objects; we
-report the full spread rather than the two or three objects that would
-look best in isolation.
+zero, 3 of 7 individually significant ($p{<}0.05$) in the \emph{harmful}
+direction (TomatoSoupCan, Pear) or trending that way (MustardBottle,
+CrackerBox, $p{<}0.15$); only Banana and PowerDrill show small,
+non-significant drops. EBM v2 is more mixed: significantly \emph{beats}
+baseline on TomatoSoupCan, directionally positive on Pear, directionally
+negative (ns) on MustardBottle/CrackerBox/PowerDrill -- consistent with the
+pooled, non-significant $-3.7$\,pp. No per-object story we tried reaches a
+clean, uniform verdict across all seven; we report the full spread rather
+than the two or three objects that look best in isolation.
 
 \noindent\textbf{Landing-position sensitivity, independent of method.}
 A separate, generation-isolated diagnostic\footnote{Single-object scenes,
-semantic grounding disabled, 50 OT-CFM trials/object (a different harness
-and seed grid from \cref{tab:perobject}, collected before the seeding-bug
-audit on the already-per-trial-seeded worktree branch that was later
-merged---see \cref{sec:experiments}---so this diagnostic's own candidates
-were never affected by the bug). Three contact features (local point
-density, surface-normal consistency, contact-width ratio) are tested
-success- vs.\ fail-trial with Mann--Whitney $U$, corrected across
-3 features $\times$ 5 objects (Pear, MustardBottle, CrackerBox,
-TomatoSoupCan, PowerDrill) via Bonferroni and Benjamini--Hochberg.} asks a
-narrower question than \cref{tab:perobject}: for a \emph{fixed} sampler,
-does exactly where a candidate lands on the object predict success? This is
-answered independently of whether any given generator is good at finding
-those positions. MustardBottle and Pear show the strongest, Bonferroni-surviving
-signal (local point density/normal consistency, $p{=}0.00030$/$0.00029$
-and $p{=}0.00068$); TomatoSoupCan survives Bonferroni on local point
-density ($p{=}0.00123$); CrackerBox and TomatoSoupCan show weaker,
-BH-only signal on the remaining features; PowerDrill is the only object
-with a clean null across all three features under either correction
-($p{\geq}0.17$). A post-hoc follow-up (single exploratory test, not part
-of the pre-specified 15-test family, uncorrected) checks a fourth,
-elongation-specific feature for PowerDrill---gripper-axis alignment
-relative to the object's principal axis---and finds only a marginal trend
-($p{=}0.062$): PowerDrill's point cloud is only weakly elongated
-(major/minor eigenvalue ratio 1.075), so PCA's ``principal axis'' is not a
-strongly stable direction here, and PowerDrill's null remains the most
-plausible reading. We caution against over-interpreting this diagnostic as
-explaining \cref{tab:perobject}'s $\Delta$ column: it establishes that
-landing position matters (a lot, for some objects), not that any
-particular generator we tested reliably finds the better positions---the
-main table shows OT-CFM specifically does not, and EBM v2 does only for
-TomatoSoupCan.
+semantic grounding disabled, 50 OT-CFM trials/object, collected on the
+already-per-trial-seeded worktree branch pre-merge (\cref{sec:experiments}),
+so unaffected by the seeding bug. Three contact features (local point
+density, surface-normal consistency, contact-width ratio), Mann--Whitney
+$U$, corrected across 3 features $\times$ 5 objects via Bonferroni/BH.}
+asks a narrower question than \cref{tab:perobject}: for a \emph{fixed}
+sampler, does exactly where a candidate lands on the object predict
+success, independent of whether any generator is good at finding those
+positions? MustardBottle and Pear show the strongest, Bonferroni-surviving
+signal (local point density/normal consistency, $p{=}0.00030$/$0.00029$ and
+$p{=}0.00068$); TomatoSoupCan survives Bonferroni on local point density
+($p{=}0.00123$); CrackerBox and TomatoSoupCan show weaker, BH-only signal on
+the remaining features; PowerDrill is the only clean null across all three
+features under either correction ($p{\geq}0.17$, consistent with its point
+cloud being only weakly elongated). We caution against over-interpreting
+this as explaining \cref{tab:perobject}'s $\Delta$ column: it establishes
+that landing position matters for some objects, not that any generator we
+tested reliably finds the better positions -- OT-CFM specifically does not,
+and EBM v2 does only for TomatoSoupCan.
 
 \noindent\textbf{Scissors (88\%, both conditions).}
 Scissors recovers from 0/25 to 22/25 under both methods after correcting
@@ -680,30 +631,26 @@ predicts.
 \noindent\textbf{A condition-aware fix helps partially and inconsistently,
 not cleanly.} We adapted Cheng and Schwing's~\cite{cheng2025curse}
 discrete-class fix to our 7-object setting: rather than a shared OT plan
-across the mixed
-minibatch, we solve OT coupling independently within each object's own
-training examples (the discrete-class limit of their released
-configuration, which uses a very large condition weight to the same
-effect). This recovers TomatoSoupCan partway (78\%$\to$88\%, still below
-baseline's 92\%) and helps CrackerBox (28\%$\to$44\%, now above baseline,
-though CrackerBox is noisy for every method tested), but leaves Pear
-completely unmoved (52\%, identical to unfixed OT-CFM) -- the object where
-OT-CFM's failure is largest. We do not read this as the fix being wrong in
-principle, but as insufficient on its own in our data regime: Pear has the
-fewest training examples of the three objects shown here, and a per-object
-OT sub-batch of that size may simply be too small for coupling, condition-aware
-or not, to help. We report this as a partial, honest result rather than
-omit it.
+across the mixed minibatch, we solve OT coupling independently within each
+object's own training examples (the discrete-class limit of their released
+configuration). This recovers TomatoSoupCan partway (78\%$\to$88\%, still
+below baseline's 92\%) and helps CrackerBox (28\%$\to$44\%, now above
+baseline, though CrackerBox is noisy for every method tested), but leaves
+Pear completely unmoved (52\%) -- the object where OT-CFM's failure is
+largest. We do not read this as the fix being wrong in principle, but as
+insufficient on its own in our data regime: Pear has the fewest training
+examples of the three objects shown here, and a per-object OT sub-batch of
+that size may simply be too small for coupling, condition-aware or not, to
+help. We report this as a partial, honest result rather than omit it.
 
 \noindent\textbf{A naive energy-based model fails catastrophically, and we
-show exactly why.} EBM v1, trained with plain binary cross-entropy against
-static labels and sampled via CEM search, collapses to 0\% on two of three
-objects ($p{<}0.001$ both) -- worse than every other condition tested,
-including OT-CFM. \cref{sec:ebm} traces this to CEM exploiting a
-region the model never learned to score correctly, and describes the fix:
-training with hard negatives mined from the model's own current beliefs,
-as Implicit Behavioral Cloning~\cite{florence2021implicit} prescribes and
-our first attempt omitted.
+show exactly why.} EBM v1 (plain binary cross-entropy, CEM sampling)
+collapses to 0\% on two of three objects ($p{<}0.001$ both) -- worse than
+every other condition, including OT-CFM. \cref{sec:ebm} traces this to CEM
+exploiting a region the model never learned to score correctly, and
+describes the fix: hard negatives mined from the model's own current
+beliefs, as IBC~\cite{florence2021implicit} prescribes and our first
+attempt omitted.
 
 \noindent\textbf{The corrected EBM (v2) reaches baseline parity, with one
 individually significant win.} With adversarial negative mining added and
@@ -720,237 +667,173 @@ proposal in this small-data regime, not as a second method that beats
 baseline the way OT-CFM was originally (incorrectly) reported to.
 
 \noindent\textbf{Reliability across generation seeds.}
-\cref{tab:ablation} compares methods at one generated candidate set per
-orientation seed (25 orientation seeds).
-To check whether the OT-CFM-vs.-alternatives ranking holds up under
-independently resampled candidates, we ran a separate, generation-isolated
-experiment (semantic grounding disabled, single-object scenes, 5
-orientation seeds $\times$ 10 generation seeds per object, the same
-OT-CFM/CFM-noOT/DDPM checkpoints).
-Pairing trials by (object, orientation seed, generation seed) and testing
-with McNemar's exact test, OT-CFM is significantly \emph{less} reliable
-than both alternatives specifically on Pear ($p{=}0.041$ vs.\ CFM-noOT,
-$p{=}0.021$ vs.\ DDPM) and TomatoSoupCan ($p{=}0.012$, $p{=}0.002$), with
-no significant difference on the remaining objects.
-We report this as a limitation rather than a contradiction of
-\cref{tab:ablation}: the two experiments differ in evaluation harness
-(semantic grounding on vs.\ off) and seed structure and are not directly
-comparable, but the seed-resampled result indicates OT-CFM's per-object
-advantage is not uniform across generator draws and should not be assumed
-to generalize to every resampling of the generator.
-An ensemble candidate-selection strategy substantially mitigates this for
-both flagged objects: drawing 10 independent OT-CFM candidates (same
-generation-isolated harness) and executing the one closest to their
-pose-space consensus (median), rather than the one with the lowest
-predicted IK error, raises Pear's success rate from 6\% to 68\% (Fisher's
-exact $p{=}5.8{\times}10^{-11}$) and TomatoSoupCan's from 34\% to 64\%
-($p{=}0.0048$), at matched ensemble size (10 vs.\ 10, so the effect is
-attributable to the selection rule and not pool size). MustardBottle and
-CrackerBox---which show no significant seed-reliability gap above---show a
-correspondingly weaker (MustardBottle, $50\%{\to}68\%$, $p{=}0.10$) or
-absent (CrackerBox, $44\%$ vs.\ $44\%$, exact tie) benefit from the same
-strategy, consistent with the mitigation targeting specifically the
-objects where single-draw reliability is worst.
+\cref{tab:ablation} compares methods at one candidate set per orientation
+seed (25 seeds). To check whether this ranking holds under independently
+resampled candidates, we ran a separate experiment (5 orientation seeds
+$\times$ 10 generation seeds/object, same checkpoints). Pairing by (object,
+orientation seed, generation seed) with McNemar's exact test, OT-CFM is
+significantly \emph{less} reliable than both alternatives on Pear
+($p{=}0.041$ vs.\ CFM-noOT, $p{=}0.021$ vs.\ DDPM) and TomatoSoupCan
+($p{=}0.012$, $p{=}0.002$), with no significant difference elsewhere -- the
+two experiments differ in harness and seed structure and are not directly
+comparable, but this indicates OT-CFM's per-object advantage is not uniform
+across generator draws. Ensemble selection substantially mitigates this for
+both flagged objects: drawing 10 independent OT-CFM candidates and
+executing the one closest to their pose-space consensus (median), rather
+than the lowest-predicted-IK-error one, raises Pear from 6\% to 68\%
+($p{=}5.8{\times}10^{-11}$) and TomatoSoupCan from 34\% to 64\%
+($p{=}0.0048$), at matched ensemble size (so the effect is attributable to
+the selection rule, not pool size). MustardBottle and CrackerBox -- no
+significant seed-reliability gap above -- show correspondingly weaker
+($50\%{\to}68\%$, $p{=}0.10$) or absent ($44\%$ tie) benefit, consistent
+with the mitigation targeting objects where single-draw reliability is
+worst.
 
 % =============================================================================
 \section{Discussion}
 \label{sec:discussion}
 
-\subsection{Why OT Coupling Hurts Here}
+\subsection{Why OT Coupling Hurts, and Why EBM v2 Recovers}
 \label{sec:why-ot-hurts}
 
 Minibatch OT coupling~\cite{tong2023otcfm} was designed for and validated on
 \emph{unconditional} generation, where solving one Earth-Mover assignment
-per minibatch is unambiguous: every noise sample is interchangeable with
-every data sample. Our setting is conditional -- each minibatch mixes seven
-object identities -- and Cheng and Schwing~\cite{cheng2025curse} show this
-changes the picture: a shared, condition-agnostic OT plan produces a training-time
-prior over $x_0$ that is implicitly skewed by which noise samples the
-solver happened to assign to which object in that minibatch, while
-inference-time sampling draws $x_0$ from the full, unconditional
-$\mathcal{N}(0,I)$ prior the model never actually trained against for a
-given condition. \cref{sec:ablation}'s controls are consistent with exactly
-this: removing OT coupling (Remove-OT) or replacing flow matching with
-diffusion (DDPM) -- changing one thing relative to OT-CFM -- both track
-baseline far more closely than OT-CFM does, and a discrete-class-appropriate
-condition-aware fix (Stratified-OT) partially recovers two of three objects
-tested. None of this would follow if the flow-matching paradigm itself, or
-the training data, were the problem; it is specific to the coupling
-mechanism, at our per-condition data scale ($\sim$400 examples/object).
-We flag this as a caution for the growing body of robotics work that adopts
-minibatch-OT-coupled flow matching by default, citing its unconditional
-benefits, without checking whether their training minibatches mix
-conditions the way ours do.
+per minibatch is unambiguous. Our setting mixes seven object identities per
+minibatch, and Cheng and Schwing~\cite{cheng2025curse} show this changes
+the picture: a shared, condition-agnostic OT plan produces a training-time
+prior over $x_0$ implicitly skewed by which noise samples the solver
+happened to assign to which object, while inference-time sampling draws
+$x_0$ from the full, unconditional prior the model never trained against
+for a given condition. \cref{sec:ablation}'s controls agree: removing OT
+coupling or replacing flow matching with diffusion -- changing one thing
+relative to OT-CFM -- both track baseline far more closely, and a
+discrete-class condition-aware fix partially recovers two of three objects
+tested. None of this would follow if flow matching itself, or the training
+data, were the problem; it is specific to the coupling mechanism at our
+per-condition data scale ($\sim$400 examples/object) -- a caution for
+robotics work adopting minibatch-OT-coupled flow matching by default
+without checking whether training minibatches mix conditions this way.
 
-\subsection{Why a Properly-Trained Energy-Based Model Reaches Parity}
-
-\cref{sec:ebm} and \cref{sec:ablation} report a second failure-and-fix pair,
-structurally similar to the first but at a different layer of the pipeline:
-a naive EBM trained with static contrastive labels is exploited by its own
-inference-time search into a confidently-wrong region the training loss
-never constrained; adding hard-negative mining -- training against
-whatever the model currently over-scores, not only the original dataset's
-logged failures -- fixes this, exactly as Florence et al.~\cite{florence2021implicit}
-describe and Singh et al.~\cite{singh2024cgdf} apply to grasp generation specifically.
-Both failure modes we report (condition-blind OT coupling, un-mined EBM
-negatives) share a common shape: a training procedure that is correct on
-average but leaves a specific, structured blind spot that the deployed
-inference procedure (unconditional-prior sampling; adversarial CEM search)
-reliably finds and exploits. Neither is a criticism of flow matching or
-energy-based models as paradigms; both are reminders that the training
-recipe and the inference procedure must be checked jointly, not validated
-separately.
+The EBM failure-and-fix pair (\cref{sec:ebm,sec:ablation}) shares the same
+shape at a different layer: a naive EBM trained with static contrastive
+labels is exploited by its own inference-time search into a
+confidently-wrong region the training loss never constrained; hard-negative
+mining -- training against whatever the model currently over-scores, not
+only logged failures -- fixes this, as Florence et al.~\cite{florence2021implicit}
+prescribe. Both cases are a training procedure correct on average but
+leaving a structured blind spot that the deployed inference procedure
+reliably finds; neither is a criticism of flow matching or EBMs as
+paradigms, but a reminder that training recipe and inference procedure must
+be checked jointly.
 
 \subsection{Scissors: Physics-Configuration Correction}
 \label{ssec:scissors}
 
 Scissors was 0/25 across all conditions due to a VHACD mesh tunnelling bug:
-14 merged convex hulls at $\approx$2\,cm thickness allowed the object to
-pass through the table under MuJoCo contact detection.
-Replacing the geometry with a bounding-box proxy at 4\,cm restores a high
-success rate for all methods, but not a clean ceiling: the proxy's 4\,cm
-thickness is only marginally above the gripper's 4\,cm minimum opening, so
-grasp success is sensitive to run-to-run variation in exactly where the
-gripper contacts the (barely-cleared) collision geometry.
-
-We measured this configuration on three separate dates and got three
-different counts out of 25 seeds: 25/25 (2026-06-26), 23/25
-(2026-06-28, reported in project history but without a surviving per-seed
-log), and 22/25 (2026-07-09, the measurement reported in this paper,
-verified with a full per-seed log and a smoke test confirming the
-executed candidates and outcomes vary meaningfully across seeds, i.e.\
-this is not a degenerate or stuck sampler). We do not have an explanation
-for the drift---the manifest-level physics configuration is unchanged
-across all three dates---beyond the geometry's thin safety margin making
-it more susceptible than other objects to small numerical differences
-between runs (e.g.\ contact-solver iteration order, floating-point
-accumulation). We report the most recent (2026-07-09) measurement rather
-than treat any single run as ground truth, and flag this instability as a
-property of this specific object's collision geometry, not of the
-grasping pipeline being evaluated: baseline and OT-CFM are affected
-identically (22/25 for both, at every re-measurement above), so Scissors
-still contributes equally to each condition and does not differentiate
-methods, regardless of which of the three counts is used.
-
-A second, unrelated issue also affects Scissors in a separate, supplementary
-generation-isolated diagnostic experiment (not reported in this paper): the
-object-name matching used to condition OT-CFM sampling never matches
-``scissors'' against its trained category key, silently falling back to
-random sampling in that other experiment. This does not affect any number
-reported here---baseline and OT-CFM are identical for Scissors in this
-paper's own evaluation regardless of which sampler produced the
-candidates---but we note it for transparency since both issues share the
-same object.
+14 merged convex hulls at $\approx$2\,cm thickness let the object pass
+through the table under MuJoCo contact detection. A bounding-box proxy at
+4\,cm restores a high success rate for all methods, but not a clean
+ceiling -- 4\,cm is only marginally above the gripper's 4\,cm minimum
+opening, so success is sensitive to run-to-run variation in exactly where
+the gripper contacts the barely-cleared geometry: three re-measurements on
+separate dates gave 25/25, 23/25, and 22/25 out of 25 seeds under an
+unchanged manifest-level configuration. We report the most recent (22/25)
+rather than treat any one run as ground truth. Critically, baseline and
+OT-CFM are affected identically at every re-measurement, so Scissors
+contributes equally to each condition and does not differentiate methods
+regardless of which count is used. A second, unrelated issue -- OT-CFM's
+object-name matching never matches ``scissors'' against its trained
+category key, falling back to random sampling -- affects a separate,
+supplementary diagnostic not reported here and does not change any number
+in this paper, since baseline and OT-CFM are already identical for
+Scissors in our own evaluation; noted for transparency since both issues
+share the same object.
 
 \subsection{Limitations}
 
-\noindent\textbf{Top-down constraint.}
-The current pipeline fixes roll $= \pi$, pitch $= 0$, reducing the 6-DoF
-problem to effective 3-DoF ($(x,y,\psi)$).
-Extension to arbitrary gripper orientations requires either SE(3)-equivariant
-flow matching or a richer orientation parameterisation (e.g., quaternion or
-$6$-d representation).
+\noindent\textbf{Top-down constraint.} The pipeline fixes roll $=\pi$,
+pitch $=0$, reducing 6-DoF to effective 3-DoF ($(x,y,\psi)$); arbitrary
+orientations require SE(3)-equivariant flow matching or a richer
+orientation parameterisation.
 
-\noindent\textbf{Simulation only.}
-All results are from MuJoCo simulation.
-Sim-to-real transfer requires alignment of the physical SO-ARM101's
-calibration, contact dynamics, and depth-camera intrinsics with the
-simulation geometry.
+\noindent\textbf{Simulation only.} All results are from MuJoCo simulation;
+sim-to-real transfer requires aligning the physical SO-ARM101's
+calibration, contact dynamics, and camera intrinsics with the simulation
+geometry.
 
-\noindent\textbf{CoM-relative shift.}
-\cref{eq:shift} centres generated candidates on the current object CoM
-by subtracting the training-set global mean.
-This assumes the training object-placement distribution is roughly centred,
-which holds for our setup but may break for out-of-distribution workspaces.
+\noindent\textbf{CoM-relative shift.} \cref{eq:shift} centres candidates on
+the current object CoM by subtracting the training-set global mean, which
+assumes a roughly centred training placement distribution -- true here but
+not guaranteed for out-of-distribution workspaces.
 
-\noindent\textbf{No generative method we tested reliably beats baseline on
-CrackerBox.} Baseline, OT-CFM, Remove-OT, DDPM, Stratified-OT, and EBM v2 are
-all at or below baseline on CrackerBox (\cref{tab:ablation}), the one object
-where the pattern seen everywhere else -- some method reaching parity or
-better -- does not appear. We do not have a settled explanation; \S\ref{sec:perobject}'s
-contact-feature diagnostic finds only a weak, BH-only signal there,
-consistent with CrackerBox's flat geometry being intrinsically harder for
-any of the position/orientation-based methods tested, but this is not
-confirmed.
+\noindent\textbf{No generative method reliably beats baseline on
+CrackerBox.} Baseline, OT-CFM, Remove-OT, DDPM, Stratified-OT, and EBM v2
+are all at or below baseline on CrackerBox (\cref{tab:ablation}) -- the one
+object where the pattern seen elsewhere (some method reaching parity or
+better) does not appear. \S\ref{sec:perobject}'s contact-feature
+diagnostic finds only a weak, BH-only signal there, consistent with but not
+confirming that CrackerBox's flat geometry is intrinsically harder for the
+position/orientation-based methods tested.
 
-\noindent\textbf{Not fully swept; one check finds Pear specifically
-fragile.} Stratified-OT's failure to move Pear at all, unlike its partial
-recovery of TomatoSoupCan/CrackerBox, may reflect Pear's smaller training
-set (248 positives, fewest of all 7) rather than a limit of the approach.
-A stronger EBM v2 hard-negative-mining schedule reproduces TomatoSoupCan/
-CrackerBox exactly (100\%/28\%) but drops Pear 72\%$\to$48\% (ns at
-$n{=}25$, McNemar $p{=}0.15$) -- again Pear, again the least data.
+\noindent\textbf{Pear is specifically fragile.} Stratified-OT's failure to
+move Pear at all, unlike its partial recovery of TomatoSoupCan/CrackerBox,
+may reflect Pear's smaller training set (248 positives, fewest of all 7)
+rather than a limit of the approach -- a stronger EBM v2 mining schedule
+reproduces TomatoSoupCan/CrackerBox exactly but drops Pear 72\%$\to$48\%
+(ns, $p{=}0.15$).
 
 \subsection{Future Work}
 \label{sec:future}
 
-The clearest next step is closing the gap this paper leaves open on Pear
-and CrackerBox: whether Stratified-OT's partial recovery is a data-budget
-limit (testable by rebalancing or augmenting Pear's training set) or a
-deeper limitation of the discrete-class coupling fix, and whether a wider
-hard-negative-mining budget or a learned (rather than uniform-random)
-proposal distribution for CEM search closes the remaining EBM v2 gap on
-CrackerBox. SE(3)-equivariant flow models (e.g., Riemannian flow
-matching~\cite{chen2024rfm}) or an SE(3)-aware energy function could extend
-either approach to the full 6-DoF pose space, relaxing the top-down
-constraint (\cref{sec:inference}); validating on a Piper 6-DoF manipulator
-would test this directly. Real-robot evaluation on the physical SO-ARM101
-is a further validation step, independent of which candidate-generation
-method is used. More broadly, we encourage other groups applying
-minibatch-OT-coupled flow matching to conditional, small-per-class-data
-robotics problems to check for the failure mode in \cref{sec:why-ot-hurts}
-before assuming OT coupling's unconditional-generation benefits transfer.
+The clearest next step is closing the Pear/CrackerBox gap: whether
+Stratified-OT's partial recovery is a data-budget limit or a deeper
+limitation of the discrete-class fix, and whether a wider hard-negative
+budget closes EBM v2's remaining CrackerBox gap. SE(3)-equivariant flow
+models~\cite{chen2024rfm} or an SE(3)-aware energy function could extend
+either approach to full 6-DoF, relaxing the top-down constraint
+(\cref{sec:inference}); real-robot evaluation on the physical SO-ARM101 is a
+further, independent validation step. More broadly, we encourage other
+groups applying minibatch-OT-coupled flow matching to conditional,
+small-per-class-data robotics problems to check for the failure mode in
+\cref{sec:why-ot-hurts} before assuming its unconditional-generation
+benefits transfer.
 
 % =============================================================================
 \section{Conclusion}
 \label{sec:conclusion}
 
-We set out to build a grasp generation pipeline combining Optimal Transport
-Conditional Flow Matching (OT-CFM) with geometric reranking (LGGSN), and an
-initial 175-trial evaluation appeared to show a large, significant gain over
-random-CoM sampling. Auditing the evaluation harness before finalizing this
+An initial 175-trial evaluation of OT-CFM + LGGSN appeared to show a large
+gain over random-CoM sampling. Auditing the harness before finalizing this
 result uncovered a genuine bug -- unseeded generator sampling silently
 collapsed 25 nominally distinct trials per object to near-repeats of one
-candidate -- and fixing it reversed the conclusion: on a clean, per-trial-seeded
-$n{=}50$/object re-evaluation (350 trials/condition), OT-CFM is
-significantly \emph{worse} than random-CoM sampling with the same reranker
-($-10.0$\,pp, $z{=}-3.02$, $p{=}0.0025$).
+candidate -- and fixing it reversed the conclusion: on a clean $n{=}50$/object
+re-evaluation, OT-CFM is significantly \emph{worse} than baseline
+($-10.0$\,pp, $p{=}0.0025$). Controlled comparisons localize this to
+minibatch OT coupling specifically, not to conditional flow matching or
+learned generation in general, consistent with a training/inference
+mismatch recently identified in the generative-modeling
+literature~\cite{cheng2025curse} -- to our knowledge the first demonstration
+that this mismatch degrades physically executed task success rather than
+only a generation-quality proxy. A condition-aware coupling fix recovers two
+of three objects tested partially, but not Pear, and not cleanly.
 
-We used the corrected pipeline as a diagnostic instrument rather than
-discarding it. Controlled comparisons localize the failure to minibatch
-optimal-transport coupling specifically, not to conditional flow matching or
-learned candidate generation in general: removing OT coupling, or replacing
-flow matching with diffusion, both track baseline far more closely than
-OT-CFM does, consistent with a training/inference distribution mismatch
-recently identified for conditional flow matching~\cite{cheng2025curse} --
-to our knowledge the first demonstration that this mismatch degrades
-physically executed robot task success, not only a generation-quality proxy.
-A condition-aware coupling fix recovers two of three objects tested
-partially, but not Pear, and not cleanly.
-
-We separately tested an energy-based alternative motivated by Implicit
-Behavioral Cloning~\cite{florence2021implicit}. A naive version, trained
-without adversarial negative mining, was exploited by its own
-inference-time search into a confidently-wrong, data-unsupported region
-(0--16\% success); adding the negative-mining mechanism IBC prescribes and
-our first attempt omitted recovers the same architecture to statistical
-parity with baseline (74.0\% vs.\ 77.7\%, $p{=}0.29$), significantly
-exceeding it on one of six objects. Across every generative candidate method
-we tested -- OT-CFM, OT-free CFM, DDPM, a condition-aware OT variant, and
-two energy-based variants -- none reliably and significantly beats a
-well-reranked random baseline in this small-data ($\sim$400
-examples/object), single-GPU regime; the one significant effect in either
-direction is OT-CFM's specific, avoidable harm. One method does help
-robustly and without any retraining: selecting the pose-space consensus
-candidate from ten independent draws, rather than the lowest-predicted-IK-error
-one, significantly improves reliability on exactly the two objects where
-single-draw sampling is least stable.
-We report all of this, including what did not work and why, because we
-believe the diagnosis and the two documented failure-and-fix pairs are of
-independent value to others building similar pipelines under similar data
-and compute constraints.
-
-\balance
+A separately-tested energy-based alternative shows the same shape of
+failure and fix: a naive version, trained without adversarial negative
+mining, was exploited by its own inference-time search into a
+confidently-wrong region (0--16\% success); adding the mining mechanism
+Implicit Behavioral Cloning~\cite{florence2021implicit} prescribes recovers
+the same architecture to statistical parity with baseline (74.0\% vs.\
+77.7\%, $p{=}0.29$). Across every generative method tested, none reliably
+beats a well-reranked random baseline in this small-data, single-GPU
+regime; the one significant effect in either direction is OT-CFM's specific,
+avoidable harm. One method helps robustly without retraining: selecting the
+pose-space consensus candidate from ten independent draws, rather than the
+lowest-predicted-IK-error one, significantly improves reliability on
+exactly the two objects where single-draw sampling is least stable. We
+report all of this, including what did not work and why, because we
+believe the diagnosis and the two failure-and-fix pairs are of independent
+value to others building similar pipelines under similar data and compute
+constraints.
 
 % =============================================================================
 \begin{thebibliography}{10}
@@ -1059,5 +942,6 @@ in \emph{Proc.\ Conf.\ Robot Learning (CoRL)}, PMLR vol.~270,
   pp.~5067--5086, 2025.
 
 \end{thebibliography}
+\balance
 
 \end{document}
