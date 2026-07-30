@@ -174,7 +174,39 @@ PIPER_FIELDS = {
     "success": FieldSpec(Provenance.EXECUTION_DERIVED, "the label itself"),
 }
 
-ALL_FIELDS = {**SOARM_FIELDS, **PIPER_FIELDS}
+# ── world_model/ MLP critic fields (Risk-Gated VLA Phase 1/2 study) ───────
+# Registered 2026-07-30 during the risk_gated_vla audit (results/risk_gated_vla/audit.md
+# Section 3). This pipeline predates causal_validity_audit/ entirely (mlp_predictor.pkl is
+# dated 2026-05-15) and had never been run through this gate before. Traced against the
+# actual call sites: data/transition_logger.py::build_feature (feature assembly) and
+# scripts/collect_mujoco_transitions.py::run_collection (capture timing).
+WORLD_MODEL_FIELDS = {
+    "grasp_pose": FieldSpec(
+        Provenance.PRE_EXECUTION,
+        "sampled by sample_grasp()/_sample_grasp() from obj_pos + RNG, before "
+        "execute_grasp()/_execute() is ever called -- the proposed action itself",
+    ),
+    "obj_pos_before": FieldSpec(
+        Provenance.PRE_EXECUTION,
+        "env.get_obj_pos(oid) captured after settle steps, strictly before grasp "
+        "execution -- static pre-grasp scene state",
+    ),
+    "obj_quat_before": FieldSpec(
+        Provenance.PRE_EXECUTION,
+        "env.get_obj_pose(oid)['quaternion'] captured at the same pre-grasp point as "
+        "obj_pos_before",
+    ),
+    "pc_stats_before": FieldSpec(
+        Provenance.PRE_EXECUTION,
+        "compute_pc_stats(obs_before, oid) -- derived from the pre-grasp point cloud "
+        "capture only, no execution state involved",
+    ),
+    "success": FieldSpec(Provenance.EXECUTION_DERIVED, "the label itself -- valid as a training target, not as model input"),
+    "dz": FieldSpec(Provenance.EXECUTION_DERIVED, "obj_pos_after[2] - obj_pos_before[2] -- requires execution to have happened"),
+    "fell_off": FieldSpec(Provenance.EXECUTION_DERIVED, "thresholded on obj_pos_after -- post-execution only"),
+}
+
+ALL_FIELDS = {**SOARM_FIELDS, **PIPER_FIELDS, **WORLD_MODEL_FIELDS}
 
 
 class CausalValidityViolation(Exception):
