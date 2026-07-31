@@ -117,10 +117,28 @@ def test_plan_proposing_the_approved_command_is_clean():
 
 def test_plan_proposing_an_unapproved_command_is_flagged():
     spec = _spec()
-    plan = _plan([["python", "-c", "print('ok')"], ["rm", "-rf", "/"]])
+    plan = _plan([["rm", "-rf", "/"]])
     violations = validate_plan_commands(plan, spec)
     assert len(violations) == 1
     assert "rm" in str(violations[0]) or "not an approved command" in violations[0]
+
+
+def test_plan_proposing_too_many_commands_is_flagged():
+    """MVP1 command-count-limit gate: at most MAX_PROPOSED_COMMANDS (1) may
+    be proposed per plan, so a plan can never smuggle in an additional or
+    duplicate smoke run alongside the one the deterministic runner executes."""
+    spec = _spec()
+    plan = _plan([["python", "-c", "print('ok')"], ["rm", "-rf", "/"]])
+    violations = validate_plan_commands(plan, spec)
+    assert any("too many proposed commands" in v for v in violations)
+    assert any("not an approved command" in v for v in violations)
+
+
+def test_plan_proposing_duplicate_commands_is_flagged():
+    spec = _spec()
+    plan = _plan([["python", "-c", "print('ok')"], ["python", "-c", "print('ok')"]])
+    violations = validate_plan_commands(plan, spec)
+    assert any("duplicate proposed command" in v for v in violations)
 
 
 def test_plan_proposing_a_forbidden_command_is_flagged():

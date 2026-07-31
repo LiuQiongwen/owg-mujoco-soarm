@@ -5,9 +5,17 @@
     python -m research_agent.cli smoke experiments/example_smoke.yaml
     python -m research_agent.cli status <run_id>
 
-`plan` and `smoke` default to mock Codex/Claude adapters (no CLI required,
-fully offline). Pass `--agents real` to use the real `codex`/`claude` CLIs
-once they are installed and authenticated.
+`plan` and `smoke` default to a mock, offline Codex adapter and (for
+`smoke`) a mock, offline Claude adapter -- no CLI required. Pass
+`--codex real` to plan with the actual `codex` CLI (read-only, ephemeral)
+once it is installed and authenticated; Codex is only ever an advisor, and
+every command it proposes must still independently pass the Python
+command/path policy engine before anything runs.
+
+The real Claude adapter is disabled in this MVP1 build: `--claude real` is
+rejected deterministically (REAL_CLAUDE_DISABLED_IN_MVP1) rather than
+silently falling back to mock or silently invoking a real agent. `mock` is
+the only supported value for `--claude` right now.
 """
 from __future__ import annotations
 
@@ -18,7 +26,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from research_agent.agents.claude import ClaudeAgent, MockClaudeAgent, RealClaudeAgent
+from research_agent.agents.claude import ClaudeAgent, MockClaudeAgent
 from research_agent.agents.codex import CodexAgent, MockCodexAgent, RealCodexAgent
 from research_agent.flow import plan_flow, smoke_flow
 from research_agent.tasks import experiment as experiment_tasks
@@ -30,24 +38,38 @@ EXIT_ERROR = 3
 
 _STATUS_EXIT_CODES = {"PASS": EXIT_OK, "FAIL": EXIT_FAIL, "BLOCKED": EXIT_BLOCKED}
 
+REAL_CLAUDE_DISABLED_CODE = "REAL_CLAUDE_DISABLED_IN_MVP1"
 
-_REAL_AGENTS_WARNING = (
-    "WARNING: --agents real selected. This spawns the actual `codex` and `claude` "
-    "CLIs as subprocess agents. This path is EXPERIMENTAL and UNVERIFIED -- no "
-    "automated test in this repository exercises it, and it has never been run "
-    "end-to-end (see .agents/tasks/active/tango_agent_mvp0.md, Reconciliation "
-    "note). Codex still runs read-only and Claude is still confined to an "
-    "isolated worktree, but the CLI output parsing and error handling on this "
-    "path are unverified. Proceed only if `codex` and `claude` are installed, "
-    "authenticated, and you understand these guarantees."
+_REAL_CODEX_WARNING = (
+    "WARNING: --codex real selected. This spawns the actual `codex` CLI as a read-only, "
+    "ephemeral (`--sandbox read-only --ephemeral`) planning subprocess. This path is "
+    "EXPERIMENTAL: automated tests in this repository only exercise it against fake `codex` "
+    "executables (see tests/test_real_codex_planner.py), never a real authenticated `codex` "
+    "installation. Codex is only an advisor -- every command it proposes must still "
+    "independently pass the deterministic command/path policy engine, and a PLAN_PASS verdict "
+    "never causes anything to execute by itself."
 )
 
 
-def _build_agents(kind: str) -> tuple[CodexAgent, ClaudeAgent]:
+class RealClaudeDisabledError(RuntimeError):
+    """Raised when --claude real is requested. Real Claude is not connected
+    in this MVP1 build -- see the module docstring."""
+
+
+def _build_codex_agent(kind: str) -> CodexAgent:
     if kind == "real":
-        print(_REAL_AGENTS_WARNING, file=sys.stderr)
-        return RealCodexAgent(), RealClaudeAgent()
-    return MockCodexAgent(), MockClaudeAgent()
+        print(_REAL_CODEX_WARNING, file=sys.stderr)
+        return RealCodexAgent()
+    return MockCodexAgent()
+
+
+def _build_claude_agent(kind: str) -> ClaudeAgent:
+    if kind == "real":
+        raise RealClaudeDisabledError(
+            f"{REAL_CLAUDE_DISABLED_CODE}: the real Claude adapter is disabled in this MVP1 "
+            "build; pass --claude mock (the only supported value)."
+        )
+    return MockClaudeAgent()
 
 
 def _runs_root(args) -> Path:
@@ -66,7 +88,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
-    codex_agent, _ = _build_agents(args.agents)
+    codex_agent = _build_codex_agent(args.codex)
     result = plan_flow(
         Path(args.spec_path),
         repo_root=Path(args.repo_root).resolve(),
@@ -79,7 +101,12 @@ def cmd_plan(args: argparse.Namespace) -> int:
 
 
 def cmd_smoke(args: argparse.Namespace) -> int:
-    codex_agent, claude_agent = _build_agents(args.agents)
+    try:
+        claude_agent = _build_claude_agent(args.claude)
+    except RealClaudeDisabledError as e:
+        print(json.dumps({"error": str(e), "code": REAL_CLAUDE_DISABLED_CODE}, indent=2), file=sys.stderr)
+        return EXIT_ERROR
+    codex_agent = _build_codex_agent(args.codex)
     report = smoke_flow(
         Path(args.spec_path),
         repo_root=Path(args.repo_root).resolve(),
@@ -123,15 +150,23 @@ def build_parser() -> argparse.ArgumentParser:
     p_plan.add_argument("spec_path")
     p_plan.add_argument("--run-id", default=None)
     p_plan.add_argument(
-        "--agents", choices=["mock", "real"], default="mock",
-        help="mock (default, offline, no CLI required) or real (invokes the codex/claude CLIs)",
+        "--codex", choices=["mock", "real"], default="mock",
+        help="mock (default, offline, no CLI required) or real (invokes the codex CLI, read-only)",
     )
     p_plan.set_defaults(func=cmd_plan)
 
     p_smoke = sub.add_parser("smoke", help="run the full ten-stage smoke-experiment pipeline")
     p_smoke.add_argument("spec_path")
     p_smoke.add_argument("--run-id", default=None)
-    p_smoke.add_argument("--agents", choices=["mock", "real"], default="mock")
+    p_smoke.add_argument(
+        "--codex", choices=["mock", "real"], default="mock",
+        help="mock (default, offline, no CLI required) or real (invokes the codex CLI, read-only)",
+    )
+    p_smoke.add_argument(
+        "--claude", choices=["mock", "real"], default="mock",
+        help="mock (default, and the only supported value in this MVP1 build -- "
+        "real is rejected with REAL_CLAUDE_DISABLED_IN_MVP1)",
+    )
     p_smoke.set_defaults(func=cmd_smoke)
 
     p_status = sub.add_parser("status", help="show the status of a previous run")

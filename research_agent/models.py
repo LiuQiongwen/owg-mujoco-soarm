@@ -132,6 +132,10 @@ class PlanResult(AgentJudgement):
     # policies.commands.validate_plan_commands) before the executor stage
     # is ever reached.
     proposed_commands: list[list[str]] = Field(default_factory=list)
+    expected_artifacts: list[str] = Field(default_factory=list)
+    expected_metrics: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
 
 
 class ImplementationResult(AgentJudgement):
@@ -208,8 +212,20 @@ class RunPaths:
         return self.run_dir / "worktree"
 
     @property
+    def prompts_dir(self) -> Path:
+        return self.run_dir / "prompts"
+
+    @property
     def plan_path(self) -> Path:
         return self.run_dir / "plan.json"
+
+    @property
+    def plan_raw_path(self) -> Path:
+        return self.run_dir / "plan.raw.json"
+
+    @property
+    def plan_schema_path(self) -> Path:
+        return self.run_dir / "plan.schema.json"
 
     @property
     def implementation_path(self) -> Path:

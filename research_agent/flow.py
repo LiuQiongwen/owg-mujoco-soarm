@@ -32,7 +32,7 @@ from typing import Optional
 from prefect import flow, task
 
 from research_agent.agents.claude import ClaudeAgent, MockClaudeAgent
-from research_agent.agents.codex import CodexAgent, MockCodexAgent
+from research_agent.agents.codex import CodexAgent, CodexPlannerError, MockCodexAgent
 from research_agent.models import (
     CommandResult,
     ExperimentSpec,
@@ -45,7 +45,11 @@ from research_agent.models import (
 )
 from research_agent.policies import commands as command_policy
 from research_agent.policies import paths as path_policy
-from research_agent.subprocess_runner import InfrastructureError
+from research_agent.subprocess_runner import (
+    CommandTimeoutError,
+    ExecutableNotFoundError,
+    InfrastructureError,
+)
 from research_agent.tasks import experiment as experiment_tasks
 from research_agent.tasks import reporting as reporting_tasks
 from research_agent.tasks import repository as repository_tasks
@@ -84,20 +88,55 @@ def _retry_only_infrastructure(task_, task_run, state) -> bool:
 
 # ── prompt builders (plain text; no LLM call happens here) ─────────────────
 
-def _build_planner_prompt(spec: ExperimentSpec) -> str:
-    return (
-        "You are a read-only planner. Do not modify any files or run any "
-        "command. Plan only.\n\n"
-        f"task_id: {spec.task_id}\n"
-        f"goal: {spec.goal}\n"
-        f"allowed_paths: {spec.allowed_paths}\n"
-        f"forbidden_paths: {spec.forbidden_paths}\n"
-        f"approved smoke_command: {spec.smoke_command}\n\n"
-        "Return exactly one PlanResult JSON object. If you propose any "
-        "commands for later stages, they must exactly match an approved "
-        "command in the specification -- otherwise leave proposed_commands "
-        "empty."
-    )
+def _build_planner_prompt(spec: ExperimentSpec, *, run_paths: RunPaths, repo_root: Path) -> str:
+    """Full planner prompt for both the mock and the real Codex adapter.
+    Required content per the MVP1 task contract: experiment specification;
+    task ID and run ID; repository context; allowed/forbidden paths;
+    approved command arrays; required artifacts; required metrics;
+    command-count limits; mode; and an explicit safety-restriction list."""
+    approved = command_policy.approved_commands(spec, allow_confirmatory=False)
+    required_metrics = [rm.model_dump() for rm in spec.required_metrics]
+    return "\n".join([
+        "You are a READ-ONLY planning assistant for the TANGO Experiment Agent.",
+        "",
+        "MODE: planning-only, non-confirmatory, read-only.",
+        "",
+        "SAFETY RESTRICTIONS (mandatory, no exceptions):",
+        "- This step is planning only. Do not modify any file in the repository.",
+        "- Treat the repository as read-only even if your own sandbox would otherwise allow writes.",
+        "- Do not execute any experiment command yourself. A separate deterministic runner executes "
+        "the one approved smoke command after this planning step -- you never run it.",
+        "- Do not propose any command outside the approved command array(s) listed below.",
+        "- Do not invoke Claude, claude-code, or any other coding/execution agent.",
+        "- Do not run, or propose running, anything involving a GPU, CUDA, a physical robot, model "
+        "training, Docker, sudo, `git push`, network downloads, or a confirmatory experiment.",
+        "- Output only the single requested structured plan object; no other text.",
+        "",
+        f"task_id: {spec.task_id}",
+        f"run_id: {run_paths.run_id}",
+        f"repository_root: {repo_root}",
+        f"goal: {spec.goal}",
+        "",
+        f"allowed_paths: {spec.allowed_paths}",
+        f"forbidden_paths: {spec.forbidden_paths}",
+        "",
+        f"approved_command_arrays (the ONLY commands you may propose, byte-for-byte): {approved}",
+        "confirmatory_command (if any) is intentionally excluded from the approved list above and "
+        "must never be proposed.",
+        "",
+        f"required_artifacts: ['{run_paths.artifacts_dir.name}/metrics.json' under the run directory]",
+        f"required_metrics: {required_metrics}",
+        f"max_proposed_commands: {command_policy.MAX_PROPOSED_COMMANDS}",
+        "",
+        "Return exactly one JSON object matching the supplied PlanResult schema, with fields: "
+        "schema_version, task_id, run_id, verdict, summary, issues, artifacts, proposed_commands, "
+        "expected_artifacts, expected_metrics, risks, assumptions.",
+        f"task_id must be exactly {spec.task_id!r}; run_id must be exactly {run_paths.run_id!r}.",
+        "verdict must be exactly one of PLAN_PASS, PLAN_REVISE, PLAN_BLOCKED.",
+        "proposed_commands must be a list of command arrays (list of lists of strings) -- never a "
+        "shell string -- and each one must exactly match one of the approved_command_arrays above; "
+        "leave it empty ([]) if you have nothing to propose.",
+    ])
 
 
 def _build_executor_prompt(spec: ExperimentSpec, plan: PlanResult) -> str:
@@ -153,7 +192,9 @@ def snapshot_repository_task(repo_root: Path, run_paths: RunPaths) -> dict:
 
 @task(name="codex_planner", retries=2, retry_delay_seconds=1, retry_condition_fn=_retry_only_infrastructure)
 def codex_plan_task(codex_agent: CodexAgent, *, spec: ExperimentSpec, run_paths: RunPaths, repo_root: Path) -> PlanResult:
-    prompt = _build_planner_prompt(spec)
+    prompt = _build_planner_prompt(spec, run_paths=run_paths, repo_root=repo_root)
+
+    before = repository_tasks.capture_repo_fingerprint(repo_root, run_paths, label="before_codex_planning")
     plan = codex_agent.plan(
         prompt=prompt,
         run_dir=run_paths.run_dir,
@@ -162,15 +203,68 @@ def codex_plan_task(codex_agent: CodexAgent, *, spec: ExperimentSpec, run_paths:
         task_id=spec.task_id,
         run_id=run_paths.run_id,
     )
+    # Independently re-verify (never merely trust Codex's own claim) that the
+    # read-only planning subprocess did not modify anything outside the run
+    # directory it was given.
+    after = repository_tasks.capture_repo_fingerprint(repo_root, run_paths, label="after_codex_planning")
+    changes = repository_tasks.diff_fingerprints(before, after, run_dir=run_paths.run_dir, repo_root=repo_root)
+    if changes:
+        raise PipelineBlocked(
+            "codex_planner", "REPOSITORY_CHANGED_DURING_CODEX_PLANNING: " + "; ".join(changes)
+        )
+
     reporting_tasks.save_json_artifact(run_paths.plan_path, plan)
     return plan
+
+
+def _synthetic_blocked_plan(spec: ExperimentSpec, run_paths: RunPaths, *, reason: str) -> PlanResult:
+    """Build and persist a terminal PLAN_BLOCKED PlanResult representing a
+    real-Codex planning failure that never produced (or never validated
+    into) an actual plan -- e.g. the executable was unavailable, the
+    process timed out, or its output failed validation. `reason` must
+    already be prefixed with the exact deterministic code (e.g.
+    "CODEX_TIMEOUT: ..."); the code token (everything before the first
+    ": ") becomes plan.issues[0]. This is the single place plan.json is
+    written for every non-PLAN_PASS/REVISE/BLOCKED-from-Codex-itself
+    outcome, so a failure here never leaves the run without a terminal,
+    persisted plan.json."""
+    code = reason.split(":", 1)[0].strip()
+    plan = PlanResult(
+        task_id=spec.task_id,
+        run_id=run_paths.run_id,
+        verdict="PLAN_BLOCKED",
+        summary=reason,
+        issues=[code],
+        artifacts=[],
+    )
+    reporting_tasks.save_json_artifact(run_paths.plan_path, plan)
+    return plan
+
+
+def _run_codex_planner(codex_agent: CodexAgent, *, spec: ExperimentSpec, run_paths: RunPaths, repo_root: Path) -> PlanResult:
+    """Wraps codex_plan_task so every possible real-Codex failure mode
+    (infrastructure or research/policy) becomes a terminal PLAN_BLOCKED
+    PlanResult instead of an uncaught exception -- see CodexAgent's module
+    docstring for which exceptions are retried vs. terminal."""
+    try:
+        return codex_plan_task(codex_agent, spec=spec, run_paths=run_paths, repo_root=repo_root)
+    except PipelineBlocked as e:
+        return _synthetic_blocked_plan(spec, run_paths, reason=e.reason)
+    except ExecutableNotFoundError as e:
+        return _synthetic_blocked_plan(spec, run_paths, reason=f"CODEX_EXECUTABLE_UNAVAILABLE: {e}")
+    except CommandTimeoutError as e:
+        return _synthetic_blocked_plan(spec, run_paths, reason=f"CODEX_TIMEOUT: {e}")
+    except InfrastructureError as e:
+        return _synthetic_blocked_plan(spec, run_paths, reason=f"CODEX_TIMEOUT: {e}")
+    except CodexPlannerError as e:
+        return _synthetic_blocked_plan(spec, run_paths, reason=str(e))
 
 
 @task(name="plan_policy_validation")
 def plan_policy_validation_task(spec: ExperimentSpec, plan: PlanResult) -> None:
     violations = command_policy.validate_plan_commands(plan, spec)
     if violations:
-        raise PipelineBlocked("plan_policy_validation", "; ".join(violations))
+        raise PipelineBlocked("plan_policy_validation", "CODEX_COMMAND_POLICY_FAILED: " + "; ".join(violations))
 
 
 @task(name="create_isolated_worktree", retries=1, retry_delay_seconds=1, retry_condition_fn=_retry_only_infrastructure)
@@ -289,8 +383,14 @@ def plan_flow(
     run_paths = init_run_task(runs_root, resolved_run_id, spec_path)
 
     snapshot_repository_task(repo_root, run_paths)
-    plan = codex_plan_task(codex_agent, spec=spec, run_paths=run_paths, repo_root=repo_root)
-    plan_policy_validation_task(spec, plan)
+    plan = _run_codex_planner(codex_agent, spec=spec, run_paths=run_paths, repo_root=repo_root)
+    if plan.verdict != "PLAN_PASS":
+        return plan
+
+    try:
+        plan_policy_validation_task(spec, plan)
+    except PipelineBlocked as e:
+        return _synthetic_blocked_plan(spec, run_paths, reason=e.reason)
     return plan
 
 
@@ -302,10 +402,23 @@ def smoke_flow(
     runs_root: Path,
     run_id: Optional[str] = None,
     codex_agent: Optional[CodexAgent] = None,
+    codex_reviewer_agent: Optional[CodexAgent] = None,
     claude_agent: Optional[ClaudeAgent] = None,
 ) -> FinalReport:
-    """Runs the full ten-stage pipeline described in the module docstring."""
+    """Runs the full ten-stage pipeline described in the module docstring.
+
+    MVP1 scope note: only the PLANNER may be a RealCodexAgent; the reviewer
+    stays mock unless a reviewer agent is explicitly supplied. If
+    `codex_agent` is a MockCodexAgent and no `codex_reviewer_agent` is
+    given, the same mock instance is reused for both roles (preserving
+    MVP0 behavior, including a caller-configured review_verdict on that one
+    instance) -- but if `codex_agent` is a RealCodexAgent, the reviewer
+    defaults to a fresh MockCodexAgent() rather than silently reusing the
+    real one, since "Replace only the mock Codex planner" is this MVP's
+    explicit scope; the CLI never passes real for the reviewer role."""
     codex_agent = codex_agent or MockCodexAgent()
+    if codex_reviewer_agent is None:
+        codex_reviewer_agent = codex_agent if isinstance(codex_agent, MockCodexAgent) else MockCodexAgent()
     claude_agent = claude_agent or MockClaudeAgent()
     repo_root = Path(repo_root).resolve()
     runs_root = Path(runs_root).resolve()
@@ -318,14 +431,16 @@ def smoke_flow(
 
     snapshot_repository_task(repo_root, run_paths)
 
-    plan = codex_plan_task(codex_agent, spec=spec, run_paths=run_paths, repo_root=repo_root)
+    plan = _run_codex_planner(codex_agent, spec=spec, run_paths=run_paths, repo_root=repo_root)
 
     worktree_created = False
     try:
         if plan.verdict != "PLAN_PASS":
+            stage_code = "CODEX_PLAN_REVISE" if plan.verdict == "PLAN_REVISE" else "CODEX_PLAN_BLOCKED"
             report = _blocked_report(
                 run_id=resolved_run_id, task_id=spec.task_id, run_dir=run_paths.run_dir,
-                stage="codex_planner", reason=f"plan verdict={plan.verdict}: {plan.summary}", plan=plan,
+                stage="codex_planner", reason=f"{stage_code}: plan verdict={plan.verdict}: {plan.summary}",
+                plan=plan,
             )
             reporting_tasks.write_final_report(run_paths, report)
             return report
@@ -353,7 +468,7 @@ def smoke_flow(
         verification = verify_artifacts_task(spec, run_paths, smoke_result)
 
         review = codex_review_task(
-            codex_agent, spec=spec, plan=plan, implementation=implementation,
+            codex_reviewer_agent, spec=spec, plan=plan, implementation=implementation,
             verification=verification, run_paths=run_paths, repo_root=repo_root,
         )
 
