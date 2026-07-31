@@ -1,0 +1,58 @@
+# Example smoke experiment for the TANGO Experiment Agent.
+#
+# The smoke_command below is a harmless, GPU-free, robot-free, network-free
+# Python one-liner: it writes a valid metrics.json into the run's assigned
+# artifact directory (passed in via the RESEARCH_AGENT_ARTIFACTS_DIR
+# environment variable, set by research_agent.tasks.experiment.run_smoke_command)
+# and exits 0. It never touches repository files.
+
+task_id: example_smoke
+goal: >
+  Prove the end-to-end TANGO Experiment Agent pipeline (validate, snapshot,
+  plan, plan-policy-validation, isolated-worktree executor, static checks,
+  deterministic smoke run, artifact verification, review, report) works
+  using a harmless placeholder command, with no GPU, robot, Docker, sudo,
+  git push, or full training involved.
+
+allowed_paths:
+  - experiments
+  - research_agent_runs
+
+forbidden_paths:
+  - research_agent
+  - tests
+
+smoke_command:
+  - python
+  - "-c"
+  - |
+    import json, os
+    out_dir = os.environ["RESEARCH_AGENT_ARTIFACTS_DIR"]
+    metrics = {"smoke_ok": True, "value": 1.0}
+    with open(os.path.join(out_dir, "metrics.json"), "w") as f:
+        json.dump(metrics, f)
+
+confirmatory_command: null
+
+seeds: [0]
+
+timeouts:
+  planner_seconds: 60
+  executor_seconds: 60
+  smoke_seconds: 30
+  verifier_seconds: 30
+  reviewer_seconds: 60
+
+required_metrics:
+  - name: smoke_ok
+    type: bool
+  - name: value
+    type: float
+    min_value: 0.0
+    max_value: 1.0
+
+approval:
+  required_for_confirmatory: true
+  approved_by: null
+
+max_run_count: 5
