@@ -1,0 +1,64 @@
+# Example MVP2 execute-flow experiment for the TANGO Experiment Agent.
+#
+# Used by the real-Claude fake-executor test suite (tests/test_real_claude_executor.py)
+# as a template for a harmless, source-code-only modification task: the
+# executor (real or fake) is only ever permitted to touch files under
+# research_agent_sandbox/ or tests/fixtures/, well away from any production
+# code, data, results, checkpoints, calibration, or paper files. `execute`
+# never runs smoke_command (or any other research-experiment command) at
+# all, so smoke_command here is a placeholder never invoked by that flow --
+# see research_agent.execute_flow's module docstring.
+
+task_id: example_mvp2_sandbox
+goal: >
+  Create or update a single harmless placeholder file under
+  research_agent_sandbox/ demonstrating the MVP2 isolated-execution-worktree
+  Claude executor. Make no other change.
+
+allowed_paths:
+  - research_agent_sandbox
+  - tests/fixtures
+
+forbidden_paths:
+  - research_agent
+  - tests
+  - tango_robot
+  - grasp_6dof
+  - world_model
+
+allowed_modify_paths:
+  - research_agent_sandbox
+  - tests/fixtures
+
+max_changed_files: 3
+max_changed_bytes: 20000
+
+allowed_executor_commands: []
+required_executor_checks:
+  - compileall
+
+# Placeholder only -- execute_flow never runs this command; smoke_command
+# is a required ExperimentSpec field inherited from the MVP0/MVP1 schema.
+smoke_command:
+  - python
+  - "-c"
+  - "pass"
+
+confirmatory_command: null
+
+seeds: [0]
+
+timeouts:
+  planner_seconds: 60
+  executor_seconds: 120
+  smoke_seconds: 30
+  verifier_seconds: 30
+  reviewer_seconds: 60
+
+required_metrics: []
+
+approval:
+  required_for_confirmatory: true
+  approved_by: null
+
+max_run_count: 10
