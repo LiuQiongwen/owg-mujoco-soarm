@@ -91,3 +91,5 @@ MUJOCO_LOG.TXT
 .agents/config.sh
 .agents/run_research_loop.sh
 .agents/task.md
+
+.venv-research-agent/
