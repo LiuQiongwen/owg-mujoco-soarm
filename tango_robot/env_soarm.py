@@ -1136,6 +1136,51 @@ class EnvironmentSoArm:
         mujoco.mj_forward(self.model, self.data)
         return pe_iks
 
+    def compute_ik_reachability_per_candidate(self, poses_xyzyaw: list) -> list:
+        """Per-candidate IK reachability (Tier-3): unlike compute_ik_reachability
+        above, which reuses one shared CoM target for every candidate in a
+        scene, each candidate's own (x, y, z, yaw) is solved independently
+        from HOME_QPOS via _solve_ik_jaw_topdown. This is the one feature
+        family with genuine within-scene variance -- different candidates
+        have different targets and therefore different solver outcomes.
+
+        Runs entirely on a scratch MjData bound to the same (static) model,
+        never touching self.data, so this cannot leak ANY simulation state
+        into the real episode -- not just qpos/qvel/ctrl, but also contact
+        and constraint-solver warmstart state, which a qpos/qvel/ctrl-only
+        save/restore does NOT fully isolate. Using a fully separate MjData
+        makes that class of leakage structurally impossible rather than
+        merely unlikely.
+
+        See causal_validity_audit/provenance.py's SOARM_FIELDS entries for
+        ik_converged/ik_residual/max_joint_delta: this isolated re-solve
+        from HOME_QPOS is what keeps them PRE_EXECUTION-admissible — they
+        must never be read back from the actual grasp-execution trajectory.
+        """
+        real_data = self.data
+        scratch = mujoco.MjData(self.model)
+        home = np.asarray(HOME_QPOS, dtype=float)
+        out = []
+        try:
+            self.data = scratch
+            for x, y, z, yaw in poses_xyzyaw:
+                mujoco.mj_resetData(self.model, scratch)
+                for adr, q in zip(self._arm_qpos_adr, HOME_QPOS):
+                    scratch.qpos[adr] = q
+                mujoco.mj_forward(self.model, scratch)
+                converged, pe, _oe = self._solve_ik_jaw_topdown(
+                    np.array([x, y, z], dtype=float), yaw=float(yaw), reset_to_home=False)
+                solved = scratch.qpos[self._arm_qpos_adr].copy()
+                max_delta = float(np.max(np.abs(solved - home)))
+                out.append({
+                    "ik_converged": bool(converged),
+                    "ik_residual": float(pe),
+                    "max_joint_delta": max_delta,
+                })
+        finally:
+            self.data = real_data
+        return out
+
     # ── EEF motion ────────────────────────────────────────────────────────────
 
     def _move_ee_internal(self, target_pos: np.ndarray,

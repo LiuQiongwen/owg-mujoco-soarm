@@ -786,6 +786,17 @@ class RobotEnvUI:
                       f"> {IK_PE_THRESHOLD*1000:.0f}mm threshold; "
                       f"fallback to first {len(use_idx)}")
 
+            # Tier-3: per-candidate IK reachability (genuinely varies within
+            # the episode, unlike pe_ik above which reuses one shared CoM
+            # target for prefiltering) -- solved only for the surviving
+            # use_idx candidates, in the same order, so it can be zipped
+            # with them below when a v11_ik-style (20-dim) checkpoint needs
+            # ik_converged/ik_residual/max_joint_delta in each grasp's
+            # _metrics.
+            per_cand_ik = self.env.compute_ik_reachability_per_candidate(
+                [(candidates[i][0], candidates[i][1], gz, candidates[i][2]) for i in use_idx]
+            )
+
             # ── EBM (CEM search) / CFM candidate generation (replaces random sampling when enabled) ─
             obj_name = (self.env.obj_names[self.env.obj_ids.index(obj_id)]
                         if obj_id in self.env.obj_ids and self.env.obj_names
@@ -817,19 +828,23 @@ class RobotEnvUI:
                 grasps = cfm_grasps
             else:
                 grasps = []
-                for i in use_idx:
+                for idx_pos, i in enumerate(use_idx):
                     cx, cy, yaw, opening = candidates[i]
+                    ik = per_cand_ik[idx_pos]
                     grasps.append({
                         "position": [cx, cy, gz],
                         "rpy":      [np.pi, 0.0, yaw],
                         "width":    opening,
                         "score":    0.0,
                         "_metrics": {
-                            "H":       H,
-                            "dz":      0.0,
-                            "dz_lift": 0.0,
-                            "need_dz": 0.0,
-                            "pe_ik":   pe,
+                            "H":               H,
+                            "dz":              0.0,
+                            "dz_lift":         0.0,
+                            "need_dz":         0.0,
+                            "pe_ik":           pe,
+                            "ik_converged":    ik["ik_converged"],
+                            "ik_residual":     ik["ik_residual"],
+                            "max_joint_delta": ik["max_joint_delta"],
                         },
                     })
 

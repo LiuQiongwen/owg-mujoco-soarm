@@ -117,6 +117,36 @@ SOARM_FIELDS = {
         "pool-relative: min-max normalized z within the current candidate "
         "pool's poses -- same verification as dist_to_centroid",
     ),
+    # ADDED (Tier-3, LGGSN per-candidate IK reachability): unlike the
+    # existing "score_candidate_ik" entry above (a single scalar reused
+    # across a whole selection pool) or "pe_ik" (episode-level, one CoM
+    # target for every candidate — see compute_ik_reachability), these three
+    # are solved independently per candidate via
+    # EnvironmentSoArm.compute_ik_reachability_per_candidate, which re-solves
+    # IK from HOME_QPOS against that candidate's own (x, y, z, yaw) and
+    # restores qpos/qvel/ctrl afterward. Admissible for the same reason
+    # score_candidate_ik is: an isolated kinematic check against the
+    # candidate pose alone, never a value read back from the actual
+    # grasp-execution trajectory (see the Piper grasp_yaw entry below for
+    # the failure mode this registry exists to catch: a field that looks
+    # pre-execution but is silently reassigned post-motion).
+    "ik_converged": FieldSpec(
+        Provenance.PRE_EXECUTION,
+        "isolated kinematic IK re-solve against the candidate's own "
+        "(x, y, z, yaw), from HOME_QPOS, via "
+        "compute_ik_reachability_per_candidate -- same admissible pattern "
+        "as score_candidate_ik, never read back from the actual "
+        "grasp-execution trajectory",
+    ),
+    "ik_residual": FieldSpec(
+        Provenance.PRE_EXECUTION,
+        "same isolated per-candidate re-solve as ik_converged",
+    ),
+    "max_joint_delta": FieldSpec(
+        Provenance.PRE_EXECUTION,
+        "same isolated per-candidate re-solve as ik_converged: max absolute "
+        "arm-joint displacement from HOME_QPOS after that re-solve",
+    ),
 }
 
 # ── Piper raw log fields (piper_pick_and_place.py run_pick_and_place) ─────
