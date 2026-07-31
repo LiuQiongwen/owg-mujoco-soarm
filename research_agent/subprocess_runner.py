@@ -29,6 +29,19 @@ class InfrastructureError(RuntimeError):
     """Launch failure or timeout -- the only condition the flow retries."""
 
 
+class ExecutableNotFoundError(InfrastructureError):
+    """The command's executable could not be found (FileNotFoundError). A
+    distinct subclass so callers (e.g. RealCodexAgent) can map it to a
+    specific terminal code without string-sniffing the message -- still an
+    InfrastructureError, so existing isinstance/pytest.raises(InfrastructureError)
+    checks and the flow's retry_condition_fn are unaffected."""
+
+
+class CommandTimeoutError(InfrastructureError):
+    """The command exceeded its timeout and was killed. A distinct subclass
+    for the same reason as ExecutableNotFoundError above."""
+
+
 def redact_environment(env: Mapping[str, str]) -> dict:
     """Return a copy of env with likely-sensitive values masked, for saving
     an environment snapshot alongside a run without leaking secrets."""
@@ -102,7 +115,7 @@ def run_command(
             f"\n[research_agent] command timed out after {timeout}s\n"
         )
     except FileNotFoundError as e:
-        raise InfrastructureError(f"executable not found: {command[0]!r}: {e}") from e
+        raise ExecutableNotFoundError(f"executable not found: {command[0]!r}: {e}") from e
     except OSError as e:
         raise InfrastructureError(f"failed to launch command {command!r}: {e}") from e
 
@@ -127,6 +140,6 @@ def run_command(
     meta_path.write_text(result.model_dump_json(indent=2) + "\n")
 
     if timed_out:
-        raise InfrastructureError(f"command '{name}' timed out after {timeout}s: {command}")
+        raise CommandTimeoutError(f"command '{name}' timed out after {timeout}s: {command}")
 
     return result

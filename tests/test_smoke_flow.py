@@ -227,12 +227,38 @@ def test_smoke_flow_never_invokes_a_real_cli_binary(tmp_path):
 
 # ── regression: the CLI's default (no --agents flag) must stay mock ────────
 
-def test_cli_default_agents_argument_is_mock():
-    """argparse-level guarantee: omitting --agents must resolve to "mock" on
-    both `plan` and `smoke`, so real agents are always an explicit opt-in."""
+def test_cli_default_codex_and_claude_arguments_are_mock():
+    """argparse-level guarantee: omitting --codex/--claude must resolve to
+    "mock" on both `plan` and `smoke`, so real agents are always an explicit,
+    independently-selected opt-in (never bundled behind a single flag)."""
     parser = build_parser()
-    assert parser.parse_args(["plan", "spec.yaml"]).agents == "mock"
-    assert parser.parse_args(["smoke", "spec.yaml"]).agents == "mock"
+    plan_args = parser.parse_args(["plan", "spec.yaml"])
+    assert plan_args.codex == "mock"
+    smoke_args = parser.parse_args(["smoke", "spec.yaml"])
+    assert smoke_args.codex == "mock"
+    assert smoke_args.claude == "mock"
+
+
+def test_cli_smoke_rejects_real_claude_deterministically(tmp_path):
+    """--claude real must never invoke anything: it is rejected up front
+    with the exact deterministic code REAL_CLAUDE_DISABLED_IN_MVP1, and the
+    pipeline must never even start (no run directory should be created)."""
+    repo_root = _init_repo(tmp_path)
+    spec_path = _write_spec(tmp_path, task_id="real_claude_rejected_case")
+    runs_root = tmp_path / "runs"
+
+    result = subprocess.run(
+        [
+            sys.executable, "-m", "research_agent.cli",
+            "--repo-root", str(repo_root), "--runs-root", str(runs_root),
+            "smoke", str(spec_path), "--run-id", "rejected_run",
+            "--claude", "real",
+        ],
+        cwd=PACKAGE_ROOT, capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode != 0
+    assert "REAL_CLAUDE_DISABLED_IN_MVP1" in result.stderr
+    assert not (runs_root / "rejected_run").exists()
 
 
 def test_cli_smoke_default_never_invokes_codex_or_claude_executables(tmp_path):

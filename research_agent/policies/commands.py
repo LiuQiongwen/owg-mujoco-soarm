@@ -31,7 +31,16 @@ FORBIDDEN_EXACT_TOKENS = {
     "nvidia-smi",
     "--backend=real",
     "--confirmatory",
+    "bash",
+    "sh",
 }
+
+# Plan-policy-validation gate (informational commands an LLM plan proposes,
+# never executed directly -- see validate_plan_commands): at most one
+# proposed command per plan, so a plan can never smuggle in an additional
+# or duplicate smoke run alongside (or instead of) the one the deterministic
+# runner will execute.
+MAX_PROPOSED_COMMANDS = 1
 FORBIDDEN_SUBSTRINGS = (
     "cuda",
     "docker",
@@ -93,7 +102,21 @@ def validate_plan_commands(plan: "PlanResult", spec: "ExperimentSpec") -> list[s
     them) must independently pass the same approval gate. Returns a list of
     human-readable violation messages; empty means the plan is clean."""
     violations: list[str] = []
-    for command in plan.proposed_commands:
+    commands = plan.proposed_commands
+
+    if len(commands) > MAX_PROPOSED_COMMANDS:
+        violations.append(
+            f"too many proposed commands: {len(commands)} exceeds max_proposed_commands={MAX_PROPOSED_COMMANDS}"
+        )
+
+    seen: set[tuple[str, ...]] = set()
+    for command in commands:
+        key = tuple(command)
+        if key in seen:
+            violations.append(f"duplicate proposed command is not permitted: {command}")
+            continue
+        seen.add(key)
+
         forbidden = find_forbidden_token(command)
         if forbidden is not None:
             violations.append(f"proposed command contains forbidden token {forbidden!r}: {command}")

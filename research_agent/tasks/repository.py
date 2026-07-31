@@ -102,6 +102,84 @@ def remove_isolated_worktree(repo_root: Path, run_paths: RunPaths, run_id: str, 
     )
 
 
+_IGNORED_STATUS_PREFIXES = (".prefect", "prefect.db")
+
+
+def capture_repo_fingerprint(repo_root: Path, run_paths: RunPaths, *, label: str, timeout: float = 30.0) -> dict:
+    """Cheap, Git-plumbing-based fingerprint of the repository's current
+    tracked/staged/untracked state and HEAD -- used to independently verify
+    (never merely trust Codex's own claim) that a read-only planning
+    subprocess did not modify anything outside its assigned run directory.
+    Called once before and once after the Codex planner runs; see
+    diff_fingerprints below for the comparison."""
+    run_paths.commands_dir.mkdir(parents=True, exist_ok=True)
+    prefix = f"codex_repo_check_{label}"
+
+    def _git(args: list, name: str) -> str:
+        result = subprocess_runner.run_command(
+            ["git", "-C", str(repo_root), *args],
+            cwd=repo_root,
+            run_dir=run_paths.commands_dir,
+            name=name,
+            timeout=timeout,
+        )
+        return Path(result.stdout_path).read_text()
+
+    return {
+        "head": _git(["rev-parse", "HEAD"], f"{prefix}_head").strip(),
+        "status": _git(["status", "--porcelain=v1", "--ignored=matching"], f"{prefix}_status"),
+        "diff": _git(["diff", "--binary"], f"{prefix}_diff"),
+        "diff_cached": _git(["diff", "--cached", "--binary"], f"{prefix}_diff_cached"),
+    }
+
+
+def _relevant_status_lines(raw: str, *, repo_root: Path, run_dir: Path) -> set:
+    run_dir_resolved = run_dir.resolve()
+    lines: set = set()
+    for line in raw.splitlines():
+        if not line.strip():
+            continue
+        path_part = line[3:].strip() if len(line) > 3 else line.strip()
+        if " -> " in path_part:
+            path_part = path_part.split(" -> ", 1)[1]
+        path_part = path_part.strip('"')
+        abs_path = (repo_root / path_part).resolve()
+        try:
+            abs_path.relative_to(run_dir_resolved)
+            continue  # inside the immutable run directory -- expected, not a violation
+        except ValueError:
+            pass
+        if any(path_part == p or path_part.startswith(p + "/") for p in _IGNORED_STATUS_PREFIXES):
+            continue  # expected Prefect local-mode runtime files
+        lines.add(line)
+    return lines
+
+
+def diff_fingerprints(before: dict, after: dict, *, run_dir: Path, repo_root: Path) -> list[str]:
+    """Compare two capture_repo_fingerprint() snapshots, ignoring anything
+    that changed only inside the immutable run directory or known Prefect
+    runtime files. Returns a list of human-readable change descriptions;
+    empty means the repository was untouched (aside from the run
+    directory) between the two snapshots."""
+    changes: list[str] = []
+    if before["head"] != after["head"]:
+        changes.append(f"HEAD moved from {before['head']} to {after['head']}")
+
+    before_status = _relevant_status_lines(before["status"], repo_root=repo_root, run_dir=run_dir)
+    after_status = _relevant_status_lines(after["status"], repo_root=repo_root, run_dir=run_dir)
+    if before_status != after_status:
+        added = sorted(after_status - before_status)
+        removed = sorted(before_status - after_status)
+        changes.append(f"git status changed outside the run directory: added={added} removed={removed}")
+
+    if before["diff"] != after["diff"]:
+        changes.append("tracked working-tree diff changed outside the run directory")
+    if before["diff_cached"] != after["diff_cached"]:
+        changes.append("staged diff changed")
+
+    return changes
+
+
 def worktree_changed_paths(worktree_dir: Path, run_paths: RunPaths, *, timeout: float = 30.0) -> list[str]:
     """Paths (tracked or untracked) changed inside the isolated worktree,
     relative to the worktree root -- used to enforce the path allowlist
