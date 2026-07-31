@@ -54,6 +54,15 @@ trajs/
 paperA_data/lerobot_datasets/
 tango_robot/piper_robosuite/piper_trajs/
 
+# ---- TANGO Experiment Agent runtime artifacts (do NOT commit) ----
+# Project-local virtualenv (kept separate from the shared `tango` conda env)
+# and per-run output directories -- both are regenerated, never source.
+/.venv/
+/research_agent_runs/
+# setuptools build byproducts from `pip install .` (pyproject.toml)
+/build/
+*.egg-info/
+
 # ---- Build byproducts: LaTeX / console logs (do NOT commit) ----
 # Regenerated on every compile/run; not meant to be diffed or reviewed.
 *.aux

@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tango-experiment-agent"
+version = "0.1.0"
+description = "TANGO Experiment Agent -- Prefect-orchestrated, policy-gated experiment pipeline with Codex and Claude Code subprocess adapters."
+requires-python = ">=3.10"
+dependencies = [
+    "prefect==3.8.1",
+    "pydantic==2.13.4",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[tool.setuptools.packages.find]
+include = ["research_agent*"]
