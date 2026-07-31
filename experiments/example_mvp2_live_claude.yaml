@@ -1,0 +1,65 @@
+# The single harmless live-Claude validation task for MVP2 (see the task
+# contract's "Harmless live Claude validation" section). Run only after all
+# fake-Claude tests pass, and only as:
+#
+#   python -m research_agent.cli execute experiments/example_mvp2_live_claude.yaml \
+#       --codex mock --claude real
+#
+# --codex mock isolates real-Claude testing from real-Codex variability, per
+# the task contract. The only permitted modification is a single file with
+# exact, deterministic, non-sensitive content -- no command execution beyond
+# the harness's own read-only inspection/static checks, no commit, no push,
+# no research experiment, no GPU, no robot, no network access.
+
+task_id: example_mvp2_live_claude
+goal: >
+  Inside the assigned execution worktree, create exactly one new file at
+  research_agent_sandbox/live_claude_validation.txt whose entire content is
+  the single line "TANGO_MVP2_LIVE_VALIDATION" (no other text, no trailing
+  content beyond a single trailing newline, no other file created or
+  modified). Do not run any command. Do not modify any other file.
+
+allowed_paths:
+  - research_agent_sandbox
+
+forbidden_paths:
+  - research_agent
+  - tests
+  - tango_robot
+  - grasp_6dof
+  - world_model
+
+allowed_modify_paths:
+  - research_agent_sandbox/live_claude_validation.txt
+
+max_changed_files: 1
+max_changed_bytes: 200
+
+allowed_executor_commands: []
+required_executor_checks:
+  - compileall
+
+# Placeholder only -- execute_flow never runs this command.
+smoke_command:
+  - python
+  - "-c"
+  - "pass"
+
+confirmatory_command: null
+
+seeds: [0]
+
+timeouts:
+  planner_seconds: 60
+  executor_seconds: 180
+  smoke_seconds: 30
+  verifier_seconds: 30
+  reviewer_seconds: 60
+
+required_metrics: []
+
+approval:
+  required_for_confirmatory: true
+  approved_by: null
+
+max_run_count: 3
