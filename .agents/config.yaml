@@ -1,0 +1,16 @@
+version: 1
+max_rounds: 2
+default_timeout_seconds: 30
+max_trials: 10
+max_seeds: 2
+max_cost_units: 3
+prefer_worktree: true
+protected_paths:
+  - results
+  - data
+  - paperA_data
+  - trajs
+  - grasp_6dof/models
+  - .agents/locks
+confirmatory_lock_dir: .agents/locks
+runs_dir: .agents/runs

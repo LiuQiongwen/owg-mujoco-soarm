@@ -70,3 +70,15 @@ MUJOCO_LOG.TXT
 /cfm_all_poses_ot.png
 /cfm_banana_poses.png
 /ddpm_all_poses.png
+
+# Agent runtime artifacts
+.agents/runs/*
+!.agents/runs/.gitignore
+!.agents/runs/.gitkeep
+.agents/state.json
+.agents/claude_report.md
+.agents/codex_plan.md
+.agents/codex_review.md
+.agents/config.sh
+.agents/run_research_loop.sh
+.agents/task.md
