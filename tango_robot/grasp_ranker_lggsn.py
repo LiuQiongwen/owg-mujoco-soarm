@@ -28,6 +28,13 @@ FEATURE_COLS_EXT  = FEATURE_COLS_FULL + [
     "local_point_density", "normal_consistency", "contact_width_ratio",
 ]
 FEATURE_COLS_EXT2 = FEATURE_COLS_EXT + ["pe_ik"]
+# Tier-3: per-candidate IK reachability (see
+# EnvironmentSoArm.compute_ik_reachability_per_candidate), built on top of
+# the 17-dim FEATURE_COLS_EXT (the v5d feature set), NOT on top of the
+# 18-dim pe_ik variant above -- pe_ik is episode-level (one CoM target
+# shared by every candidate); these three are solved independently per
+# candidate and are meant to replace pe_ik's role, not stack with it.
+FEATURE_COLS_EXT3_IK = FEATURE_COLS_EXT + ["ik_converged", "ik_residual", "max_joint_delta"]
 
 # Module-level alias kept for backward-compat imports
 FEATURE_COLS = FEATURE_COLS_FULL if (_USE_DIST and _USE_ZREL) else (
@@ -100,7 +107,7 @@ class LggsnGraspRanker:
         # ── Step 3: derive per-instance feature flags from geom_dim ──────────
         # LGGSNVision checkpoints have ckpt_dim = geom_dim + vis_dim (e.g. 18+256=274).
         _VIS_DIM = 256
-        _KNOWN_GEOM = {12, 14, 17, 18}
+        _KNOWN_GEOM = {12, 14, 17, 18, 20}
         if ckpt_dim in _KNOWN_GEOM:
             self._vis_dim = 0
             _actual_geom  = ckpt_dim
@@ -111,7 +118,7 @@ class LggsnGraspRanker:
         else:
             raise ValueError(
                 f"Unsupported checkpoint geom_dim={ckpt_dim} (mlp_in={mlp_in_dim}) "
-                f"in {model_path}; expected 12, 14, 17, 18 or 18+256=274"
+                f"in {model_path}; expected 12, 14, 17, 18, 20 or +256 vision variants"
             )
 
         if ckpt_dim == 12:
@@ -119,6 +126,7 @@ class LggsnGraspRanker:
             self._use_zrel = False
             self._use_pc_feats = False
             self._use_pe_ik = False
+            self._use_ik_feats = False
             self._feature_cols = FEATURE_COLS_BASE[:]
             print(f"[LggsnGraspRanker] legacy 12-dim checkpoint — "
                   f"dist_to_centroid and z_rel disabled for this instance")
@@ -127,19 +135,32 @@ class LggsnGraspRanker:
             self._use_zrel = True
             self._use_pc_feats = False
             self._use_pe_ik = False
+            self._use_ik_feats = False
             self._feature_cols = FEATURE_COLS_FULL[:]
         elif ckpt_dim == 17:
             self._use_dist = True
             self._use_zrel = True
             self._use_pc_feats = True
             self._use_pe_ik = False
+            self._use_ik_feats = False
             self._feature_cols = FEATURE_COLS_EXT[:]
         elif ckpt_dim == 18:
             self._use_dist = True
             self._use_zrel = True
             self._use_pc_feats = True
             self._use_pe_ik = True
+            self._use_ik_feats = False
             self._feature_cols = FEATURE_COLS_EXT2[:]
+        elif ckpt_dim == 20:
+            # Tier-3: per-candidate IK reachability (ik_converged/ik_residual/
+            # max_joint_delta), built on FEATURE_COLS_EXT (not on the pe_ik
+            # variant) -- see FEATURE_COLS_EXT3_IK above.
+            self._use_dist = True
+            self._use_zrel = True
+            self._use_pc_feats = True
+            self._use_pe_ik = False
+            self._use_ik_feats = True
+            self._feature_cols = FEATURE_COLS_EXT3_IK[:]
 
         vis_tag = f" + vis({self._vis_dim})" if self._vis_dim else ""
         q_tag   = f" + query_emb({_n_queries}×{_query_dim})" if _has_query_emb else ""
@@ -464,6 +485,18 @@ class LggsnGraspRanker:
                 g_ = self._unwrap_grasp(g_raw)
                 pe_vals.append(float((g_.get("_metrics") or {}).get("pe_ik", 0.0)))
             extra.append(np.array(pe_vals, dtype=np.float32).reshape(-1, 1))
+
+        if self._use_ik_feats:
+            ik_rows = []
+            for g_raw in grasps:
+                g_ = self._unwrap_grasp(g_raw)
+                m_ = g_.get("_metrics") or {}
+                ik_rows.append([
+                    1.0 if m_.get("ik_converged", False) else 0.0,
+                    float(m_.get("ik_residual", 0.0)),
+                    float(m_.get("max_joint_delta", 0.0)),
+                ])
+            extra.append(np.array(ik_rows, dtype=np.float32))
 
         if extra:
             return np.concatenate([arr] + extra, axis=1)

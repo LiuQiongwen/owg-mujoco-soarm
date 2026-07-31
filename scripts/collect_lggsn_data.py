@@ -229,14 +229,23 @@ def _compute_per_candidate_vis_feats(
 def _featurize_candidates(cands: np.ndarray,
                            episode_pcd: np.ndarray,
                            pe_ik: float,
-                           vis_feats: list | None = None) -> list[dict]:
+                           vis_feats: list | None = None,
+                           per_cand_ik: list | None = None) -> list[dict]:
     """
-    Build 18-dim feature dict for every candidate.
+    Build 18-dim feature dict for every candidate (21-dim when per_cand_ik
+    is given — see below).
 
     cands: (N, 6)  [x, y, z, yaw, opening_len, obj_height]
     episode_pcd: (M, 3) full scene pointcloud in robot-base frame
     pe_ik: IK position error for the CoM target (same for all candidates in
            episode — mirrors inference where all candidates share CoM target)
+    per_cand_ik: optional list of N dicts from
+        EnvironmentSoArm.compute_ik_reachability_per_candidate (Tier-3),
+        each {"ik_converged", "ik_residual", "max_joint_delta"} solved
+        independently for that candidate's own (x, y, z, yaw) — unlike
+        pe_ik, this genuinely varies within an episode. When given, these
+        three keys are added to every row; when None (default), they're
+        omitted and rows stay 18-dim, unchanged from before.
 
     dist_to_centroid and z_rel are episode-level (computed across all N
     candidates) and stored directly so the training script needs no recompute.
@@ -288,6 +297,10 @@ def _featurize_candidates(cands: np.ndarray,
             "visual_feat":         vis_feats[i] if vis_feats is not None
                                    else [0.0] * 256,
         }
+        if per_cand_ik is not None:
+            row["ik_converged"]   = bool(per_cand_ik[i]["ik_converged"])
+            row["ik_residual"]    = round(float(per_cand_ik[i]["ik_residual"]), 6)
+            row["max_joint_delta"] = round(float(per_cand_ik[i]["max_joint_delta"]), 6)
         rows.append(row)
     return rows
 
@@ -339,6 +352,13 @@ def collect_episode(
     pe_iks = env.compute_ik_reachability([com_target])
     pe_ik  = pe_iks[0]
 
+    # ── Tier-3: per-candidate IK reachability (genuinely varies within the
+    #    episode, unlike pe_ik above which reuses one shared CoM target) ──────
+    per_cand_ik = env.compute_ik_reachability_per_candidate(
+        [(float(cands[i, 0]), float(cands[i, 1]), float(cands[i, 2]), float(cands[i, 3]))
+         for i in range(len(cands))]
+    )
+
     # ── SAM visual features: per-candidate projection onto feature map ────────
     vis_feats = None
     if segmentor is not None:
@@ -350,7 +370,8 @@ def collect_episode(
         )
 
     # ── featurize ALL candidates upfront (episode-context stats use full set) ─
-    feat_rows = _featurize_candidates(cands, episode_pcd, pe_ik, vis_feats=vis_feats)
+    feat_rows = _featurize_candidates(cands, episode_pcd, pe_ik, vis_feats=vis_feats,
+                                       per_cand_ik=per_cand_ik)
 
     # ── execute top-max_candidates individually, respawning each time ─────────
     n_exec = min(max_candidates, len(cands))
@@ -389,11 +410,13 @@ def collect_episode(
         if not quiet:
             sym = "✓" if success else "✗"
             r   = feat_rows[cand_idx]
+            ik_tag = (f"  ik_res={r['ik_residual']*1000:.1f}mm"
+                      f" conv={int(r['ik_converged'])}" if "ik_residual" in r else "")
             print(f"  [{sym}] {obj_key:<10} s{seed:03d}  c={cand_idx}  "
                   f"H={H:.3f}  "
                   f"ld={r['local_point_density']:.3f}  "
                   f"nc={r['normal_consistency']:.3f}  "
-                  f"pe_ik={pe_ik*1000:.1f}mm")
+                  f"pe_ik={pe_ik*1000:.1f}mm{ik_tag}")
 
     return n_success, n_exec
 
