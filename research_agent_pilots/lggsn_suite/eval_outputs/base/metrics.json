@@ -1,0 +1,56 @@
+{
+  "checkpoint_name": "base",
+  "checkpoint_sha256": "333f792615547a293b6e7a33fe23b9ecc1366ae7406e0552f53479a719d4d499",
+  "provenance_status": "EVALUATABLE_WITH_VERIFIED_PROVENANCE",
+  "feature_columns": [
+    "x",
+    "y",
+    "z",
+    "roll",
+    "pitch",
+    "yaw",
+    "width",
+    "score",
+    "dz",
+    "dz_lift",
+    "need_dz",
+    "H"
+  ],
+  "input_dim": 12,
+  "dataset_sha256": "30ca2c398de4bc451691ae6e802e619e7838e0b8bce12a4eba8115b6ff4c42b5",
+  "seed": 42,
+  "val_frac": 0.2,
+  "eligible_group_count": 297,
+  "eligible_pair_count": 582,
+  "pair_accuracy": 0.654639175257732,
+  "positive_score_mean": 0.6037190852188828,
+  "negative_score_mean": 0.5490631087688287,
+  "mean_score_margin": 0.15158650670136578,
+  "median_score_margin": 0.13396649062633514,
+  "ties_count": 0,
+  "malformed_group_count": 0,
+  "skipped_row_count": 0,
+  "all_scores_finite": true,
+  "bootstrap_ci_95": [
+    0.400390625,
+    0.7437908496732026
+  ],
+  "per_query_val_pair_accuracy": {
+    "Banana": 0.6634615384615384,
+    "MustardBottle": 0.8083333333333333,
+    "Scissors": 0.7652173913043478,
+    "TomatoSoupCan": 0.19736842105263158,
+    "PowerDrill": 0.6176470588235294,
+    "CrackerBox": 0.7070707070707071
+  },
+  "train_split": {
+    "pair_count": 8943,
+    "pair_accuracy": 0.5501509560550151,
+    "ties_count": 0,
+    "mean_score_margin": 0.06506572018846007,
+    "median_score_margin": 0.04008018970489502
+  },
+  "deterministic_digest": "96fa1a877c0cc41af8273c5faa674bd1ea68fcdb26a6c4e4273acd280bddd86a",
+  "pilot_ok": true,
+  "runtime_seconds": 2.1913
+}

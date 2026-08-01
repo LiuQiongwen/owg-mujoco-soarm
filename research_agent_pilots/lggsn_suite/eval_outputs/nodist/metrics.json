@@ -1,0 +1,57 @@
+{
+  "checkpoint_name": "nodist",
+  "checkpoint_sha256": "f85bbf0daa7c2bd0d002f7d8f4c48ce4ad2429d005e10fa62f8ba38ccc9bc3d7",
+  "provenance_status": "EVALUATABLE_WITH_VERIFIED_PROVENANCE",
+  "feature_columns": [
+    "x",
+    "y",
+    "z",
+    "roll",
+    "pitch",
+    "yaw",
+    "width",
+    "score",
+    "dz",
+    "dz_lift",
+    "need_dz",
+    "H",
+    "z_rel"
+  ],
+  "input_dim": 13,
+  "dataset_sha256": "30ca2c398de4bc451691ae6e802e619e7838e0b8bce12a4eba8115b6ff4c42b5",
+  "seed": 42,
+  "val_frac": 0.2,
+  "eligible_group_count": 297,
+  "eligible_pair_count": 582,
+  "pair_accuracy": 0.5257731958762887,
+  "positive_score_mean": 0.7464669068443207,
+  "negative_score_mean": 0.7586363859821312,
+  "mean_score_margin": -0.10706362620004972,
+  "median_score_margin": 7.683038711547852e-05,
+  "ties_count": 0,
+  "malformed_group_count": 0,
+  "skipped_row_count": 0,
+  "all_scores_finite": true,
+  "bootstrap_ci_95": [
+    0.3895216400911162,
+    0.6492146596858639
+  ],
+  "per_query_val_pair_accuracy": {
+    "Banana": 0.5192307692307693,
+    "MustardBottle": 0.2916666666666667,
+    "Scissors": 0.6608695652173913,
+    "TomatoSoupCan": 0.5526315789473685,
+    "PowerDrill": 0.27941176470588236,
+    "CrackerBox": 0.8080808080808081
+  },
+  "train_split": {
+    "pair_count": 8943,
+    "pair_accuracy": 0.5266689030526669,
+    "ties_count": 1,
+    "mean_score_margin": -0.004619627686081002,
+    "median_score_margin": 7.76052474975586e-05
+  },
+  "deterministic_digest": "ed7315089a2ee369671d79a5af3b7aa955238f53e181762f6e0573f3f37f3f89",
+  "pilot_ok": true,
+  "runtime_seconds": 1.2941
+}

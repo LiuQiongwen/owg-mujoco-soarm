@@ -1,0 +1,57 @@
+{
+  "checkpoint_name": "nozrel",
+  "checkpoint_sha256": "9ebf71758a63646d152387d483265389b31e137b52d9b488ac9805725b24d1dc",
+  "provenance_status": "EVALUATABLE_WITH_VERIFIED_PROVENANCE",
+  "feature_columns": [
+    "x",
+    "y",
+    "z",
+    "roll",
+    "pitch",
+    "yaw",
+    "width",
+    "score",
+    "dz",
+    "dz_lift",
+    "need_dz",
+    "H",
+    "dist_to_centroid"
+  ],
+  "input_dim": 13,
+  "dataset_sha256": "30ca2c398de4bc451691ae6e802e619e7838e0b8bce12a4eba8115b6ff4c42b5",
+  "seed": 42,
+  "val_frac": 0.2,
+  "eligible_group_count": 297,
+  "eligible_pair_count": 582,
+  "pair_accuracy": 0.6872852233676976,
+  "positive_score_mean": 0.009231380256579262,
+  "negative_score_mean": 0.005787443216088214,
+  "mean_score_margin": 0.01529691022868477,
+  "median_score_margin": 0.0003765241417568177,
+  "ties_count": 0,
+  "malformed_group_count": 0,
+  "skipped_row_count": 0,
+  "all_scores_finite": true,
+  "bootstrap_ci_95": [
+    0.46740858505564387,
+    0.7843137254901961
+  ],
+  "per_query_val_pair_accuracy": {
+    "Banana": 0.6634615384615384,
+    "MustardBottle": 0.8166666666666667,
+    "Scissors": 0.7304347826086957,
+    "TomatoSoupCan": 0.34210526315789475,
+    "PowerDrill": 0.6470588235294118,
+    "CrackerBox": 0.797979797979798
+  },
+  "train_split": {
+    "pair_count": 8943,
+    "pair_accuracy": 0.6288717432628872,
+    "ties_count": 0,
+    "mean_score_margin": 0.006761532494324193,
+    "median_score_margin": 0.0005066226876806468
+  },
+  "deterministic_digest": "5e3a66595b215c20dac112a84eeb0faa284381b7dbf9d24aa42254f815c35e55",
+  "pilot_ok": true,
+  "runtime_seconds": 1.2986
+}
