@@ -54,7 +54,7 @@ from typing import Optional
 from pydantic import ValidationError
 
 from research_agent import subprocess_runner
-from research_agent.models import CommandResult, PlanResult, ReviewResult
+from research_agent.models import CommandResult, DiagnosisResult, PlanResult, ReviewResult
 
 
 def _strict_output_schema(model_cls) -> dict:
@@ -246,16 +246,109 @@ class RealCodexAgent(CodexAgent):
         data = json.loads(out_path.read_text())
         return ReviewResult.model_validate(data)
 
+    def diagnose(
+        self, *, prompt: str, run_dir: Path, cwd: Path, timeout: float, task_id: str, run_id: str, attempt_index: int
+    ) -> DiagnosisResult:
+        """MVP3 diagnosis role: a read-only `codex exec` invocation, exactly
+        as read-only/ephemeral as `plan` -- a separate ROLE (different
+        prompt, different schema, produces DiagnosisResult not PlanResult),
+        not a separate adapter class. Never retried by the caller (see
+        research_agent.repair_flow) for anything except the narrow,
+        explicit "malformed JSON, first occurrence" case the MVP3 task
+        contract permits."""
+        run_dir = Path(run_dir)
+        prompts_dir = run_dir / "prompts"
+        prompts_dir.mkdir(parents=True, exist_ok=True)
+        prompt_path = prompts_dir / f"codex_diagnosis_{attempt_index:02d}_prompt.md"
+        prompt_path.write_text(prompt)
+
+        schema_path = run_dir / f"diagnosis_{attempt_index:02d}.schema.json"
+        schema_path.write_text(json.dumps(_strict_output_schema(DiagnosisResult), indent=2) + "\n")
+
+        raw_path = run_dir / f"diagnosis_{attempt_index:02d}.raw.json"
+        if raw_path.exists():
+            raw_path.unlink()
+
+        resolved_binary = shutil.which(self._binary)
+        command = [
+            resolved_binary or self._binary,
+            "exec",
+            "--sandbox",
+            "read-only",
+            "--ephemeral",
+            "--output-schema",
+            str(schema_path.resolve()),
+            "--output-last-message",
+            str(raw_path.resolve()),
+            "-",
+        ]
+
+        commands_dir = run_dir / "commands"
+        commands_dir.mkdir(parents=True, exist_ok=True)
+        name = f"codex_diagnosis_{attempt_index:02d}"
+        (commands_dir / f"{name}.command.json").write_text(json.dumps(command, indent=2) + "\n")
+
+        try:
+            result = subprocess_runner.run_command(
+                command, cwd=cwd, run_dir=commands_dir, name=name, timeout=timeout, input_path=prompt_path,
+            )
+        except subprocess_runner.ExecutableNotFoundError as e:
+            self._write_launch_failure_artifacts(commands_dir, command, cwd, resolved_binary, message=str(e), name=name)
+            raise
+        except subprocess_runner.CommandTimeoutError:
+            self._write_completed_or_timeout_artifacts(commands_dir, resolved_binary, name=name)
+            raise
+
+        self._write_completed_or_timeout_artifacts(commands_dir, resolved_binary, result=result, name=name)
+
+        if result.returncode != 0:
+            stderr_text = Path(result.stderr_path).read_text()
+            if _looks_like_auth_failure(result.returncode, stderr_text):
+                raise CodexPlannerError(
+                    "CODEX_AUTHENTICATION_FAILED", f"codex exec exited {result.returncode}; see commands/{name}.stderr",
+                )
+            raise CodexPlannerError(
+                "CODEX_NONZERO_EXIT", f"codex exec exited {result.returncode}; see commands/{name}.stderr",
+            )
+
+        if not raw_path.exists():
+            raise CodexPlannerError("CODEX_OUTPUT_MISSING", f"no output written to {raw_path}")
+
+        raw_text = raw_path.read_text()
+        try:
+            data = json.loads(raw_text)
+        except json.JSONDecodeError as e:
+            raise CodexPlannerError("CODEX_OUTPUT_MALFORMED", f"{raw_path.name} is not valid JSON: {e}") from e
+
+        try:
+            diagnosis = DiagnosisResult.model_validate(data)
+        except ValidationError as e:
+            raise CodexPlannerError("CODEX_SCHEMA_INVALID", str(e)) from e
+
+        if diagnosis.task_id != task_id:
+            raise CodexPlannerError("CODEX_TASK_ID_MISMATCH", f"expected task_id={task_id!r}, got {diagnosis.task_id!r}")
+        if diagnosis.run_id != run_id:
+            raise CodexPlannerError("CODEX_RUN_ID_MISMATCH", f"expected run_id={run_id!r}, got {diagnosis.run_id!r}")
+        if diagnosis.attempt_index != attempt_index:
+            raise CodexPlannerError(
+                "CODEX_ATTEMPT_INDEX_MISMATCH",
+                f"expected attempt_index={attempt_index!r}, got {diagnosis.attempt_index!r}",
+            )
+
+        return diagnosis
+
     @staticmethod
-    def _write_launch_failure_artifacts(commands_dir: Path, command, cwd, resolved_binary, *, message: str) -> None:
+    def _write_launch_failure_artifacts(
+        commands_dir: Path, command, cwd, resolved_binary, *, message: str, name: str = "codex_planner"
+    ) -> None:
         """The executable could not even be launched: subprocess_runner
         raises before writing any of its usual sidecar files, so we write
         the required artifacts ourselves here."""
-        (commands_dir / "codex_planner.stdout").write_text("")
-        (commands_dir / "codex_planner.stderr").write_text(message)
-        (commands_dir / "codex_planner.exit_code").write_text("")
+        (commands_dir / f"{name}.stdout").write_text("")
+        (commands_dir / f"{name}.stderr").write_text(message)
+        (commands_dir / f"{name}.exit_code").write_text("")
         payload = {
-            "name": "codex_planner",
+            "name": name,
             "command": [str(tok) for tok in command],
             "cwd": str(cwd),
             "returncode": None,
@@ -266,15 +359,15 @@ class RealCodexAgent(CodexAgent):
             "resolved_executable": resolved_binary,
             "error": message,
         }
-        (commands_dir / "codex_planner.result.json").write_text(json.dumps(payload, indent=2) + "\n")
+        (commands_dir / f"{name}.result.json").write_text(json.dumps(payload, indent=2) + "\n")
 
     @staticmethod
     def _write_completed_or_timeout_artifacts(
-        commands_dir: Path, resolved_binary, *, result: Optional[CommandResult] = None
+        commands_dir: Path, resolved_binary, *, result: Optional[CommandResult] = None, name: str = "codex_planner"
     ) -> None:
         """Normal completion (any exit code) always has a CommandResult; a
         timeout does not (subprocess_runner raises instead of returning),
-        but it has already written commands/codex_planner.meta.json to disk
+        but it has already written commands/{name}.meta.json to disk
         before raising -- read that back to populate result.json."""
         if result is not None:
             exit_code_text = "" if result.returncode is None else str(result.returncode)
@@ -290,12 +383,12 @@ class RealCodexAgent(CodexAgent):
                 "resolved_executable": resolved_binary,
             }
         else:
-            meta_path = commands_dir / "codex_planner.meta.json"
+            meta_path = commands_dir / f"{name}.meta.json"
             meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
             exit_code_text = ""
             payload = {**meta, "resolved_executable": resolved_binary}
-        (commands_dir / "codex_planner.exit_code").write_text(exit_code_text)
-        (commands_dir / "codex_planner.result.json").write_text(json.dumps(payload, indent=2) + "\n")
+        (commands_dir / f"{name}.exit_code").write_text(exit_code_text)
+        (commands_dir / f"{name}.result.json").write_text(json.dumps(payload, indent=2) + "\n")
 
 
 class MockCodexAgent(CodexAgent):
@@ -303,9 +396,28 @@ class MockCodexAgent(CodexAgent):
     touches the network -- the smoke flow's default agent, and the only
     Codex adapter any automated test in this repository uses."""
 
-    def __init__(self, plan_verdict: str = "PLAN_PASS", review_verdict: str = "REVIEW_PASS"):
+    def __init__(
+        self,
+        plan_verdict: str = "PLAN_PASS",
+        review_verdict: str = "REVIEW_PASS",
+        *,
+        diagnose_verdict: str = "DIAGNOSE_REPAIRABLE",
+        diagnose_failure_class: str = "EXPECTED_CONTENT_MISMATCH",
+        diagnose_files_allowed_to_touch: Optional[list[str]] = None,
+        diagnose_commands_allowed_to_run: Optional[list[list[str]]] = None,
+    ):
         self._plan_verdict = plan_verdict
         self._review_verdict = review_verdict
+        # MVP3 diagnosis-role configuration (additive; unused by MVP0/1/2
+        # callers, which never call .diagnose()). An empty/None
+        # files_allowed_to_touch means "do not narrow the original spec's
+        # allowed_modify_paths any further" -- see repair_flow.py's scope
+        # validation, which always intersects this against the ORIGINAL
+        # spec and never trusts it to expand scope.
+        self._diagnose_verdict = diagnose_verdict
+        self._diagnose_failure_class = diagnose_failure_class
+        self._diagnose_files_allowed_to_touch = diagnose_files_allowed_to_touch
+        self._diagnose_commands_allowed_to_run = diagnose_commands_allowed_to_run or []
 
     def plan(self, *, prompt, run_dir, cwd, timeout, task_id, run_id) -> PlanResult:
         return PlanResult(
@@ -326,4 +438,22 @@ class MockCodexAgent(CodexAgent):
             summary="mock reviewer: inspected saved verification artifacts; no issues raised",
             issues=[],
             artifacts=[],
+        )
+
+    def diagnose(
+        self, *, prompt, run_dir, cwd, timeout, task_id, run_id, attempt_index
+    ) -> DiagnosisResult:
+        return DiagnosisResult(
+            task_id=task_id,
+            run_id=run_id,
+            attempt_index=attempt_index,
+            verdict=self._diagnose_verdict,
+            failure_class=self._diagnose_failure_class,
+            root_cause="mock diagnosis: canned, deterministic, offline -- see MockCodexAgent(diagnose_*=...)",
+            evidence=[],
+            repair_instructions=["apply the smallest change that satisfies the verifier's failed checks"],
+            files_allowed_to_touch=list(self._diagnose_files_allowed_to_touch or []),
+            commands_allowed_to_run=[list(c) for c in self._diagnose_commands_allowed_to_run],
+            risks=[],
+            assumptions=[],
         )
