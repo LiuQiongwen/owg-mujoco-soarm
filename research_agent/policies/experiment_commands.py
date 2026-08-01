@@ -178,9 +178,20 @@ def approved_commands(spec: "ExperimentSpec") -> list[list[str]]:
     return [list(c) for c in spec.execution.approved_commands]
 
 
-def assert_exact_match(command: Sequence[str], spec: "ExperimentSpec") -> None:
+def assert_exact_match(
+    command: Sequence[str], spec: "ExperimentSpec", *, approved_commands_override: "list[list[str]] | None" = None
+) -> None:
+    """approved_commands_override lets a caller compare against a RESOLVED
+    approved-commands list (research_agent.policies.repo_root_placeholder)
+    instead of spec.execution.approved_commands verbatim -- e.g. when a spec
+    uses the ${REPO_ROOT} placeholder, both `command` and every entry in the
+    override must already be fully resolved (no `${...}` left in either) by
+    the caller; this function does no placeholder expansion itself. None
+    (the default) preserves the exact prior behavior for every spec that
+    never uses a placeholder."""
     command = list(command)
-    if not any(command == approved for approved in approved_commands(spec)):
+    candidates = approved_commands_override if approved_commands_override is not None else approved_commands(spec)
+    if not any(command == approved for approved in candidates):
         raise ExperimentCommandPolicyViolation(
             "UNAPPROVED_COMMAND", f"command does not exactly match an approved command in the specification: {command}"
         )
@@ -196,38 +207,55 @@ def assert_command_count_within_limit(commands: Sequence[Sequence[str]], spec: "
         )
 
 
-def authorize_execution(command: Sequence[str], spec: "ExperimentSpec") -> None:
+def authorize_execution(
+    command: Sequence[str], spec: "ExperimentSpec", *, approved_commands_override: "list[list[str]] | None" = None
+) -> None:
     """The single entry point research_agent.execution_flow calls before
     spawning any restricted subprocess. Runs every gate in a fixed order;
     raises ExperimentCommandPolicyViolation on the first one that fails.
     Never returns a "maybe" -- either the command is fully authorized, or an
-    exception is raised."""
+    exception is raised.
+
+    `command` must already be fully resolved (see
+    research_agent.policies.repo_root_placeholder) -- this function never
+    expands a placeholder itself, it only authorizes what it's given."""
     assert_command_shape(command)
     command = list(command)
     assert_no_shell_metacharacters(command)
     assert_executable_allowed(command)
     assert_no_forbidden_tokens(command)
     assert_no_network_indicators(command)
-    assert_exact_match(command, spec)
+    assert_exact_match(command, spec, approved_commands_override=approved_commands_override)
 
 
-def validate_approved_commands(spec: "ExperimentSpec") -> list[str]:
-    """Spec-load-time validation: every entry in spec.execution
-    .approved_commands must independently pass every gate EXCEPT the
-    exact-match gate (trivially true against itself) -- used by
-    execution_flow's upfront POLICY_FAILURE check so a spec containing an
-    unsafe "approved" command is rejected before planning ever starts, not
-    discovered only when execution is attempted. Returns human-readable
-    violation messages; empty means every approved command is clean."""
+def validate_approved_commands(
+    spec: "ExperimentSpec", *, commands: "list[list[str]] | None" = None
+) -> list[str]:
+    """Spec-load-time validation: every entry in `commands` (default:
+    spec.execution.approved_commands, unresolved) must independently pass
+    every gate EXCEPT the exact-match gate (trivially true against itself)
+    -- used by execution_flow's upfront POLICY_FAILURE check so a spec
+    containing an unsafe "approved" command is rejected before planning
+    ever starts, not discovered only when execution is attempted. Returns
+    human-readable violation messages; empty means every approved command
+    is clean.
+
+    A caller resolving a ${REPO_ROOT} placeholder (research_agent.policies
+    .repo_root_placeholder) should pass the RESOLVED commands here --
+    otherwise the literal `${REPO_ROOT}` token's `$` would trip
+    assert_no_shell_metacharacters, which has no awareness of placeholder
+    syntax at all (deliberately -- see that module's docstring: it is the
+    only place ${...} is ever understood)."""
     violations: list[str] = []
     if spec.execution is None:
         return violations
-    if len(spec.execution.approved_commands) > spec.execution.limits.max_commands:
+    effective_commands = commands if commands is not None else spec.execution.approved_commands
+    if len(effective_commands) > spec.execution.limits.max_commands:
         violations.append(
-            f"approved_commands has {len(spec.execution.approved_commands)} entries, exceeding "
+            f"approved_commands has {len(effective_commands)} entries, exceeding "
             f"limits.max_commands={spec.execution.limits.max_commands}"
         )
-    for command in spec.execution.approved_commands:
+    for command in effective_commands:
         try:
             assert_command_shape(command)
             assert_no_shell_metacharacters(command)
