@@ -78,6 +78,7 @@ from research_agent.policies import commands as command_policy
 from research_agent.policies import environment_policy
 from research_agent.policies import execution_policy
 from research_agent.policies import experiment_commands
+from research_agent.policies import repo_root_placeholder
 from research_agent.restricted_subprocess import (
     RestrictedExecutableNotFoundError,
     RestrictedSubprocessError,
@@ -480,9 +481,27 @@ def run_experiment_flow(
 
         _transition("PLAN_VALIDATED")
 
+        # ── resolve any ${REPO_ROOT} placeholder in every approved command
+        # (research_agent.policies.repo_root_placeholder) BEFORE any policy
+        # gate ever runs -- by design, no gate downstream of this point
+        # understands placeholder syntax at all. resolved_approved_commands
+        # is reused for the exact-match authorization check in the
+        # execution loop below, so validation and execution are guaranteed
+        # to agree on the exact same resolved values. ──────────────────────
+        declared_approved_commands = [list(c) for c in execution.approved_commands] if execution else []
+        try:
+            resolved_approved_commands = [
+                repo_root_placeholder.resolve_command(c, repo_root) for c in declared_approved_commands
+            ]
+        except repo_root_placeholder.PlaceholderPolicyViolation as e:
+            return _finalize(final_state="POLICY_FAILURE", stage="approved_commands_placeholder_resolution", reason=str(e))
+
         # ── defense-in-depth: re-validate every approved experiment command
-        # (not just the pre-execution implementation commands above) ──────
-        cmd_violations = experiment_commands.validate_approved_commands(spec)
+        # (not just the pre-execution implementation commands above) --
+        # against the RESOLVED form, since the declared form's literal
+        # ${REPO_ROOT} would otherwise trip the generic shell-metacharacter
+        # gate, which has no placeholder awareness (deliberately). ─────────
+        cmd_violations = experiment_commands.validate_approved_commands(spec, commands=resolved_approved_commands)
         if cmd_violations:
             return _finalize(final_state="POLICY_FAILURE", stage="approved_commands_validation", reason="; ".join(cmd_violations))
 
@@ -577,7 +596,10 @@ def run_experiment_flow(
             return _finalize(final_state="POLICY_FAILURE", stage="execution_gate", reason=f"execution_mode={execution.execution_mode!r} is not permitted in this MVP4 build")
 
         before_exec_fp = repository_tasks.capture_repo_fingerprint(repo_root, run_paths, label="before_execution")
-        current_commands = [list(c) for c in execution.approved_commands]
+        # Same declared/resolved lists computed once above (before the
+        # approved_commands_validation gate) -- reused here so validation
+        # and execution can never disagree about what "resolved" means.
+        current_commands = declared_approved_commands
 
         # ── bounded EXECUTING / VERIFYING_RESULTS / repair loop ────────────
         attempt_index = 0
@@ -605,8 +627,18 @@ def run_experiment_flow(
                 if i >= limits.max_commands:
                     command_issues.append(f"command index {i} exceeds limits.max_commands={limits.max_commands}")
                     break
+                # `command` (declared, possibly containing ${REPO_ROOT}) is
+                # persisted as this attempt's approved_command for audit;
+                # `resolved_command` (placeholder-free, an absolute path
+                # inside repo_root) is what is actually authorized and
+                # executed. Both are recorded (see run_restricted_command's
+                # command.json: approved_command=declared,
+                # executed_command=resolved).
+                resolved_command = resolved_approved_commands[i]
                 try:
-                    experiment_commands.authorize_execution(command, spec)
+                    experiment_commands.authorize_execution(
+                        resolved_command, spec, approved_commands_override=resolved_approved_commands
+                    )
                 except experiment_commands.ExperimentCommandPolicyViolation as e:
                     command_authorization_violations.append(str(e))
                     break
@@ -614,12 +646,19 @@ def run_experiment_flow(
                 remaining_runtime_budget = max(1.0, limits.max_total_command_runtime_seconds - total_command_runtime - runtime_this_attempt)
                 per_cmd_timeout = min(limits.per_command_timeout_seconds, remaining_runtime_budget)
                 command_dir = run_paths.execution_command_dir(attempt_index, i)
+                # rlimit_overrides is deliberately narrow: only max_processes
+                # is ever spec-configurable (see ExecutionLimits.max_processes),
+                # so every other restricted_subprocess.DEFAULT_LIMITS value
+                # (cpu_seconds, address_space_bytes, file_size_bytes,
+                # max_open_files) stays exactly as fixed today for every spec.
+                rlimit_overrides = {"max_processes": limits.max_processes} if limits.max_processes is not None else None
                 try:
                     result = run_restricted_command(
-                        command, cwd=exec_cwd, command_dir=command_dir, name=f"command_{i:02d}", env=env,
+                        resolved_command, cwd=exec_cwd, command_dir=command_dir, name=f"command_{i:02d}", env=env,
                         timeout=per_cmd_timeout, approved_command=command,
                         working_directory_policy=execution.working_directory_policy,
                         max_output_bytes=limits.max_output_bytes,
+                        limits=rlimit_overrides,
                     )
                 except RestrictedExecutableNotFoundError as e:
                     infra_failure = ("EXECUTABLE_UNAVAILABLE", str(e))

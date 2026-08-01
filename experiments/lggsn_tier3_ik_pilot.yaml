@@ -1,0 +1,235 @@
+# Real-project MVP4 restricted-execution pilot: exercises the actual,
+# committed LGGSN Tier-3 per-candidate IK reachability feature
+# (EnvironmentSoArm.compute_ik_reachability_per_candidate /
+# EnvironmentSoArm._solve_ik_jaw_topdown, tango_robot/env_soarm.py -- see
+# commit 5fdaa3f "Tier-3 LGGSN per-candidate IK reachability feature") on a
+# fixed, committed fixture of grasp-candidate poses. This is a validation
+# pilot for the research pipeline, NOT a paper-final / confirmatory result:
+# it proves the harness can run real repository research code end-to-end
+# deterministically; it does not assert anything about grasp success rate.
+#
+# The approved command runs research_agent_pilots/lggsn_tier3_ik/run_pilot.py
+# via the tango conda env's own python interpreter (invoked by its absolute
+# path -- NOT `conda run`, which is on the MVP4 command policy's forbidden-
+# executable list; see research_agent/policies/experiment_commands.py
+# FORBIDDEN_EXECUTABLE_BASENAMES). That script:
+#   - reads research_agent_pilots/lggsn_tier3_ik/fixtures/candidate_poses.json
+#     (7 hand-picked candidate poses, SHA-256 recorded below and in metrics.json)
+#   - calls tango_robot.headless_ik.HeadlessIKSolver.solve_ik_jaw_topdown once
+#     per candidate -- a verbatim extraction of
+#     EnvironmentSoArm._solve_ik_jaw_topdown proven bit-for-bit equivalent by
+#     tests/test_headless_ik_topdown_parity.py (max joint-angle deviation
+#     2.6e-7 rad across 6 cross-check cases). HeadlessIKSolver is used
+#     instead of EnvironmentSoArm directly only because
+#     EnvironmentSoArm._rebuild_model unconditionally constructs a GL/EGL
+#     renderer regardless of vis=False; HeadlessIKSolver never touches it.
+#   - delegates all validation/aggregation/hashing to
+#     research_agent_pilots/lggsn_tier3_ik/pilot_core.py (pure stdlib, no
+#     mujoco dependency, unit-testable under the research-agent venv)
+#   - writes exactly two artifacts: metrics.json, candidate_features.json
+#
+# environment_overrides.MALLOC_ARENA_MAX=1 is required, not cosmetic: without
+# it, numpy+mujoco's default per-thread malloc arenas push the process's
+# virtual address space past 1GB (even though actual RSS stays under
+# 550MB), which trips the MVP4 harness's fixed RLIMIT_AS
+# (research_agent/restricted_subprocess.py DEFAULT_LIMITS -- not
+# spec-configurable). Confirmed empirically: must be set in the *launching*
+# environment (glibc reads it at first malloc, before this pilot's own
+# top-of-file os.environ.setdefault() runs), which is exactly what
+# environment_overrides does (research_agent/policies/environment_policy.py
+# build_child_environment sets it before the subprocess is spawned).
+#
+# execution.limits.max_processes=4096 is also required, not cosmetic: the
+# harness's fixed RLIMIT_NPROC=32 default is a per-UID ceiling, already
+# exceeded by unrelated processes on this shared host, so mujoco's model
+# compiler (which needs to create at least one thread) fails with EAGAIN
+# under the unmodified default. See ExecutionLimits.max_processes
+# (research_agent/models.py) and execution_flow.py's rlimit_overrides --
+# added specifically to unblock this pilot; every other spec's rlimits are
+# completely unaffected (the field defaults to None = unchanged behavior).
+#
+# Usage:
+#   python -m research_agent.cli run-experiment \
+#       experiments/lggsn_tier3_ik_pilot.yaml \
+#       --codex mock --claude mock --execute
+#
+# Expected outcome: final_state=PASS, with metrics.json matching the
+# required_metrics pins below (deterministic under the frozen fixture +
+# committed IK code -- reproduced identically across repeated local runs
+# during development, digest 69ad2a7f...).
+
+task_id: lggsn_tier3_ik_pilot
+goal: >
+  Run exactly one pre-approved, deterministic, CPU-only command that calls
+  the real, committed LGGSN Tier-3 per-candidate IK reachability feature
+  (via a verbatim-extracted headless solver, to fit the restricted harness's
+  resource limits) on a fixed 7-candidate pose fixture, and verify the
+  resulting metrics deterministically. No source code, dataset, checkpoint,
+  or existing result is modified; no training, GPU, robot, or network access
+  is ever invoked. This is a pipeline-validation pilot, not a scientific
+  claim about grasp performance.
+
+allowed_paths:
+  - research_agent_pilots/lggsn_tier3_ik
+
+forbidden_paths:
+  - research_agent
+  - tests
+  - grasp_6dof
+  - world_model
+  - data
+  - datasets
+  - results
+  - checkpoints
+  - paperA_data
+
+# Placeholder only -- `run-experiment` never runs this; smoke_command is a
+# required ExperimentSpec field inherited from the MVP0/MVP1 schema.
+smoke_command:
+  - python
+  - "-c"
+  - "pass"
+
+confirmatory_command: null
+
+seeds: [0]
+
+timeouts:
+  planner_seconds: 60
+  executor_seconds: 60
+  smoke_seconds: 30
+  verifier_seconds: 30
+  reviewer_seconds: 60
+
+required_metrics: []
+
+approval:
+  required_for_confirmatory: true
+  approved_by: null
+
+max_run_count: 5
+
+execution:
+  execution_mode: restricted
+  confirmatory: false
+  cpu_only: true
+  network_allowed: false
+  gpu_allowed: false
+  robot_allowed: false
+  training_allowed: false
+  working_directory_policy: isolated_run_directory
+
+  approved_commands:
+    # ${REPO_ROOT} (research_agent/policies/repo_root_placeholder.py) is
+    # expanded by trusted Python code in execution_flow.py to whatever
+    # --repo-root the run-experiment CLI is actually invoked with (default:
+    # cwd) BEFORE any policy gate or the exact-match authorization check
+    # ever runs -- never a shell, never os.environ. This keeps the spec
+    # portable across the main repository and any future Git worktree; no
+    # development-worktree path is baked in. The tango python interpreter
+    # below stays pinned to an absolute, machine-local path -- that is a
+    # deliberate, documented limitation (see the header comment above): this
+    # pilot only runs on a host with a `tango` conda env at exactly this
+    # location, not a portability gap in the ${REPO_ROOT} mechanism itself.
+    - - /home/lina/miniforge3/envs/tango/bin/python
+      - ${REPO_ROOT}/research_agent_pilots/lggsn_tier3_ik/run_pilot.py
+
+  allowed_output_paths:
+    - metrics.json
+    - candidate_features.json
+
+  required_artifacts:
+    - metrics.json
+    - candidate_features.json
+
+  required_metrics:
+    # candidate_count matches the fixed fixture (7 candidates -- see
+    # research_agent_pilots/lggsn_tier3_ik/fixtures/candidate_poses.json).
+    - key: candidate_count
+      check: int_equals
+      value: 7
+    # Deterministic under the frozen fixture + committed IK code -- not an
+    # invented scientific threshold, just the reproducible output of this
+    # exact input on this exact code (confirmed identical across two
+    # independent local runs during development).
+    - key: converged_count
+      check: int_equals
+      value: 2
+    # Structural sanity range, not a success threshold -- convergence_rate
+    # must be a valid rate, nothing more is asserted about its value.
+    - key: convergence_rate
+      check: float_range
+      min_value: 0.0
+      max_value: 1.0
+    - key: all_residuals_finite
+      check: bool_equals
+      value: true
+    - key: all_joint_deltas_finite
+      check: bool_equals
+      value: true
+    - key: max_residual
+      check: float_equals
+      value: 0.033328365409923795
+      tolerance: 0.000001
+    - key: max_joint_delta
+      check: float_equals
+      value: 2.7438472969992493
+      tolerance: 0.000001
+    - key: fixture_sha256
+      check: str_equals
+      value: "1f6777ca28bd3756b5e18a8e1bfb9b8f96d02c4f6945c8602a6062b94de2e2c8"
+    - key: deterministic_digest
+      check: str_equals
+      value: "69ad2a7f3ea0a9728e770170b72c9b45be71b403d6401b0ec2f79e888cca2de5"
+    - key: pilot_ok
+      check: bool_equals
+      value: true
+
+  environment_allowlist: []
+  environment_overrides:
+    # "disable": HeadlessIKSolver never renders anything (pure mj_forward /
+    # mj_jacSite physics), so no GL backend is needed -- and skipping GL/EGL
+    # initialization avoids a driver thread that pushed this host over the
+    # harness's fixed RLIMIT_NPROC=32 (a per-UID ceiling; this shared
+    # development host already runs >100 processes under this account).
+    MUJOCO_GL: "disable"
+    MALLOC_ARENA_MAX: "1"
+    # Without this, Python writes .pyc bytecode-cache files into the repo
+    # tree on import (e.g. tango_robot/__pycache__/) -- caught live: the
+    # harness's mutation detection treats that as a POLICY_FAILURE
+    # ("main worktree mutated during execution") even though __pycache__/
+    # is gitignored, since it checks for any tree mutation, not just
+    # trackable ones. See run_pilot.py's own sys.dont_write_bytecode=True
+    # for the second, defense-in-depth layer.
+    PYTHONDONTWRITEBYTECODE: "1"
+
+  limits:
+    max_commands: 1
+    max_execution_attempts: 1
+    max_wall_clock_seconds: 30
+    per_command_timeout_seconds: 20
+    max_total_command_runtime_seconds: 25
+    max_output_bytes: 100000
+    max_artifact_files: 2
+    max_artifact_bytes: 100000
+    max_artifact_file_bytes: 50000
+    max_repair_rounds: 0
+    max_total_codex_invocations: 2
+    max_total_claude_invocations: 1
+    # RLIMIT_NPROC override (research_agent.models.ExecutionLimits.max_processes,
+    # added for this pilot): the harness's fixed default of 32 is a per-UID
+    # ceiling, not scoped to this subprocess's own tree -- on this shared
+    # development host the same account already runs >1000 processes/threads
+    # for unrelated work, so 32 is already exceeded before the approved
+    # command even starts. mujoco.MjModel.from_xml_string() needs to create
+    # at least one thread; confirmed via isolated rlimit testing that
+    # RLIMIT_NPROC=32 alone (no other rlimit) was sufficient to make it fail
+    # with EAGAIN. 4096 is comfortably above today's ambient count with real
+    # headroom, while remaining a genuine, bounded ceiling (still far below
+    # any fork-bomb scenario the rlimit exists to catch) -- see
+    # ExecutionLimits.max_processes's docstring (ge=8, le=8192; can never be
+    # disabled outright).
+    max_processes: 4096
+
+  retry_policy:
+    allow_timeout_retry: false

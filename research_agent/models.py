@@ -136,6 +136,26 @@ class ExecutionLimits(StrictModel):
     max_total_codex_invocations: int = Field(3, ge=1, le=10)
     max_total_claude_invocations: int = Field(2, ge=1, le=10)
 
+    # Optional override for restricted_subprocess.DEFAULT_LIMITS["max_processes"]
+    # (the subprocess's own RLIMIT_NPROC). None (default) means "use the
+    # harness's fixed default of 32" -- every spec written before this field
+    # existed keeps that exact behavior, unchanged.
+    #
+    # RLIMIT_NPROC is a per-UID ceiling enforced by the kernel against the
+    # TOTAL live process/thread count for that user account system-wide, not
+    # scoped to this subprocess's own tree (see
+    # research_agent/restricted_subprocess.py's module docstring: "NOT
+    # container-level isolation"). On a shared development host where the
+    # same account already runs hundreds of processes/threads for unrelated
+    # work, 32 is not "restrictive" -- it is already exceeded before the
+    # approved command even starts, so ANY thread creation by that command
+    # (e.g. a numerical library's internal thread pool, unrelated to command
+    # correctness) fails immediately with EAGAIN. A spec that legitimately
+    # needs to run real multi-threaded-at-the-C-library-level code (not
+    # multiprocessing, not a fork bomb) may raise this within a still-bounded
+    # range; it can never be disabled outright.
+    max_processes: Optional[int] = Field(None, ge=8, le=8192)
+
 
 class RetryPolicy(StrictModel):
     """A timeout is non-retriable by default (see failure_taxonomy.py and
