@@ -1,0 +1,479 @@
+{
+  "comparisons": [
+    {
+      "accuracy_a": 0.654639175257732,
+      "accuracy_b": 0.5257731958762887,
+      "accuracy_diff_b_minus_a": -0.12886597938144329,
+      "bootstrap": {
+        "ci_lower": -0.3424657534246575,
+        "ci_upper": 0.1062124248496994,
+        "confidence": 0.95,
+        "n_clusters": 6,
+        "n_resamples": 10000,
+        "observed_diff_b_minus_a": -0.12886597938144329,
+        "resampling_unit": "query",
+        "seed": 20260803
+      },
+      "checkpoint_a": "base",
+      "checkpoint_b": "nodist",
+      "discordant_a_correct_b_wrong": 179,
+      "discordant_a_wrong_b_correct": 104,
+      "interpretation_holm": "SIGNIFICANT_FAVORS_A",
+      "interpretation_raw": "SIGNIFICANT_FAVORS_A",
+      "loss": 179,
+      "mcnemar_p_value_holm_adjusted": 3.889621739055322e-05,
+      "mcnemar_p_value_raw": 9.724054347638305e-06,
+      "n_pairs": 582,
+      "per_query_breakdown": [
+        {
+          "accuracy_a": 0.6634615384615384,
+          "accuracy_b": 0.5192307692307693,
+          "accuracy_diff_b_minus_a": -0.14423076923076916,
+          "loss": 33,
+          "n_pairs": 104,
+          "query": "Banana",
+          "tie": 53,
+          "win": 18
+        },
+        {
+          "accuracy_a": 0.7070707070707071,
+          "accuracy_b": 0.8080808080808081,
+          "accuracy_diff_b_minus_a": 0.101010101010101,
+          "loss": 14,
+          "n_pairs": 99,
+          "query": "CrackerBox",
+          "tie": 61,
+          "win": 24
+        },
+        {
+          "accuracy_a": 0.8083333333333333,
+          "accuracy_b": 0.2916666666666667,
+          "accuracy_diff_b_minus_a": -0.5166666666666666,
+          "loss": 69,
+          "n_pairs": 120,
+          "query": "MustardBottle",
+          "tie": 44,
+          "win": 7
+        },
+        {
+          "accuracy_a": 0.6176470588235294,
+          "accuracy_b": 0.27941176470588236,
+          "accuracy_diff_b_minus_a": -0.3382352941176471,
+          "loss": 28,
+          "n_pairs": 68,
+          "query": "PowerDrill",
+          "tie": 35,
+          "win": 5
+        },
+        {
+          "accuracy_a": 0.7652173913043478,
+          "accuracy_b": 0.6608695652173913,
+          "accuracy_diff_b_minus_a": -0.10434782608695659,
+          "loss": 29,
+          "n_pairs": 115,
+          "query": "Scissors",
+          "tie": 69,
+          "win": 17
+        },
+        {
+          "accuracy_a": 0.19736842105263158,
+          "accuracy_b": 0.5526315789473685,
+          "accuracy_diff_b_minus_a": 0.3552631578947369,
+          "loss": 6,
+          "n_pairs": 76,
+          "query": "TomatoSoupCan",
+          "tie": 37,
+          "win": 33
+        }
+      ],
+      "score_margin": {
+        "mean_diff_b_minus_a": -0.2586501329014155,
+        "median_diff_b_minus_a": -0.20812493143603206,
+        "n_excluded": 0,
+        "n_finite_pairs": 582
+      },
+      "tie": 299,
+      "win": 104
+    },
+    {
+      "accuracy_a": 0.654639175257732,
+      "accuracy_b": 0.6872852233676976,
+      "accuracy_diff_b_minus_a": 0.03264604810996563,
+      "bootstrap": {
+        "ci_lower": -0.007987220447284393,
+        "ci_upper": 0.08625814618149498,
+        "confidence": 0.95,
+        "n_clusters": 6,
+        "n_resamples": 10000,
+        "observed_diff_b_minus_a": 0.03264604810996563,
+        "resampling_unit": "query",
+        "seed": 20260803
+      },
+      "checkpoint_a": "base",
+      "checkpoint_b": "nozrel",
+      "discordant_a_correct_b_wrong": 50,
+      "discordant_a_wrong_b_correct": 69,
+      "interpretation_holm": "NOT_SIGNIFICANT",
+      "interpretation_raw": "NOT_SIGNIFICANT",
+      "loss": 50,
+      "mcnemar_p_value_holm_adjusted": 0.2955708822067723,
+      "mcnemar_p_value_raw": 0.09852362740225742,
+      "n_pairs": 582,
+      "per_query_breakdown": [
+        {
+          "accuracy_a": 0.6634615384615384,
+          "accuracy_b": 0.6634615384615384,
+          "accuracy_diff_b_minus_a": 0.0,
+          "loss": 17,
+          "n_pairs": 104,
+          "query": "Banana",
+          "tie": 70,
+          "win": 17
+        },
+        {
+          "accuracy_a": 0.7070707070707071,
+          "accuracy_b": 0.797979797979798,
+          "accuracy_diff_b_minus_a": 0.09090909090909094,
+          "loss": 6,
+          "n_pairs": 99,
+          "query": "CrackerBox",
+          "tie": 78,
+          "win": 15
+        },
+        {
+          "accuracy_a": 0.8083333333333333,
+          "accuracy_b": 0.8166666666666667,
+          "accuracy_diff_b_minus_a": 0.008333333333333304,
+          "loss": 5,
+          "n_pairs": 120,
+          "query": "MustardBottle",
+          "tie": 109,
+          "win": 6
+        },
+        {
+          "accuracy_a": 0.6176470588235294,
+          "accuracy_b": 0.6470588235294118,
+          "accuracy_diff_b_minus_a": 0.02941176470588236,
+          "loss": 5,
+          "n_pairs": 68,
+          "query": "PowerDrill",
+          "tie": 56,
+          "win": 7
+        },
+        {
+          "accuracy_a": 0.7652173913043478,
+          "accuracy_b": 0.7304347826086957,
+          "accuracy_diff_b_minus_a": -0.034782608695652195,
+          "loss": 11,
+          "n_pairs": 115,
+          "query": "Scissors",
+          "tie": 97,
+          "win": 7
+        },
+        {
+          "accuracy_a": 0.19736842105263158,
+          "accuracy_b": 0.34210526315789475,
+          "accuracy_diff_b_minus_a": 0.14473684210526316,
+          "loss": 6,
+          "n_pairs": 76,
+          "query": "TomatoSoupCan",
+          "tie": 53,
+          "win": 17
+        }
+      ],
+      "score_margin": {
+        "mean_diff_b_minus_a": -0.13628959647268102,
+        "median_diff_b_minus_a": -0.13287937321001664,
+        "n_excluded": 0,
+        "n_finite_pairs": 582
+      },
+      "tie": 463,
+      "win": 69
+    },
+    {
+      "accuracy_a": 0.654639175257732,
+      "accuracy_b": 0.6580756013745704,
+      "accuracy_diff_b_minus_a": 0.0034364261168384758,
+      "bootstrap": {
+        "ci_lower": -0.12359550561797761,
+        "ci_upper": 0.1412639405204461,
+        "confidence": 0.95,
+        "n_clusters": 6,
+        "n_resamples": 10000,
+        "observed_diff_b_minus_a": 0.0034364261168384758,
+        "resampling_unit": "query",
+        "seed": 20260803
+      },
+      "checkpoint_a": "base",
+      "checkpoint_b": "full_v2",
+      "discordant_a_correct_b_wrong": 69,
+      "discordant_a_wrong_b_correct": 71,
+      "interpretation_holm": "NOT_SIGNIFICANT",
+      "interpretation_raw": "NOT_SIGNIFICANT",
+      "loss": 69,
+      "mcnemar_p_value_holm_adjusted": 0.9326867554513671,
+      "mcnemar_p_value_raw": 0.9326867554513671,
+      "n_pairs": 582,
+      "per_query_breakdown": [
+        {
+          "accuracy_a": 0.6634615384615384,
+          "accuracy_b": 0.4230769230769231,
+          "accuracy_diff_b_minus_a": -0.24038461538461536,
+          "loss": 31,
+          "n_pairs": 104,
+          "query": "Banana",
+          "tie": 67,
+          "win": 6
+        },
+        {
+          "accuracy_a": 0.7070707070707071,
+          "accuracy_b": 0.9191919191919192,
+          "accuracy_diff_b_minus_a": 0.21212121212121215,
+          "loss": 0,
+          "n_pairs": 99,
+          "query": "CrackerBox",
+          "tie": 78,
+          "win": 21
+        },
+        {
+          "accuracy_a": 0.8083333333333333,
+          "accuracy_b": 0.775,
+          "accuracy_diff_b_minus_a": -0.033333333333333326,
+          "loss": 10,
+          "n_pairs": 120,
+          "query": "MustardBottle",
+          "tie": 104,
+          "win": 6
+        },
+        {
+          "accuracy_a": 0.6176470588235294,
+          "accuracy_b": 0.7352941176470589,
+          "accuracy_diff_b_minus_a": 0.11764705882352944,
+          "loss": 1,
+          "n_pairs": 68,
+          "query": "PowerDrill",
+          "tie": 58,
+          "win": 9
+        },
+        {
+          "accuracy_a": 0.7652173913043478,
+          "accuracy_b": 0.6521739130434783,
+          "accuracy_diff_b_minus_a": -0.11304347826086958,
+          "loss": 24,
+          "n_pairs": 115,
+          "query": "Scissors",
+          "tie": 80,
+          "win": 11
+        },
+        {
+          "accuracy_a": 0.19736842105263158,
+          "accuracy_b": 0.39473684210526316,
+          "accuracy_diff_b_minus_a": 0.19736842105263158,
+          "loss": 3,
+          "n_pairs": 76,
+          "query": "TomatoSoupCan",
+          "tie": 55,
+          "win": 18
+        }
+      ],
+      "score_margin": {
+        "mean_diff_b_minus_a": -0.15124678798019886,
+        "median_diff_b_minus_a": -0.13386602699756622,
+        "n_excluded": 0,
+        "n_finite_pairs": 582
+      },
+      "tie": 442,
+      "win": 71
+    },
+    {
+      "accuracy_a": 0.5257731958762887,
+      "accuracy_b": 0.6580756013745704,
+      "accuracy_diff_b_minus_a": 0.13230240549828176,
+      "bootstrap": {
+        "ci_lower": -0.05672268907563022,
+        "ci_upper": 0.33830845771144286,
+        "confidence": 0.95,
+        "n_clusters": 6,
+        "n_resamples": 10000,
+        "observed_diff_b_minus_a": 0.13230240549828176,
+        "resampling_unit": "query",
+        "seed": 20260803
+      },
+      "checkpoint_a": "nodist",
+      "checkpoint_b": "full_v2",
+      "discordant_a_correct_b_wrong": 93,
+      "discordant_a_wrong_b_correct": 170,
+      "interpretation_holm": "SIGNIFICANT_FAVORS_B",
+      "interpretation_raw": "SIGNIFICANT_FAVORS_B",
+      "loss": 93,
+      "mcnemar_p_value_holm_adjusted": 1.188134490428686e-05,
+      "mcnemar_p_value_raw": 2.376268980857372e-06,
+      "n_pairs": 582,
+      "per_query_breakdown": [
+        {
+          "accuracy_a": 0.5192307692307693,
+          "accuracy_b": 0.4230769230769231,
+          "accuracy_diff_b_minus_a": -0.0961538461538462,
+          "loss": 27,
+          "n_pairs": 104,
+          "query": "Banana",
+          "tie": 60,
+          "win": 17
+        },
+        {
+          "accuracy_a": 0.8080808080808081,
+          "accuracy_b": 0.9191919191919192,
+          "accuracy_diff_b_minus_a": 0.11111111111111116,
+          "loss": 6,
+          "n_pairs": 99,
+          "query": "CrackerBox",
+          "tie": 76,
+          "win": 17
+        },
+        {
+          "accuracy_a": 0.2916666666666667,
+          "accuracy_b": 0.775,
+          "accuracy_diff_b_minus_a": 0.48333333333333334,
+          "loss": 10,
+          "n_pairs": 120,
+          "query": "MustardBottle",
+          "tie": 42,
+          "win": 68
+        },
+        {
+          "accuracy_a": 0.27941176470588236,
+          "accuracy_b": 0.7352941176470589,
+          "accuracy_diff_b_minus_a": 0.4558823529411765,
+          "loss": 4,
+          "n_pairs": 68,
+          "query": "PowerDrill",
+          "tie": 29,
+          "win": 35
+        },
+        {
+          "accuracy_a": 0.6608695652173913,
+          "accuracy_b": 0.6521739130434783,
+          "accuracy_diff_b_minus_a": -0.008695652173912993,
+          "loss": 24,
+          "n_pairs": 115,
+          "query": "Scissors",
+          "tie": 68,
+          "win": 23
+        },
+        {
+          "accuracy_a": 0.5526315789473685,
+          "accuracy_b": 0.39473684210526316,
+          "accuracy_diff_b_minus_a": -0.1578947368421053,
+          "loss": 22,
+          "n_pairs": 76,
+          "query": "TomatoSoupCan",
+          "tie": 44,
+          "win": 10
+        }
+      ],
+      "score_margin": {
+        "mean_diff_b_minus_a": 0.10740334492121664,
+        "median_diff_b_minus_a": -6.467103958129883e-06,
+        "n_excluded": 0,
+        "n_finite_pairs": 582
+      },
+      "tie": 319,
+      "win": 170
+    },
+    {
+      "accuracy_a": 0.6872852233676976,
+      "accuracy_b": 0.6580756013745704,
+      "accuracy_diff_b_minus_a": -0.029209621993127155,
+      "bootstrap": {
+        "ci_lower": -0.12959719789842383,
+        "ci_upper": 0.06854130052724083,
+        "confidence": 0.95,
+        "n_clusters": 6,
+        "n_resamples": 10000,
+        "observed_diff_b_minus_a": -0.029209621993127155,
+        "resampling_unit": "query",
+        "seed": 20260803
+      },
+      "checkpoint_a": "nozrel",
+      "checkpoint_b": "full_v2",
+      "discordant_a_correct_b_wrong": 94,
+      "discordant_a_wrong_b_correct": 77,
+      "interpretation_holm": "NOT_SIGNIFICANT",
+      "interpretation_raw": "NOT_SIGNIFICANT",
+      "loss": 94,
+      "mcnemar_p_value_holm_adjusted": 0.4420224972794142,
+      "mcnemar_p_value_raw": 0.2210112486397071,
+      "n_pairs": 582,
+      "per_query_breakdown": [
+        {
+          "accuracy_a": 0.6634615384615384,
+          "accuracy_b": 0.4230769230769231,
+          "accuracy_diff_b_minus_a": -0.24038461538461536,
+          "loss": 42,
+          "n_pairs": 104,
+          "query": "Banana",
+          "tie": 45,
+          "win": 17
+        },
+        {
+          "accuracy_a": 0.797979797979798,
+          "accuracy_b": 0.9191919191919192,
+          "accuracy_diff_b_minus_a": 0.12121212121212122,
+          "loss": 1,
+          "n_pairs": 99,
+          "query": "CrackerBox",
+          "tie": 85,
+          "win": 13
+        },
+        {
+          "accuracy_a": 0.8166666666666667,
+          "accuracy_b": 0.775,
+          "accuracy_diff_b_minus_a": -0.04166666666666663,
+          "loss": 8,
+          "n_pairs": 120,
+          "query": "MustardBottle",
+          "tie": 109,
+          "win": 3
+        },
+        {
+          "accuracy_a": 0.6470588235294118,
+          "accuracy_b": 0.7352941176470589,
+          "accuracy_diff_b_minus_a": 0.08823529411764708,
+          "loss": 4,
+          "n_pairs": 68,
+          "query": "PowerDrill",
+          "tie": 54,
+          "win": 10
+        },
+        {
+          "accuracy_a": 0.7304347826086957,
+          "accuracy_b": 0.6521739130434783,
+          "accuracy_diff_b_minus_a": -0.07826086956521738,
+          "loss": 23,
+          "n_pairs": 115,
+          "query": "Scissors",
+          "tie": 78,
+          "win": 14
+        },
+        {
+          "accuracy_a": 0.34210526315789475,
+          "accuracy_b": 0.39473684210526316,
+          "accuracy_diff_b_minus_a": 0.05263157894736842,
+          "loss": 16,
+          "n_pairs": 76,
+          "query": "TomatoSoupCan",
+          "tie": 40,
+          "win": 20
+        }
+      ],
+      "score_margin": {
+        "mean_diff_b_minus_a": -0.01495719150751785,
+        "median_diff_b_minus_a": -0.00017330450646113604,
+        "n_excluded": 0,
+        "n_finite_pairs": 582
+      },
+      "tie": 411,
+      "win": 77
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "alpha": 0.05,
+  "bootstrap_confidence": 0.95,
+  "bootstrap_n_resamples": 10000,
+  "bootstrap_resampling_unit": "query",
+  "bootstrap_resampling_unit_note": "Cluster/block bootstrap over `query` (6 clusters in this dataset): the finest clustering unit reconstructable from pair_results.jsonl's own columns. LGGSN pairs are a cartesian product of (positive episode, negative episode) rows within one query (research_agent_pilots/lggsn_suite/eval_core.py's build_pairs), so pairs sharing a query are correlated, not independent -- resampling individual pairs i.i.d. would understate the true sampling variance.",
+  "bootstrap_seed": 20260803,
+  "checkpoint_sha256": {
+    "base": "333f792615547a293b6e7a33fe23b9ecc1366ae7406e0552f53479a719d4d499",
+    "full_v2": "b94e073b7d0c36394e25fb93e708176c64ee33b0bbf00a4d0bbfaeb07888963f",
+    "nodist": "f85bbf0daa7c2bd0d002f7d8f4c48ce4ad2429d005e10fa62f8ba38ccc9bc3d7",
+    "nozrel": "9ebf71758a63646d152387d483265389b31e137b52d9b488ac9805725b24d1dc"
+  },
+  "command": [
+    "/lena/projects/OWG-lggsn-stats/research_agent_pilots/lggsn_analysis/real_analysis.py",
+    "--repo-root",
+    ".",
+    "--output-dir",
+    "research_agent_pilots/lggsn_analysis/outputs"
+  ],
+  "core_checkpoint_names": [
+    "base",
+    "nodist",
+    "nozrel",
+    "full_v2"
+  ],
+  "dataset_sha256": "30ca2c398de4bc451691ae6e802e619e7838e0b8bce12a4eba8115b6ff4c42b5",
+  "generated_at": "2026-08-01T14:18:25.949213+00:00",
+  "git_commit": "ceb202975c3eb3560f805bc36c21b51288403b23",
+  "input_file_sha256": {
+    "base": "faa1bcaee8faa1b035de3508c34e63213c0301be18d4b00baed7b4de733f85c7",
+    "full_v2": "da197a7383d87c4db16a19930b9a76480cbb9652b2867e5f42c5235e54eaea95",
+    "nodist": "ef7825029fa086a7d9840f378de8d915993a882fcf281239701a1c2faa25b79c",
+    "nozrel": "46420b31191831f361caeda14fdb7c7caf9092afa1c0d0f4f22b98baa57986e7"
+  },
+  "multiple_comparison_method": "holm-bonferroni",
+  "n_aligned_pairs": 582,
+  "no_causal_feature_importance_claimed": true,
+  "pair_accuracy_is_not_grasp_success_rate": true,
+  "pair_identity_digest": "36bae5646bba3272e4456ae9cf263f2520f2509ad29c3f0b1c866f1555e4d5a8",
+  "phase": 3,
+  "planned_comparisons": [
+    [
+      "base",
+      "nodist"
+    ],
+    [
+      "base",
+      "nozrel"
+    ],
+    [
+      "base",
+      "full_v2"
+    ],
+    [
+      "nodist",
+      "full_v2"
+    ],
+    [
+      "nozrel",
+      "full_v2"
+    ]
+  ],
+  "runtime_seconds": 0.1333,
+  "schema_version": "lggsn_analysis_phase3_v1",
+  "started_at": "2026-08-01T14:18:25.812588+00:00",
+  "task_id": "lggsn_statistical_analysis"
+}

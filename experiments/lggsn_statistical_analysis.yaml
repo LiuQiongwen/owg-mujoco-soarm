@@ -1,68 +1,128 @@
 # MVP2 execute-flow experiment for the TANGO Experiment Agent
 # (research_agent.execute_flow / `execute` CLI command).
 #
-# PHASE 1 ONLY. Scope deliberately reduced from the original full-suite
-# goal to just the deterministic statistical core plus its tests:
-# loader.py, alignment.py, statistics.py, and
-# tests/test_lggsn_statistical_analysis.py. Explicitly OUT of scope for
-# this spec/phase (do not implement): plots, PNG/PDF figures, LaTeX
-# tables, publication tables, full report generation, and any analysis of
-# a real pair_results.jsonl (no such file is committed in this checkout --
-# see below). A later phase may re-expand this spec's goal/paths to add
-# those; until then, this spec's acceptance criteria are exactly the
-# Phase 1 items below. This spec only describes and bounds the
-# *implementation* task; it does not run the analysis or any research
-# experiment itself -- `execute` never invokes spec.smoke_command (see
-# execute_flow.py's module docstring), and no execution/MVP4 field is set
-# on this spec. smoke_command below is a harmless liveness placeholder
-# only (writes one bool to metrics.json so the separate `smoke` flow's
-# deterministic artifact contract stays satisfiable) -- it is NOT the
-# analysis suite and is never run by `execute`.
+# PHASE 1 (done): the deterministic statistical core -- loader.py,
+# alignment.py, statistics.py, tests/test_lggsn_statistical_analysis.py --
+# committed at ceb2029. That phase deliberately worked only against
+# aggregate metrics and hand-authored pair-level *fixtures* (test data),
+# never a real pair_results.jsonl, because no such file existed anywhere
+# in this checkout or its git history (confirmed by a filesystem and
+# `git log --all` search before Phase 2 began).
 #
-# Two supported data modes for Phase 1, both real, neither fabricated:
-#   * aggregate-only mode: reads the already-committed aggregate outputs
-#     -- research_agent_pilots/lggsn_suite/eval_outputs/{base,nodist,
-#     nozrel,full_v2}/metrics.json and .../matrix_summary.json -- no
-#     pair-level data is available here, so only aggregate-level
-#     statistics (whatever loader.py/statistics.py genuinely support from
-#     these fields) may be produced in this mode.
-#   * aligned pair fixtures mode: deterministic, hand-authored or
-#     evaluator-regenerated pair-level fixtures (e.g. under tests/) used
-#     to exercise alignment.py/statistics.py's pair-level logic (exact
-#     McNemar, paired bootstrap, win/tie/loss) end-to-end. This is test
-#     fixture data, not the real pair_results.jsonl -- analyzing real
-#     pair_results.jsonl is explicitly out of scope for Phase 1.
-# In both modes, and per checkpoint pair, the suite must fail closed
-# (raise, not silently degrade or fabricate) whenever pair-level data is
-# requested but missing, or whenever two checkpoints' pair-level records
-# do not align (same query set, same pair identities/order).
+# PHASE 2 (this revision): obtain the real, per-checkpoint pair_results.jsonl
+# for the four core checkpoints (base/nodist/nozrel/full_v2). No preserved
+# backup was found, so it is regenerated deterministically by running the
+# already-committed standalone evaluator
+# (research_agent_pilots/lggsn_suite/evaluator.py) once per checkpoint. That
+# evaluator's own module docstring documents it as an
+# EXTERNAL_UNRESTRICTED_SUBPROCESS: it deliberately runs outside
+# research_agent entirely (torch does not fit inside MVP4's fixed
+# RLIMIT_AS=1GB) -- exactly how the already-committed
+# eval_outputs/*/metrics.json files were themselves originally produced.
+# Consequently the regeneration command itself is NOT one of this spec's
+# allowed_executor_commands and is never run through `execute`'s Claude
+# executor or any research_agent flow; it was run directly, once, outside
+# this harness, and independently verified before being accepted (see
+# below). What THIS spec's execute/build-code task covers is committing
+# that already-verified output as data, plus a provenance record, under
+# research_agent_pilots/lggsn_analysis/pair_results/<checkpoint_name>/ --
+# never under research_agent_pilots/lggsn_suite/eval_outputs/, which
+# remains a different task's read-only output directory and is still never
+# modified by this spec.
+#
+# Verification performed before accepting the regenerated data (see each
+# checkpoint's provenance.json for the concrete values): for all four
+# checkpoints, the regenerated metrics.json's `deterministic_digest`
+# matched the already-committed, provenance-verified
+# eval_outputs/<name>/metrics.json's digest byte-for-byte, and all four
+# checkpoints' 582 pair-level records share the exact same
+# (query, pos_row_id, neg_row_id) identity set -- so alignment.py's exact
+# cross-checkpoint identity requirement is satisfiable across the whole
+# core matrix without modification.
+#
+# PHASE 2 continued: explicitly OUT of scope was actually running McNemar /
+# the paired bootstrap / win-tie-loss against the real data, any plots,
+# PNG/PDF figures, LaTeX tables, publication tables, or full report
+# generation -- that was deferred to a later phase.
+#
+# PHASE 3 (this revision): that later phase. Computes and reports the real
+# paired statistical conclusions for the LGGSN core matrix, from ONLY the
+# real, provenance-pinned pair_results.jsonl files committed in Phase 2
+# (research_agent_pilots/lggsn_analysis/pair_results/{base,nodist,nozrel,
+# full_v2}/pair_results.jsonl) -- never eval_outputs/, grasp_6dof/models/,
+# or any dataset/checkpoint file, and no checkpoint is retrained or
+# regenerated. New modules: real_analysis.py (the computation + CLI) and
+# reporting.py (JSON/CSV/Markdown/manifest formatting only -- no statistics
+# computed there). statistics.py gained two additions this phase:
+# paired_bootstrap_ci_clustered (a cluster/block bootstrap -- see its
+# docstring for why per-pair i.i.d. resampling, added in Phase 1, is not
+# valid for LGGSN's cartesian-product pair construction) and
+# holm_bonferroni_adjust (family-wise multiple-comparison correction,
+# reported alongside -- never instead of -- the raw p-value). Unlike Phase
+# 2's evaluator.py regeneration, running real_analysis.py involves no
+# torch, no checkpoint loading, and no research experiment -- it is pure,
+# deterministic, CPU-only stdlib computation over already-committed JSONL
+# files, so (unlike Phase 2's regeneration command) it IS one of this
+# spec's allowed_executor_commands below. This spec still never runs it
+# automatically as part of `execute` -- `execute` never invokes
+# spec.smoke_command (see execute_flow.py's module docstring), and no
+# execution/MVP4 field is set on this spec. smoke_command below is
+# unchanged from Phase 1/2: a harmless liveness placeholder that writes one
+# bool to metrics.json so the separate `smoke` flow's deterministic
+# artifact contract stays satisfiable -- it is NOT the analysis suite and
+# is never run by `execute`.
 
 task_id: lggsn_statistical_analysis
 goal: >
-  Phase 1 only: implement research_agent_pilots/lggsn_analysis/loader.py,
-  research_agent_pilots/lggsn_analysis/alignment.py, and
-  research_agent_pilots/lggsn_analysis/statistics.py, plus
-  tests/test_lggsn_statistical_analysis.py, forming the deterministic
-  statistical core of the LGGSN checkpoint-comparison suite. loader.py
-  must support both aggregate-only mode (reading the already-committed
-  research_agent_pilots/lggsn_suite/eval_outputs/{base,nodist,nozrel,
-  full_v2}/metrics.json and .../matrix_summary.json) and aligned pair
-  fixtures mode (deterministic pair-level fixture data, not a real
-  pair_results.jsonl -- analyzing real pair_results.jsonl is out of scope
-  for this phase). alignment.py must validate that two checkpoints'
-  pair-level records are genuinely aligned (same queries, same pair
-  identities/order) and fail closed -- raise, never silently degrade or
-  fabricate -- whenever pair-level data is missing or misaligned.
-  statistics.py must implement an exact McNemar test, a deterministic
-  paired bootstrap confidence interval, and win/tie/loss counts, all
-  computed only from real aligned pair-level data (fixture or
-  regenerated), never invented. Do not implement plots, PNG/PDF figures,
-  LaTeX tables, publication tables, full report generation, or any
-  analysis of a real pair_results.jsonl in this phase. Do not modify any
-  file under research_agent_pilots/lggsn_suite/eval_outputs/ (the inputs)
-  or any other forbidden path. Do not run the analysis suite itself as
-  part of this task -- only create it, together with its tests, so it can
-  be run and reviewed later.
+  Phase 3 only (Phase 1's loader.py/alignment.py/alignment tests and Phase
+  2's committed pair_results.jsonl/provenance.json are unchanged by this
+  phase, except statistics.py gaining two additive functions): implement
+  research_agent_pilots/lggsn_analysis/real_analysis.py and
+  research_agent_pilots/lggsn_analysis/reporting.py, computing and
+  reporting the five planned pairwise comparisons (base-vs-nodist,
+  base-vs-nozrel, base-vs-full_v2, nodist-vs-full_v2, nozrel-vs-full_v2)
+  from the real, provenance-pinned pair_results.jsonl files only. Every
+  comparison must reuse the exact same 582 aligned pair identities (one
+  alignment.align_pairs call across all four checkpoints), and report:
+  aligned pair count; accuracy for both checkpoints and their difference;
+  win/tie/loss counts; both discordant counts (A-correct-B-wrong,
+  A-wrong-B-correct); the exact two-sided McNemar p-value; a deterministic
+  cluster (block) bootstrap 95% CI for the accuracy difference, clustered
+  by query (the finest unit reconstructable from pair_results.jsonl's own
+  columns, since LGGSN pairs are a cartesian product of same-query episode
+  pairs and are therefore correlated within a query -- document this
+  choice, do not resample individual pairs i.i.d.); mean/median
+  score-margin difference over pairs with finite scores on both sides
+  (excluding, never zeroing, any pair with a missing/non-finite score, and
+  reporting the exclusion count); a per-query breakdown; and a predeclared
+  alpha=0.05 interpretation label (SIGNIFICANT_FAVORS_A /
+  SIGNIFICANT_FAVORS_B / NOT_SIGNIFICANT) that is never changed post-hoc.
+  Report both the raw p-value/interpretation and a separately labeled
+  Holm-Bonferroni-adjusted p-value/interpretation across the five planned
+  comparisons -- never apply the correction silently. Do not report
+  McNemar for any comparison where binary correctness cannot be exactly
+  reconstructed (loader.load_pair_fixture_jsonl already fails closed on
+  this, so this is an invariant, not a runtime branch). Never convert
+  pair_accuracy into a grasp success rate, and never claim causal
+  feature-importance from one checkpoint per ablation. Write
+  research_agent_pilots/lggsn_analysis/outputs/pairwise_comparisons.json,
+  pairwise_comparisons.csv, per_query_breakdown.csv, statistical_summary.md,
+  and analysis_manifest.json (the manifest recording: git commit; input
+  file, checkpoint, and dataset SHA-256 values; a pair-identity digest;
+  the bootstrap seed and resampling unit; alpha; the multiple-comparison
+  method; the exact command used; and runtime). Update
+  tests/test_lggsn_statistical_analysis.py with coverage for alignment
+  consistency across all five comparisons, McNemar and Holm-Bonferroni
+  fixtures, bootstrap determinism, zero-discordance handling,
+  missing/non-finite score handling, per-query reconciliation, JSON/CSV
+  agreement, output byte-determinism across repeated runs, input-file
+  immutability, and that no comparison is ever labeled significant unless
+  its own declared rule (raw or Holm) is actually satisfied. Do not
+  implement plots, PNG/PDF figures, or LaTeX/publication tables in this
+  phase. Do not modify research_agent_pilots/lggsn_suite/eval_outputs/,
+  grasp_6dof/models/, checkpoints/, causal_validity_audit/, research_agent/,
+  or any paper file -- this phase only ever reads pair_results.jsonl/
+  provenance.json, and does not retrain or regenerate any checkpoint.
 
 allowed_paths:
   - research_agent_pilots/lggsn_analysis
@@ -93,20 +153,30 @@ allowed_modify_paths:
   - tests
   - experiments/lggsn_statistical_analysis.yaml
 
-# Phase 1 is four source files (loader.py, alignment.py, statistics.py,
-# tests/test_lggsn_statistical_analysis.py) plus a handful of small,
-# deterministic pair-level fixture files (e.g. under tests/) -- no plots,
-# figures, or generated reports, so both budgets are well below the
-# original full-suite spec's.
-max_changed_files: 15
-max_changed_bytes: 500000
+# Phase 3 adds real_analysis.py + reporting.py (source), a larger
+# tests/ update, and the five generated files under
+# research_agent_pilots/lggsn_analysis/outputs/ (~30KB for 582-pair-scale
+# JSON/CSV/Markdown/manifest output) -- still no plots/figures/LaTeX, so
+# both budgets stay well below the original full-suite spec's, just raised
+# again from Phase 2's data-only budget to fit this phase's extra source
+# and generated-output files.
+max_changed_files: 30
+max_changed_bytes: 1500000
 
-# The only three commands this task may run, byte-for-byte, as argv arrays
-# (never a shell string). All three are already covered by MVP2's own fixed
-# executor allowlist (research_agent.policies.execution_policy
-# ._FIXED_ALLOWLIST_EXACT / ._FIXED_ALLOWLIST_PREFIXES / ._PYTEST_PREFIX);
-# they are listed here explicitly so the spec is self-documenting about the
-# exact bound, not because the fixed allowlist would otherwise reject them.
+# The only four commands this task may run, byte-for-byte, as argv arrays
+# (never a shell string). The first, second, and fourth are already
+# covered by MVP2's own fixed executor allowlist
+# (research_agent.policies.execution_policy._FIXED_ALLOWLIST_EXACT /
+# ._FIXED_ALLOWLIST_PREFIXES / ._PYTEST_PREFIX); they are listed here
+# explicitly so the spec is self-documenting about the exact bound, not
+# because the fixed allowlist would otherwise reject them. The third
+# (real_analysis.py) is new this phase and is NOT part of the fixed
+# baseline allowlist -- it is deliberately added here because, unlike
+# Phase 2's evaluator.py regeneration (torch, checkpoint loading, kept
+# entirely outside this spec's command allowlist), it is pure,
+# deterministic, CPU-only stdlib computation over already-committed
+# pair_results.jsonl files: no torch, no checkpoint/dataset access, no
+# research experiment.
 allowed_executor_commands:
   - - python
     - "-m"
@@ -119,6 +189,13 @@ allowed_executor_commands:
     - pytest
     - "-q"
     - tests/test_lggsn_statistical_analysis.py
+  - - python
+    - "-m"
+    - research_agent_pilots.lggsn_analysis.real_analysis
+    - "--repo-root"
+    - "."
+    - "--output-dir"
+    - research_agent_pilots/lggsn_analysis/outputs
   - - git
     - diff
     - "--check"

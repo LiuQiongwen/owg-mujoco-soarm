@@ -1,0 +1,31 @@
+{
+  "checkpoint_name": "nozrel",
+  "checkpoint_relative_path": "grasp_6dof/models/lggsn_ablation_nozrel.pt",
+  "checkpoint_sha256": "9ebf71758a63646d152387d483265389b31e137b52d9b488ac9805725b24d1dc",
+  "dataset_relative_path": "snapshots/lggsn_live_dataset_v1/lggsn_live_candidates.jsonl",
+  "dataset_sha256": "30ca2c398de4bc451691ae6e802e619e7838e0b8bce12a4eba8115b6ff4c42b5",
+  "seed": 42,
+  "val_frac": 0.2,
+  "eligible_pair_count": 582,
+  "pair_results_line_count": 582,
+  "regenerated_by": "research_agent_pilots/lggsn_suite/evaluator.py",
+  "regenerating_command": [
+    "conda",
+    "run",
+    "-n",
+    "tango",
+    "python",
+    "research_agent_pilots/lggsn_suite/evaluator.py",
+    "<checkpoint_name>",
+    "--output-dir",
+    "<scratch_output_dir>"
+  ],
+  "execution_stage": "EXTERNAL_UNRESTRICTED_SUBPROCESS",
+  "execution_stage_note": "Ran as a normal OS subprocess in the `tango` conda env, outside research_agent entirely (never through `execute`'s Claude executor or any research_agent flow) -- torch does not fit inside MVP4's restricted-execution RLIMIT_AS, and this is exactly how the already-committed eval_outputs/*/metrics.json files were themselves originally produced. See research_agent_pilots/lggsn_suite/evaluator.py's module docstring.",
+  "regenerated_at": "2026-08-01T13:24:50.396999+00:00",
+  "regenerated_against_repo_commit": "ceb202975c3eb3560f805bc36c21b51288403b23",
+  "committed_metrics_deterministic_digest": "5e3a66595b215c20dac112a84eeb0faa284381b7dbf9d24aa42254f815c35e55",
+  "regenerated_metrics_deterministic_digest": "5e3a66595b215c20dac112a84eeb0faa284381b7dbf9d24aa42254f815c35e55",
+  "matched_committed_digest": true,
+  "note": "This provenance record documents pair_results.jsonl only. metrics.json/checkpoint_manifest.json/evaluation_manifest.json are not duplicated here -- the authoritative copy of the aggregate metrics remains research_agent_pilots/lggsn_suite/eval_outputs/nozrel/metrics.json, confirmed byte-identical above."
+}
