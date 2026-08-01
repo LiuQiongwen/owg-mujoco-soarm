@@ -37,6 +37,7 @@ import mujoco
 
 from tango_robot.env_soarm import (
     _build_scene_xml,
+    make_topdown_rotation,
     ARM_JOINTS,
     EEF_SITE,
     GRIP_JOINT,
@@ -160,6 +161,11 @@ class HeadlessIKSolver:
     def _get_eef_pos(self) -> np.ndarray:
         return self.data.site_xpos[self._eef_site_id].copy()
 
+    def _get_eef_rot(self) -> np.ndarray:
+        """Current 3x3 rotation matrix of the EEF site (world frame). Verbatim
+        copy of EnvironmentSoArm._get_eef_rot (env_soarm.py:835-837)."""
+        return self.data.site_xmat[self._eef_site_id].reshape(3, 3).copy()
+
     def _get_jaw_midpoint(self) -> np.ndarray:
         """World-frame midpoint between the fixed and moving jaw body centres."""
         if self._jaw_body_id < 0:
@@ -189,6 +195,47 @@ class HeadlessIKSolver:
             self.data.qpos[adr] = np.clip(self.data.qpos[adr] + dq[i], lo, hi)
         mujoco.mj_forward(self.model, self.data)
         return np.linalg.norm(err) < IK_TOL
+
+    def _ik_step_6dof(self, target_pos: np.ndarray, target_rot: np.ndarray,
+                      w_pos: float = 1.0, w_ori: float = 0.5,
+                      damping: float = IK_DAMPING) -> Tuple[float, float]:
+        """Single DLS IK step targeting both position and orientation.
+        Verbatim copy of EnvironmentSoArm._ik_step_6dof (env_soarm.py:900-945).
+
+        Returns (pos_err_norm, ori_err_norm).
+        """
+        nv   = self.model.nv
+        jacp = np.zeros((3, nv))
+        jacr = np.zeros((3, nv))
+        mujoco.mj_jacSite(self.model, self.data, jacp, jacr, self._eef_site_id)
+
+        cols = [self.model.joint(n).dofadr[0] for n in ARM_JOINTS]
+        Jp   = jacp[:, cols]   # 3x5
+        Jr   = jacr[:, cols]   # 3x5
+
+        pos_err = target_pos - self._get_eef_pos()
+
+        R_cur = self._get_eef_rot()
+        R_err = target_rot @ R_cur.T
+        q_err = np.zeros(4)
+        mujoco.mju_mat2Quat(q_err, R_err.ravel())
+        ori_vec = np.zeros(3)
+        mujoco.mju_quat2Vel(ori_vec, q_err, 1.0)
+
+        ori_norm = float(np.linalg.norm(ori_vec))
+        if ori_norm > 0.3:
+            ori_vec = ori_vec * (0.3 / ori_norm)
+
+        err6 = np.concatenate([w_pos * pos_err, w_ori * ori_vec])
+        J6   = np.vstack([w_pos * Jp, w_ori * Jr])   # 6x5
+
+        dq = J6.T @ np.linalg.solve(J6 @ J6.T + damping * np.eye(6), err6)
+        for i, adr in enumerate(self._arm_qpos_adr):
+            lo = self.model.jnt_range[self._arm_jnt_ids[i], 0]
+            hi = self.model.jnt_range[self._arm_jnt_ids[i], 1]
+            self.data.qpos[adr] = np.clip(self.data.qpos[adr] + dq[i], lo, hi)
+        mujoco.mj_forward(self.model, self.data)
+        return float(np.linalg.norm(pos_err)), ori_norm
 
     def solve_ik_jaw_pos_only(
         self,
@@ -228,6 +275,68 @@ class HeadlessIKSolver:
             print(f"  [headless_ik] target={target_jaw_mid.round(4)} "
                   f"solved_geom_mid={geom_pos.round(4)} pe={pe*100:.2f}cm")
         return pe < pos_tol, pe, 0.0
+
+    def solve_ik_jaw_topdown(
+        self,
+        target_jaw_mid: np.ndarray,
+        yaw:            float = 0.0,
+        iters:          int   = 600,
+        w_pos:          float = 10.0,
+        w_ori:          float = 0.3,
+        pos_tol:        float = 5e-3,
+        n_outer:        int   = 8,
+        reset_to_home:  bool  = True,
+    ) -> Tuple[bool, float, float]:
+        """Jaw-midpoint-targeted top-down IK (Tier-3 per-candidate feature).
+        Verbatim copy of EnvironmentSoArm._solve_ik_jaw_topdown
+        (env_soarm.py:1007-1071) — same code path
+        EnvironmentSoArm.compute_ik_reachability_per_candidate uses to
+        produce ik_converged/ik_residual/max_joint_delta for each grasp
+        candidate. Extracted for the same reason as solve_ik_jaw_pos_only
+        above: no viewer, no renderer, no GL, so it can run inside
+        environments with no rendering backend or a tight virtual-address-
+        space limit (EnvironmentSoArm._rebuild_model unconditionally
+        constructs mujoco.Renderer(...), which this module's __init__
+        deliberately avoids — see the module docstring).
+
+        target_jaw_mid : sim-world-frame XYZ (metres) of the jaw GEOM
+                          midpoint. Use base_to_world_frame() first if you
+                          have a robot-base-frame target.
+        yaw             : target jaw yaw angle (radians), world frame.
+
+        Returns (converged, jaw_mid_pos_err, ori_err).
+        """
+        if reset_to_home:
+            for adr, q in zip(self._arm_qpos_adr, HOME_QPOS):
+                self.data.qpos[adr] = q
+            mujoco.mj_forward(self.model, self.data)
+
+        target_rot = make_topdown_rotation(yaw)
+
+        warmup = iters // 3
+        offset = self._get_eef_pos() - self._get_jaw_geom_midpoint()
+        adjusted_site_target = target_jaw_mid + offset
+        for _ in range(warmup):
+            if self._ik_step(adjusted_site_target):
+                break
+
+        iters_6dof      = iters - warmup
+        iters_per_outer = max(50, iters_6dof // n_outer)
+
+        pe = oe = float("inf")
+        for _ in range(n_outer):
+            offset = self._get_eef_pos() - self._get_jaw_geom_midpoint()
+            adjusted_site_target = target_jaw_mid + offset
+
+            pe_site, oe = float("inf"), float("inf")
+            for _ in range(iters_per_outer):
+                pe_site, oe = self._ik_step_6dof(
+                    adjusted_site_target, target_rot, w_pos, w_ori)
+                if pe_site < pos_tol:
+                    break
+
+        pe = float(np.linalg.norm(self._get_jaw_geom_midpoint() - target_jaw_mid))
+        return pe < pos_tol, pe, oe
 
     def get_arm_qpos(self) -> np.ndarray:
         """Read back the 5 solved arm joint angles (radians), ARM_JOINTS order.
