@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -60,6 +60,188 @@ class RepairLimits(StrictModel):
     max_wall_clock_seconds: int = Field(900, ge=1, le=7200)
 
 
+# ── MVP4 restricted experiment-execution spec (defined before ExperimentSpec,
+# which embeds it as `execution`) ───────────────────────────────────────────
+#
+# Additive: `execution` defaults to None, so every MVP0/1/2/3 spec keeps
+# validating unchanged -- `run-experiment` against such a spec simply has no
+# approved_commands to run (see research_agent.execution_flow). Every safety
+# invariant this MVP4 build requires (cpu_only=true, network/gpu/robot/
+# training_allowed=false, execution_mode != "confirmatory", confirmatory !=
+# true, approved_commands within limits.max_commands) is enforced directly
+# in ExecutionSpec's own validator below -- it is impossible to construct a
+# validated ExperimentSpec that violates any of them, independent of
+# whatever the CLI or an agent later does.
+
+_ENV_NAME_RE = r"^[A-Za-z_][A-Za-z0-9_]*$"
+# Kept as an independent copy of subprocess_runner._SENSITIVE_ENV_MARKERS
+# (rather than importing it) to avoid a models<->subprocess_runner import
+# cycle -- subprocess_runner already imports research_agent.models.
+_SENSITIVE_ENV_NAME_MARKERS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL", "AUTH", "WANDB", "SSH", "PROXY")
+
+
+def _looks_like_sensitive_env_name(name: str) -> bool:
+    upper = name.upper()
+    return any(marker in upper for marker in _SENSITIVE_ENV_NAME_MARKERS)
+
+
+class MetricCheck(StrictModel):
+    """One deterministic check against a value read from the run's
+    artifacts/metrics.json (or another required-artifact JSON file). Neither
+    Codex nor Claude ever decides pass/fail here -- see
+    research_agent.tasks.metric_verifier, the sole place these are
+    evaluated."""
+
+    key: str = Field(..., min_length=1)
+    check: Literal[
+        "exists", "bool_equals", "str_equals", "int_equals", "int_range",
+        "float_equals", "float_range", "type_is",
+    ]
+    value: Optional[Union[bool, str, int, float]] = None
+    min_value: Optional[float] = None
+    max_value: Optional[float] = None
+    tolerance: Optional[float] = Field(None, ge=0)
+    json_type: Optional[Literal["object", "array", "string", "number", "integer", "boolean", "null"]] = None
+    artifact: Optional[str] = None  # required-artifact-relative path; None means artifacts/metrics.json
+
+    @model_validator(mode="after")
+    def _fields_match_check_kind(self) -> "MetricCheck":
+        if self.check in ("bool_equals", "str_equals", "int_equals") and self.value is None:
+            raise ValueError(f"check={self.check!r} requires 'value'")
+        if self.check == "float_equals" and (self.value is None or self.tolerance is None):
+            raise ValueError("check='float_equals' requires both 'value' and 'tolerance'")
+        if self.check in ("int_range", "float_range") and self.min_value is None and self.max_value is None:
+            raise ValueError(f"check={self.check!r} requires at least one of min_value/max_value")
+        if self.check == "type_is" and self.json_type is None:
+            raise ValueError("check='type_is' requires 'json_type'")
+        return self
+
+
+class ExecutionLimits(StrictModel):
+    """Conservative, small-by-default bounds for the MVP4 restricted
+    execution + repair-integration loop. See the MVP4 task contract's
+    'Retry limits' section: no field here permits an unbounded/infinite
+    retry."""
+
+    max_commands: int = Field(1, ge=1, le=10)
+    max_execution_attempts: int = Field(1, ge=1, le=5)
+    max_wall_clock_seconds: int = Field(120, ge=1, le=1800)
+    per_command_timeout_seconds: int = Field(30, ge=1, le=600)
+    max_total_command_runtime_seconds: int = Field(180, ge=1, le=3600)
+    max_output_bytes: int = Field(1_000_000, ge=1, le=50_000_000)
+    max_artifact_files: int = Field(10, ge=1, le=1000)
+    max_artifact_bytes: int = Field(2_000_000, ge=1, le=200_000_000)
+    max_artifact_file_bytes: int = Field(1_000_000, ge=1, le=200_000_000)
+    max_repair_rounds: int = Field(1, ge=0, le=3)
+    max_total_codex_invocations: int = Field(3, ge=1, le=10)
+    max_total_claude_invocations: int = Field(2, ge=1, le=10)
+
+
+class RetryPolicy(StrictModel):
+    """A timeout is non-retriable by default (see failure_taxonomy.py and
+    the MVP4 task contract's 'Non-retriable examples' list: 'timeout caused
+    by exceeding hard policy budget, unless the spec explicitly permits one
+    bounded retry with the same command and remaining wall-clock budget').
+    This is a SEPARATE, narrower mechanism from the general diagnose/repair
+    loop -- see execution_flow.py -- and still consumes
+    limits.max_execution_attempts budget when used."""
+
+    allow_timeout_retry: bool = False
+
+
+class ExecutionSpec(StrictModel):
+    """MVP4 restricted-execution configuration, embedded in ExperimentSpec
+    as `execution`. See research_agent.execution_flow and
+    research_agent.policies.experiment_commands for where every field here
+    is actually enforced -- this model only rejects an internally
+    inconsistent or unsafe-for-this-build specification at load time."""
+
+    execution_mode: Literal["smoke", "restricted", "confirmatory"] = "smoke"
+    approved_commands: list[list[str]] = Field(default_factory=list)
+    allowed_output_paths: list[str] = Field(default_factory=list)
+    required_artifacts: list[str] = Field(default_factory=list)
+    required_metrics: list[MetricCheck] = Field(default_factory=list)
+    environment_allowlist: list[str] = Field(default_factory=list)
+    environment_overrides: dict[str, str] = Field(default_factory=dict)
+    cpu_only: bool = True
+    network_allowed: bool = False
+    gpu_allowed: bool = False
+    robot_allowed: bool = False
+    training_allowed: bool = False
+    confirmatory: bool = False
+    working_directory_policy: Literal["isolated_run_directory", "execution_worktree"] = "isolated_run_directory"
+    limits: ExecutionLimits = Field(default_factory=ExecutionLimits)
+    retry_policy: RetryPolicy = Field(default_factory=RetryPolicy)
+
+    @field_validator("approved_commands")
+    @classmethod
+    def _approved_commands_are_argv_arrays(cls, value: list[list[str]]) -> list[list[str]]:
+        for command in value:
+            if not command or any(not isinstance(tok, str) or not tok for tok in command):
+                raise ValueError(
+                    f"approved_commands entries must be non-empty argv arrays, never a shell string: {command!r}"
+                )
+        return value
+
+    @field_validator("allowed_output_paths", "required_artifacts")
+    @classmethod
+    def _relative_output_paths_only(cls, value: list[str]) -> list[str]:
+        for p in value:
+            if not p or p.startswith("/") or ".." in Path(p).parts:
+                raise ValueError(f"path must be a non-empty, relative path with no '..': {p!r}")
+        return value
+
+    @field_validator("environment_allowlist")
+    @classmethod
+    def _environment_allowlist_names_are_valid(cls, value: list[str]) -> list[str]:
+        import re
+
+        for name in value:
+            if not re.match(_ENV_NAME_RE, name):
+                raise ValueError(f"environment_allowlist entry must be a valid environment variable name: {name!r}")
+            if _looks_like_sensitive_env_name(name):
+                raise ValueError(f"environment_allowlist may not name a sensitive-looking variable: {name!r}")
+        return value
+
+    @field_validator("environment_overrides")
+    @classmethod
+    def _environment_overrides_no_sensitive_names(cls, value: dict[str, str]) -> dict[str, str]:
+        for name in value:
+            if _looks_like_sensitive_env_name(name):
+                raise ValueError(f"environment_overrides may not set a sensitive-looking variable name: {name!r}")
+        return value
+
+    @model_validator(mode="after")
+    def _mvp4_safety_invariants(self) -> "ExecutionSpec":
+        if self.execution_mode == "confirmatory" or self.confirmatory:
+            raise ValueError(
+                "CONFIRMATORY_EXECUTION_REQUIRES_MVP5_APPROVAL: execution_mode='confirmatory' or "
+                "confirmatory=true is rejected by this MVP4 build"
+            )
+        if not self.cpu_only:
+            raise ValueError("MVP4 build requires cpu_only=true")
+        if self.network_allowed:
+            raise ValueError("MVP4 build requires network_allowed=false")
+        if self.gpu_allowed:
+            raise ValueError("MVP4 build requires gpu_allowed=false")
+        if self.robot_allowed:
+            raise ValueError("MVP4 build requires robot_allowed=false")
+        if self.training_allowed:
+            raise ValueError("MVP4 build requires training_allowed=false")
+        if len(self.approved_commands) > self.limits.max_commands:
+            raise ValueError(
+                f"approved_commands has {len(self.approved_commands)} entries, exceeding "
+                f"limits.max_commands={self.limits.max_commands}"
+            )
+        seen = set()
+        for command in self.approved_commands:
+            key = tuple(command)
+            if key in seen:
+                raise ValueError(f"duplicate entry in approved_commands is not permitted: {command}")
+            seen.add(key)
+        return self
+
+
 class ExperimentSpec(StrictModel):
     task_id: str = Field(..., min_length=1, pattern=r"^[a-zA-Z0-9_\-]+$")
     goal: str = Field(..., min_length=1)
@@ -100,6 +282,12 @@ class ExperimentSpec(StrictModel):
     expected_file_contents: dict[str, str] = Field(default_factory=dict)
     required_artifacts: list[str] = Field(default_factory=list)
     repair_limits: RepairLimits = Field(default_factory=RepairLimits)
+
+    # ── MVP4 restricted experiment-execution field ──────────────────────────
+    # Additive: None means "no MVP4 execution configured for this spec" --
+    # every MVP0/1/2/3 spec keeps validating and running unchanged; see
+    # ExecutionSpec above and research_agent.execution_flow.
+    execution: Optional[ExecutionSpec] = None
 
     @field_validator("expected_file_contents")
     @classmethod
@@ -505,6 +693,10 @@ FailureClass = Literal[
     "GIT_METADATA_TAMPERING",
     "RETRY_LIMIT_REACHED",
     "UNKNOWN_FAILURE",
+    # ── MVP4 additions (see research_agent.failure_taxonomy for retriability) ──
+    "EXECUTION_NONZERO_EXIT",
+    "EXECUTION_TIMEOUT",
+    "ARTIFACT_POLICY_FAILURE",
 ]
 
 
@@ -725,3 +917,222 @@ class RepairRunPaths(RunPaths):
     @property
     def final_report_path(self) -> Path:
         return self.run_dir / "final_report.json"
+
+
+# ── MVP4 restricted experiment execution: command results, artifacts,
+# deterministic verifier, state machine, final report, run layout ─────────
+
+class ExecutionCommandResult(StrictModel):
+    """One restricted-subprocess invocation of an approved experiment
+    command -- see research_agent.restricted_subprocess. Distinct from
+    CommandResult (used by the deterministic MVP0 smoke runner and MVP2/3
+    static checks): this one also records the resolved executable path,
+    the enforced resource limits, the child-environment variable NAMES
+    (never values -- see research_agent.policies.environment_policy), and
+    whether stdout/stderr were truncated at limits.max_output_bytes."""
+
+    schema_version: str = SCHEMA_VERSION
+    name: str
+    approved_command: list[str]
+    executed_command: list[str]
+    resolved_executable: Optional[str] = None
+    cwd: str
+    working_directory_policy: str
+    env_names: list[str] = Field(default_factory=list)
+    returncode: Optional[int]
+    timed_out: bool = False
+    duration_seconds: float
+    stdout_path: str
+    stderr_path: str
+    stdout_truncated: bool = False
+    stderr_truncated: bool = False
+    started_at: str
+    ended_at: str
+    limits: dict = Field(default_factory=dict)
+
+
+class ArtifactRecord(StrictModel):
+    """One entry of artifact_manifest.json -- every file/dir/symlink found
+    under the run's assigned artifacts directory after execution, built by
+    research_agent.policies.artifact_policy. Never trusts a command's own
+    claim about what it wrote -- always a fresh filesystem walk."""
+
+    relative_path: str
+    artifact_type: Literal["file", "dir", "symlink"]
+    size_bytes: Optional[int] = None
+    mtime_ns: Optional[int] = None
+    sha256: Optional[str] = None
+    symlink_target: Optional[str] = None
+
+
+class ExecutionVerifierResult(StrictModel):
+    """Deterministic per-attempt verification outcome for the MVP4
+    restricted-execution flow -- authoritative, never trusting Codex's or
+    Claude's own claim. See research_agent.tasks.metric_verifier."""
+
+    schema_version: str = SCHEMA_VERSION
+    task_id: str
+    run_id: str
+    attempt_index: int
+    verdict: Literal["PASS", "FAIL"]
+    artifact_checks: list[str] = Field(default_factory=list)
+    metric_checks: list[str] = Field(default_factory=list)
+    command_checks: list[str] = Field(default_factory=list)
+    policy_checks: list[str] = Field(default_factory=list)
+    issues: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+
+
+class ExecutionAttempt(StrictModel):
+    """Immutable per-attempt summary stored in ExecutionFinalReport
+    .execution_attempts. attempt_index counts EXECUTION attempts (running
+    the approved command(s) end to end), distinct from the optional
+    pre-execution implementation attempt/repair-round indices recorded
+    separately in `implementation`/`attempts/` -- see the MVP4 task
+    contract's 'bounded diagnose/repair integration when execution or
+    verification fails' section."""
+
+    attempt_index: int = Field(..., ge=0)
+    commands: list[ExecutionCommandResult] = Field(default_factory=list)
+    verifier: Optional[ExecutionVerifierResult] = None
+    failure_class: Optional[FailureClass] = None
+    retriable: Optional[bool] = None
+    started_at: str
+    ended_at: str
+    duration_seconds: float
+
+
+ExecutionState = Literal[
+    "PLANNING",
+    "PLAN_VALIDATED",
+    "IMPLEMENTING",
+    "VERIFYING_IMPLEMENTATION",
+    "READY_FOR_EXECUTION",
+    "EXECUTION_NOT_REQUESTED",
+    "EXECUTING",
+    "COLLECTING_ARTIFACTS",
+    "VERIFYING_RESULTS",
+    "DIAGNOSING",
+    "REPAIRING",
+    "RETRYING_EXECUTION",
+    "PASS",
+    "BLOCKED",
+    "RETRY_EXHAUSTED",
+    "INFRASTRUCTURE_FAILURE",
+    "POLICY_FAILURE",
+    "EXECUTION_FAILED",
+    "VERIFICATION_FAILED",
+]
+
+EXECUTION_TERMINAL_STATES = (
+    "PASS", "BLOCKED", "RETRY_EXHAUSTED", "INFRASTRUCTURE_FAILURE", "POLICY_FAILURE",
+    "EXECUTION_FAILED", "VERIFICATION_FAILED", "EXECUTION_NOT_REQUESTED",
+)
+EXECUTION_ACTIVE_STATES = (
+    "PLANNING", "PLAN_VALIDATED", "IMPLEMENTING", "VERIFYING_IMPLEMENTATION",
+    "READY_FOR_EXECUTION", "EXECUTING", "COLLECTING_ARTIFACTS", "VERIFYING_RESULTS",
+    "DIAGNOSING", "REPAIRING", "RETRYING_EXECUTION",
+)
+assert set(EXECUTION_TERMINAL_STATES) | set(EXECUTION_ACTIVE_STATES) == set(ExecutionState.__args__)
+assert set(EXECUTION_TERMINAL_STATES).isdisjoint(EXECUTION_ACTIVE_STATES)
+
+
+class ExecutionRunStateRecord(StrictModel):
+    """The sole content of state.json for an MVP4 `run-experiment` run,
+    rewritten atomically after every state-machine transition -- see
+    research_agent.tasks.experiment_execution.persist_execution_state."""
+
+    schema_version: str = SCHEMA_VERSION
+    run_id: str = Field(..., min_length=1)
+    task_id: str = Field(..., min_length=1)
+    state: ExecutionState
+    attempt_index: int = Field(0, ge=0)
+    updated_at: str
+    history: list[str] = Field(default_factory=list)
+    detail: Optional[str] = None
+
+
+class ExecutionFinalReport(StrictModel):
+    """final_report.json -- the MVP4 restricted-execution flow's terminal
+    report. Never claims PASS unless ExecutionVerifierResult.verdict ==
+    'PASS' for the reported passing_attempt_index, and never reports a
+    subprocess as having run unless --execute was actually passed (see
+    `execute_requested`/EXECUTION_NOT_REQUESTED)."""
+
+    schema_version: str = SCHEMA_VERSION
+    run_id: str
+    task_id: str
+    overall_status: Literal["PASS", "FAIL", "BLOCKED"]
+    final_state: str
+    stage: Optional[str] = None
+    reason: Optional[str] = None
+
+    execute_requested: bool = False
+    execution_mode: Optional[str] = None
+
+    plan: Optional[PlanResult] = None
+    implementation: Optional[ExecutorImplementationResult] = None
+    implementation_attempts: list[AttemptRecord] = Field(default_factory=list)
+
+    execution_attempts: list[ExecutionAttempt] = Field(default_factory=list)
+    passing_attempt_index: Optional[int] = None
+
+    artifact_manifest: list[ArtifactRecord] = Field(default_factory=list)
+    metrics: dict = Field(default_factory=dict)
+    verifier: Optional[ExecutionVerifierResult] = None
+
+    execution_worktree: Optional[ExecutionWorktreeRecord] = None
+    main_worktree_unchanged: bool = True
+
+    total_codex_invocations: int = 0
+    total_claude_invocations: int = 0
+    total_command_runtime_seconds: float = 0.0
+    wall_clock_seconds: float = 0.0
+    execution_limits: Optional[ExecutionLimits] = None
+
+    manual_action_required: bool = False
+
+    run_dir: str
+    created_at: str
+
+
+@dataclass(frozen=True)
+class ExecutionRunPaths(RepairRunPaths):
+    """Extends RepairRunPaths (which already provides attempts_dir/
+    diagnoses_dir/repairs_dir/state_path/final_report_path -- reused
+    unchanged for MVP4's optional pre-execution implementation/repair
+    phase) with the additional layout the MVP4 restricted-execution phase
+    needs: execution/attempt_NN/command_NN/, a dedicated isolated
+    execution_cwd/ directory (used when working_directory_policy ==
+    'isolated_run_directory'), artifact_manifest.json, metrics.json,
+    verifier.json, and failure.json at the run root."""
+
+    @property
+    def execution_dir(self) -> Path:
+        return self.run_dir / "execution"
+
+    def execution_attempt_dir(self, attempt_index: int) -> Path:
+        return self.execution_dir / f"attempt_{attempt_index:02d}"
+
+    def execution_command_dir(self, attempt_index: int, command_index: int) -> Path:
+        return self.execution_attempt_dir(attempt_index) / f"command_{command_index:02d}"
+
+    @property
+    def execution_cwd_dir(self) -> Path:
+        return self.run_dir / "execution_cwd"
+
+    @property
+    def artifact_manifest_path(self) -> Path:
+        return self.run_dir / "artifact_manifest.json"
+
+    @property
+    def metrics_path(self) -> Path:
+        return self.run_dir / "metrics.json"
+
+    @property
+    def execution_verifier_path(self) -> Path:
+        return self.run_dir / "verifier.json"
+
+    @property
+    def failure_path(self) -> Path:
+        return self.run_dir / "failure.json"
