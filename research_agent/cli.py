@@ -67,8 +67,16 @@ from research_agent.agents.claude import ClaudeAgent, MockClaudeAgent
 from research_agent.agents.claude_executor import MockClaudeExecutorAgent, RealClaudeExecutorAgent
 from research_agent.agents.codex import CodexAgent, MockCodexAgent, RealCodexAgent
 from research_agent.execute_flow import execute_flow
+from research_agent.execution_flow import ConfirmatoryRejected, run_experiment_flow
 from research_agent.flow import plan_flow, smoke_flow
-from research_agent.models import REPAIR_TERMINAL_STATES, ExecuteReport, RepairFinalReport, RepairLimits
+from research_agent.models import (
+    EXECUTION_TERMINAL_STATES,
+    REPAIR_TERMINAL_STATES,
+    ExecuteReport,
+    ExecutionFinalReport,
+    RepairFinalReport,
+    RepairLimits,
+)
 from research_agent.policies import execution_policy
 from research_agent.repair_flow import repair_flow
 from research_agent.tasks import experiment as experiment_tasks
@@ -203,6 +211,56 @@ def cmd_execute(args: argparse.Namespace) -> int:
         claude_agent=claude_agent,
     )
     print(report.model_dump_json(indent=2))
+    return _STATUS_EXIT_CODES.get(report.overall_status, EXIT_ERROR)
+
+
+def cmd_run_experiment(args: argparse.Namespace) -> int:
+    """MVP4: plan -> optional isolated pre-execution implementation ->
+    READY_FOR_EXECUTION/EXECUTION_NOT_REQUESTED gate -> (only if --execute
+    was passed) restricted, resource-limited, pre-approved-command-only
+    experiment subprocess -> artifact collection -> deterministic metric
+    verification -> bounded post-execution diagnose/repair-then-retry loop
+    -> report. Exactly like `execute`/`repair`, Codex and Claude are always
+    independently selected (`--codex real`/`--claude real`, each defaulting
+    to mock) -- there is no generic `--agents real` flag. Execution itself
+    additionally requires the separate, explicit `--execute` flag: without
+    it, the command always stops at EXECUTION_NOT_REQUESTED, regardless of
+    what Codex or Claude said. A confirmatory specification (execution_mode:
+    confirmatory, confirmatory: true, or a task_id/goal/approved_command
+    naming 'confirmatory'/'paper_final'/'final_result'/a final-results
+    directory) is rejected deterministically as
+    CONFIRMATORY_EXECUTION_REQUIRES_MVP5_APPROVAL before planning starts --
+    there is no --confirmatory flag and no way to bypass this from the CLI."""
+    try:
+        codex_agent = _build_codex_agent(args.codex)
+        claude_agent = _build_claude_executor_agent(args.claude)
+    except RealClaudeDisabledError as e:
+        print(json.dumps({"error": str(e), "code": REAL_CLAUDE_DISABLED_CODE}, indent=2), file=sys.stderr)
+        return EXIT_ERROR
+    execution_worktrees_root = (
+        Path(args.execution_worktrees_root).resolve() if args.execution_worktrees_root else None
+    )
+    try:
+        report = run_experiment_flow(
+            Path(args.spec_path),
+            repo_root=Path(args.repo_root).resolve(),
+            runs_root=_runs_root(args),
+            run_id=args.run_id,
+            execution_worktrees_root=execution_worktrees_root,
+            codex_agent=codex_agent,
+            claude_agent=claude_agent,
+            execute=args.execute,
+        )
+    except ConfirmatoryRejected as e:
+        print(json.dumps({"error": str(e), "code": "CONFIRMATORY_EXECUTION_REQUIRES_MVP5_APPROVAL"}, indent=2), file=sys.stderr)
+        return EXIT_ERROR
+    except (ValidationError, ValueError, FileNotFoundError) as e:
+        code = "CONFIRMATORY_EXECUTION_REQUIRES_MVP5_APPROVAL" if "CONFIRMATORY_EXECUTION_REQUIRES_MVP5_APPROVAL" in str(e) else "SPEC_VALIDATION_ERROR"
+        print(json.dumps({"error": str(e), "code": code}, indent=2), file=sys.stderr)
+        return EXIT_ERROR
+    print(report.model_dump_json(indent=2))
+    if report.final_state == "EXECUTION_NOT_REQUESTED":
+        return EXIT_OK
     return _STATUS_EXIT_CODES.get(report.overall_status, EXIT_ERROR)
 
 
@@ -382,26 +440,54 @@ def _load_execution_worktree_record(run_dir: Path) -> dict:
 
 def _load_recorded_report(run_dir: Path) -> tuple[str, Optional[dict], Optional[str]]:
     """Determine which structured final-report artifact this run produced --
-    `report.json` (ExecuteReport, from `execute`) or `final_report.json`
-    (RepairFinalReport, from `repair`) -- and return
-    (run_type, validated_report_dict_or_None, error_message_or_None).
+    `report.json` (ExecuteReport, from `execute`), or `final_report.json`,
+    which BOTH `repair` (RepairFinalReport) and MVP4 `run-experiment`
+    (ExecutionFinalReport) write -- and return (run_type,
+    validated_report_dict_or_None, error_message_or_None).
 
-    run_type is one of "execute", "repair", "unknown" and is derived PURELY
-    from which of those two files exists on disk -- never guessed from
-    run_id text. If the file exists but is not valid JSON or fails to
-    validate against its Pydantic schema, run_type still correctly reflects
-    which kind of run this is (the filename itself is authoritative), but
-    the returned dict is None and error_message explains why -- callers
-    must treat such a run as untrustworthy (refuse rather than compare
-    against a report that might be truncated/corrupted/hand-edited)."""
+    run_type is one of "execute", "repair", "run-experiment", "unknown" and
+    is derived PURELY from which file exists on disk and which schema its
+    content actually validates against -- never guessed from run_id text.
+    Both RepairFinalReport and ExecutionFinalReport are StrictModel
+    (extra="forbid"), so the two schemas are mutually exclusive: a
+    RepairFinalReport-shaped dict always fails ExecutionFinalReport
+    validation (missing `execution_attempts` etc.) and vice versa (missing
+    `repair_limits`); RepairFinalReport is tried first, purely for
+    backward-compatible priority, with no ambiguity either way. If the file
+    exists but is not valid JSON or fails BOTH schemas, run_type is still
+    "repair"/"run-experiment" is undecidable, so it is reported as such via
+    the error message and the returned dict is None -- callers must treat
+    such a run as untrustworthy (refuse rather than compare against a
+    report that might be truncated/corrupted/hand-edited)."""
     final_report_path = run_dir / "final_report.json"
     if final_report_path.exists():
         try:
-            data = json.loads(final_report_path.read_text())
+            raw_text = final_report_path.read_text()
+            data = json.loads(raw_text)
+        except (json.JSONDecodeError, OSError) as e:
+            return "unknown-final-report", None, f"final_report.json is missing, unreadable, or not valid JSON: {e}"
+        try:
             RepairFinalReport.model_validate(data)
-        except (json.JSONDecodeError, OSError, ValidationError) as e:
-            return "repair", None, f"final_report.json is missing, unreadable, or malformed: {e}"
-        return "repair", data, None
+            return "repair", data, None
+        except ValidationError as repair_err:
+            repair_err_text = str(repair_err)
+        try:
+            ExecutionFinalReport.model_validate(data)
+            return "run-experiment", data, None
+        except ValidationError as exec_err:
+            # Malformed/ambiguous content that matches NEITHER schema: which
+            # command actually produced this run cannot be recovered from the
+            # content alone. Default to "repair" (this repository's original,
+            # pre-MVP4 behavior for any final_report.json, valid or not) purely
+            # for backward-compatible run_type labeling -- functionally this
+            # makes no difference either way, since every caller already
+            # refuses (REFUSED_MALFORMED_REPORT / INCOMPLETE) whenever
+            # report_data is None, regardless of the run_type label.
+            return (
+                "repair", None,
+                f"final_report.json matches neither RepairFinalReport ({repair_err_text}) nor "
+                f"ExecutionFinalReport ({exec_err})",
+            )
 
     report_path = run_dir / "report.json"
     if report_path.exists():
@@ -416,12 +502,12 @@ def _load_recorded_report(run_dir: Path) -> tuple[str, Optional[dict], Optional[
 
 
 def _run_activity_state(run_dir: Path, run_type: str) -> Optional[str]:
-    """Returns the non-terminal research_agent.models.RepairState name if
-    this run is still active, else None. A terminal, schema-valid report
-    (run_type != "unknown") always means the run already finished -- only
-    MVP3 `repair` runs write state.json at all, so this can only fire for
-    run_type == "unknown" (no report.json/final_report.json yet)."""
-    if run_type != "unknown":
+    """Returns the non-terminal state name if this run is still active, else
+    None. A terminal, schema-valid report (run_type not in ("unknown",
+    "unknown-final-report")) always means the run already finished -- only
+    MVP3 `repair` and MVP4 `run-experiment` runs write state.json at all, so
+    this can only fire once no final_report.json/report.json exists yet."""
+    if run_type not in ("unknown", "unknown-final-report"):
         return None
     state_path = run_dir / "state.json"
     if not state_path.exists():
@@ -431,7 +517,7 @@ def _run_activity_state(run_dir: Path, run_type: str) -> Optional[str]:
     except (json.JSONDecodeError, OSError):
         return None
     state = state_data.get("state")
-    if state in REPAIR_TERMINAL_STATES:
+    if state in REPAIR_TERMINAL_STATES or state in EXECUTION_TERMINAL_STATES:
         return None
     return state
 
@@ -444,6 +530,16 @@ def _report_summary(run_type: str, report_data: dict) -> dict:
             "final_state": report_data.get("final_state"),
             "passing_attempt_index": report_data.get("passing_attempt_index"),
             "changed_file_count": report_data.get("changed_file_count"),
+        }
+    if run_type == "run-experiment":
+        return {
+            "run_type": "run-experiment",
+            "overall_status": report_data.get("overall_status"),
+            "final_state": report_data.get("final_state"),
+            "execute_requested": report_data.get("execute_requested"),
+            "passing_attempt_index": report_data.get("passing_attempt_index"),
+            "execution_attempts": len(report_data.get("execution_attempts") or []),
+            "implementation_attempts": len(report_data.get("implementation_attempts") or []),
         }
     return {
         "run_type": "execute",
@@ -564,6 +660,31 @@ def _recorded_changed_fingerprints_for_run(run_dir: Path, run_type: str, report_
             return {}
         passing_index = report_data.get("passing_attempt_index")
         target_index = passing_index if passing_index is not None else max(a["attempt_index"] for a in attempts)
+        manifest_path = run_dir / "attempts" / f"attempt_{target_index:02d}" / "changed_file_manifest.json"
+        if not manifest_path.exists():
+            return None
+        try:
+            manifest_data = json.loads(manifest_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return None
+        if not isinstance(manifest_data, list):
+            return None
+        return _fingerprints_from_changed_file_records(manifest_data)
+
+    if run_type == "run-experiment":
+        # MVP4 shares the same attempts/attempt_NN/changed_file_manifest.json
+        # layout as `repair` (research_agent.models.ExecutionRunPaths extends
+        # RepairRunPaths unchanged) -- but its optional pre-execution
+        # implementation/post-execution repair phase is recorded under
+        # `implementation_attempts`, not `attempts`, and (unlike `repair`,
+        # which always makes at least one implementation attempt) may be
+        # entirely EMPTY for a spec with no implementation scope configured
+        # -- in which case the execution worktree is legitimately untouched
+        # and the recorded fingerprint set is correctly {}.
+        attempts = report_data.get("implementation_attempts") or []
+        if not attempts:
+            return {}
+        target_index = max(a["attempt_index"] for a in attempts)
         manifest_path = run_dir / "attempts" / f"attempt_{target_index:02d}" / "changed_file_manifest.json"
         if not manifest_path.exists():
             return None
@@ -748,6 +869,88 @@ def cmd_worktree_cleanup(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def cmd_experiment_status(args: argparse.Namespace) -> int:
+    """Status for an MVP4 `run-experiment` run. A run with no
+    final_report.json yet (still active, or interrupted mid-run) is always
+    reported as INCOMPLETE -- never silently treated as PASS. If the run
+    directory actually belongs to a different command (`repair` or
+    `execute`), this refuses and points at the right status command instead
+    of guessing."""
+    run_dir = _runs_root(args) / args.run_id
+    if not run_dir.exists():
+        print(json.dumps({"error": f"no run directory at {run_dir}"}, indent=2), file=sys.stderr)
+        return EXIT_ERROR
+
+    run_type, report_data, report_error = _load_recorded_report(run_dir)
+
+    if run_type in ("unknown", "unknown-final-report"):
+        active_state = _run_activity_state(run_dir, run_type)
+        print(json.dumps({
+            "run_id": args.run_id,
+            "run_type": "run-experiment",
+            "current_state": active_state or "UNKNOWN",
+            "status": "INCOMPLETE",
+            "manual_action_required": True,
+            "note": report_error or (
+                "no final_report.json yet -- this run is either still active or was interrupted mid-run; "
+                "never treat an incomplete run as PASS"
+            ),
+        }, indent=2))
+        return EXIT_ERROR
+
+    if run_type != "run-experiment":
+        other_status_cmd = "repair-status" if run_type == "repair" else "status"
+        print(json.dumps({
+            "error": "REFUSED_WRONG_RUN_TYPE",
+            "reason": f"run {args.run_id!r} was produced by `{run_type}`, not `run-experiment`; use "
+            f"`{other_status_cmd}` instead",
+        }, indent=2), file=sys.stderr)
+        return EXIT_ERROR
+
+    if report_data is None:
+        print(json.dumps({"error": "REFUSED_MALFORMED_REPORT", "reason": report_error}, indent=2), file=sys.stderr)
+        return EXIT_ERROR
+
+    limits = report_data.get("execution_limits") or {}
+    execution_attempts = report_data.get("execution_attempts") or []
+    implementation_attempts = report_data.get("implementation_attempts") or []
+    repair_rounds_used = max((a["attempt_index"] for a in implementation_attempts if a.get("kind") == "repair"), default=0)
+    retry_budget_remaining = {
+        "execution_attempts": max(0, limits.get("max_execution_attempts", 0) - len(execution_attempts)),
+        "repair_rounds": max(0, limits.get("max_repair_rounds", 0) - repair_rounds_used),
+        "claude_invocations": max(0, limits.get("max_total_claude_invocations", 0) - report_data.get("total_claude_invocations", 0)),
+        "codex_invocations": max(0, limits.get("max_total_codex_invocations", 0) - report_data.get("total_codex_invocations", 0)),
+    }
+
+    print(json.dumps({
+        "run_id": args.run_id,
+        "run_type": "run-experiment",
+        "current_state": report_data.get("final_state"),
+        "status": report_data.get("overall_status"),
+        "execute_requested": report_data.get("execute_requested"),
+        "execution_mode": report_data.get("execution_mode"),
+        "passing_attempt_index": report_data.get("passing_attempt_index"),
+        "execution_attempts_used": len(execution_attempts),
+        "implementation_attempts_used": len(implementation_attempts),
+        "execution_worktree_path": (report_data.get("execution_worktree") or {}).get("worktree_path"),
+        "main_worktree_unchanged": report_data.get("main_worktree_unchanged"),
+        "retry_budget_remaining": retry_budget_remaining,
+        "manual_action_required": report_data.get("manual_action_required"),
+    }, indent=2))
+    return _STATUS_EXIT_CODES.get(report_data.get("overall_status"), EXIT_ERROR)
+
+
+def cmd_experiment_cleanup(args: argparse.Namespace) -> int:
+    """MVP4 execution-worktree cleanup -- a thin alias for
+    `worktree-cleanup`, which already understands `run-experiment` reports
+    (see `_load_recorded_report`/`_recorded_changed_fingerprints_for_run`
+    above). Kept as a distinct, discoverable command per the MVP4 CLI
+    surface; the underlying safety checks (refuse unrecorded changes,
+    refuse active runs, refuse malformed reports, refuse main, dry-run,
+    explicit --delete-branch, never `git clean -fdx`) are identical."""
+    return cmd_worktree_cleanup(args)
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     run_dir = _runs_root(args) / args.run_id
     if not run_dir.exists():
@@ -821,6 +1024,41 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_execute.set_defaults(func=cmd_execute)
 
+    p_run_experiment = sub.add_parser(
+        "run-experiment",
+        help="MVP4: plan -> optional implementation -> execution gate -> restricted CPU-only, "
+        "pre-approved-command-only experiment subprocess -> artifact collection -> metric verification -> "
+        "bounded post-execution repair-then-retry -> report. Confirmatory execution is always rejected. "
+        "Real execution requires the separate, explicit --execute flag.",
+    )
+    p_run_experiment.add_argument("spec_path")
+    p_run_experiment.add_argument("--run-id", default=None)
+    p_run_experiment.add_argument(
+        "--execution-worktrees-root", default=None,
+        help="root directory for the execution worktree (default: a sibling directory of --repo-root, "
+        "always outside the main repository worktree)",
+    )
+    p_run_experiment.add_argument(
+        "--codex", choices=["mock", "real"], default="mock",
+        help="mock (default, offline, no CLI required) or real (invokes the codex CLI, read-only) -- "
+        "used for BOTH the planner and the post-execution diagnosis role; Codex is only ever an advisor "
+        "and can never authorize a command execution",
+    )
+    p_run_experiment.add_argument(
+        "--claude", choices=["mock", "real"], default="mock",
+        help="mock (default, offline) or real (invokes the claude CLI inside the isolated execution "
+        "worktree; requires this EXPLICIT flag) -- used for the optional pre-execution implementation "
+        "and every post-execution repair round; Claude never runs or authorizes the approved experiment "
+        "command itself",
+    )
+    p_run_experiment.add_argument(
+        "--execute", action="store_true",
+        help="explicitly request restricted execution of the specification's approved commands; without "
+        "this flag the command always stops at EXECUTION_NOT_REQUESTED after planning/validation, "
+        "regardless of what Codex or Claude said",
+    )
+    p_run_experiment.set_defaults(func=cmd_run_experiment)
+
     p_repair = sub.add_parser(
         "repair",
         help="MVP3: plan -> attempt 0 -> deterministic verifier -> bounded (Codex diagnosis -> Claude "
@@ -887,6 +1125,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--delete-branch", action="store_true", help="also delete the run's throwaway branch (opt-in, off by default)"
     )
     p_worktree_cleanup.set_defaults(func=cmd_worktree_cleanup)
+
+    p_experiment_status = sub.add_parser("experiment-status", help="show the status of a previous `run-experiment` (MVP4) run")
+    p_experiment_status.add_argument("run_id")
+    p_experiment_status.set_defaults(func=cmd_experiment_status)
+
+    p_experiment_cleanup = sub.add_parser(
+        "experiment-cleanup",
+        help="remove a `run-experiment` (MVP4) run's execution worktree (alias for worktree-cleanup, "
+        "which already understands MVP4 reports; refuses if it has unrecorded changes; never touches "
+        "main; branch deletion is opt-in)",
+    )
+    p_experiment_cleanup.add_argument("run_id")
+    p_experiment_cleanup.add_argument("--dry-run", action="store_true", help="report what would happen, remove nothing")
+    p_experiment_cleanup.add_argument(
+        "--delete-branch", action="store_true", help="also delete the run's throwaway branch (opt-in, off by default)"
+    )
+    p_experiment_cleanup.set_defaults(func=cmd_experiment_cleanup)
 
     return parser
 

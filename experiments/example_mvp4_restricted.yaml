@@ -1,0 +1,131 @@
+# Harmless, deterministic, CPU-only restricted-execution spec for the TANGO
+# Experiment Agent's MVP4 (research_agent.execution_flow / `run-experiment`
+# CLI command). This is the designated single harmless live validation task
+# for MVP4 -- see the task contract's "Harmless live validation" section.
+#
+# No pre-execution implementation is configured (expected_file_contents /
+# required_artifacts / allowed_executor_commands are all left empty), so the
+# IMPLEMENTING/VERIFYING_IMPLEMENTATION states are skipped entirely: this
+# spec exercises exactly READY_FOR_EXECUTION -> EXECUTING ->
+# COLLECTING_ARTIFACTS -> VERIFYING_RESULTS -> PASS.
+#
+# The single approved command is a fixed, deterministic `python -c` script
+# (byte-for-byte, taken verbatim from this file -- nothing generated at
+# runtime) that:
+#   - performs no network access
+#   - imports no heavy research library (only json/os from the stdlib)
+#   - uses no GPU and no robot hardware
+#   - completes in well under 5 seconds
+#   - writes exactly one JSON artifact, metrics.json, under the run's
+#     assigned artifacts directory (via RESEARCH_AGENT_ARTIFACTS_DIR, which
+#     research_agent.policies.environment_policy always injects)
+#
+# Usage:
+#   python -m research_agent.cli run-experiment \
+#       experiments/example_mvp4_restricted.yaml \
+#       --codex mock --claude mock --execute
+#
+# Expected outcome: LIVE_MVP4_RESTRICTED_EXECUTION_PASS (final_state=PASS),
+# with metrics.json == {"restricted_execution_ok": true, "value": 1.0}.
+
+task_id: example_mvp4_restricted
+goal: >
+  Run exactly one pre-approved, deterministic, CPU-only python -c command
+  that writes a single metrics.json artifact under the run's assigned
+  artifacts directory, and verify it deterministically. No source code is
+  modified; no research experiment, GPU, robot, network, or training code is
+  ever invoked.
+
+allowed_paths:
+  - research_agent_sandbox
+
+forbidden_paths:
+  - research_agent
+  - tests
+  - tango_robot
+  - grasp_6dof
+  - world_model
+
+# Placeholder only -- `run-experiment` never runs this; smoke_command is a
+# required ExperimentSpec field inherited from the MVP0/MVP1 schema.
+smoke_command:
+  - python
+  - "-c"
+  - "pass"
+
+confirmatory_command: null
+
+seeds: [0]
+
+timeouts:
+  planner_seconds: 60
+  executor_seconds: 60
+  smoke_seconds: 30
+  verifier_seconds: 30
+  reviewer_seconds: 60
+
+required_metrics: []
+
+approval:
+  required_for_confirmatory: true
+  approved_by: null
+
+max_run_count: 10
+
+execution:
+  execution_mode: restricted
+  confirmatory: false
+  cpu_only: true
+  network_allowed: false
+  gpu_allowed: false
+  robot_allowed: false
+  training_allowed: false
+  working_directory_policy: isolated_run_directory
+
+  approved_commands:
+    - - python
+      - "-c"
+      - |
+        import json
+        import os
+
+        artifacts_dir = os.environ["RESEARCH_AGENT_ARTIFACTS_DIR"]
+        metrics = {"restricted_execution_ok": True, "value": 1.0}
+        out_path = os.path.join(artifacts_dir, "metrics.json")
+        with open(out_path, "w") as f:
+            json.dump(metrics, f)
+
+  allowed_output_paths:
+    - metrics.json
+
+  required_artifacts:
+    - metrics.json
+
+  required_metrics:
+    - key: restricted_execution_ok
+      check: bool_equals
+      value: true
+    - key: value
+      check: float_equals
+      value: 1.0
+      tolerance: 0.0001
+
+  environment_allowlist: []
+  environment_overrides: {}
+
+  limits:
+    max_commands: 1
+    max_execution_attempts: 1
+    max_wall_clock_seconds: 30
+    per_command_timeout_seconds: 10
+    max_total_command_runtime_seconds: 20
+    max_output_bytes: 100000
+    max_artifact_files: 1
+    max_artifact_bytes: 100000
+    max_artifact_file_bytes: 100000
+    max_repair_rounds: 0
+    max_total_codex_invocations: 2
+    max_total_claude_invocations: 1
+
+  retry_policy:
+    allow_timeout_retry: false

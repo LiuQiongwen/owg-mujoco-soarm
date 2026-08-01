@@ -21,6 +21,11 @@ RETRIABLE_FAILURE_CLASSES = frozenset({
     "ARTIFACT_MISSING",
     "ARTIFACT_MALFORMED",
     "EXPECTED_CONTENT_MISMATCH",
+    # MVP4: an approved experiment command exiting nonzero is treated the
+    # same as a repairable code defect -- see research_agent.execution_flow's
+    # diagnose/repair-then-RETRYING_EXECUTION loop, which always re-runs the
+    # SAME approved command afterwards (never a different one).
+    "EXECUTION_NONZERO_EXIT",
 })
 
 # The failure classes explicitly called out in the task contract's "Do not
@@ -42,6 +47,14 @@ _NEVER_RETRY_DOCUMENTED = frozenset({
     "WORKTREE_INVALID",
     "RETRY_LIMIT_REACHED",
     "UNKNOWN_FAILURE",
+    # MVP4: a timeout is only ever retried via the separate, narrower
+    # retry_policy.allow_timeout_retry mechanism in execution_flow.py (one
+    # bounded retry of the SAME command, budget permitting) -- never via
+    # this general diagnose/repair taxonomy. An artifact-policy violation
+    # (symlink escape, too many files, byte-limit exceeded, FIFO/socket/
+    # device file, nested Git) is always a non-retriable policy failure.
+    "EXECUTION_TIMEOUT",
+    "ARTIFACT_POLICY_FAILURE",
 })
 assert _NEVER_RETRY_DOCUMENTED.isdisjoint(RETRIABLE_FAILURE_CLASSES)
 
@@ -75,6 +88,14 @@ _TERMINAL_STATE_FOR_FAILURE_CLASS: dict[str, str] = {
     "GIT_METADATA_TAMPERING": "POLICY_FAILURE",
     "RETRY_LIMIT_REACHED": "RETRY_EXHAUSTED",
     "UNKNOWN_FAILURE": "BLOCKED",
+    # MVP4 additions -- research_agent.execution_flow computes its own
+    # terminal state (EXECUTION_FAILED/VERIFICATION_FAILED/POLICY_FAILURE)
+    # directly rather than calling terminal_state_for() for these classes;
+    # these entries exist only so the function never falls through to the
+    # generic BLOCKED default if it ever is called with one.
+    "EXECUTION_NONZERO_EXIT": "BLOCKED",
+    "EXECUTION_TIMEOUT": "BLOCKED",
+    "ARTIFACT_POLICY_FAILURE": "POLICY_FAILURE",
 }
 
 
