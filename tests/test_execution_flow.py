@@ -354,6 +354,59 @@ def test_stdout_and_stderr_captured_on_disk(tmp_path):
     assert (command_dir / "exit_code").read_text().strip() == "0"
 
 
+# ── limits.max_processes: spec-configurable RLIMIT_NPROC override ──────────
+# Added while building experiments/lggsn_tier3_ik_pilot.yaml: the fixed
+# restricted_subprocess.DEFAULT_LIMITS["max_processes"]=32 is a per-UID
+# ceiling (not scoped to the subprocess's own tree), so on a host where the
+# same account already runs >32 processes/threads for unrelated work, ANY
+# thread creation by the approved command -- even by an unrelated C library,
+# nothing to do with correctness -- fails immediately with EAGAIN. Confirmed
+# live: mujoco.MjModel.from_xml_string() failed under exactly this rlimit
+# alone (isolated from cpu/as/fsize/nofile) on a shared dev host already
+# running >1000 threads for that user.
+
+def test_max_processes_default_unset_keeps_harness_default_of_32(tmp_path):
+    report, repo_root, runs_root = _run(tmp_path, task_id="t_nproc_default", script=WRITE_OK_SCRIPT)
+    command_dir = runs_root / "run1" / "execution" / "attempt_00" / "command_00"
+    on_disk = json.loads((command_dir / "limits.json").read_text())
+    assert on_disk["max_processes"] == 32
+    assert report.overall_status == "PASS"
+
+
+def test_max_processes_spec_override_flows_through_to_subprocess_rlimit(tmp_path):
+    report, repo_root, runs_root = _run(
+        tmp_path, task_id="t_nproc_override", script=WRITE_OK_SCRIPT,
+        spec_kwargs={"limits": {
+            "max_commands": 1, "max_execution_attempts": 1, "max_wall_clock_seconds": 30,
+            "per_command_timeout_seconds": 5, "max_repair_rounds": 1,
+            "max_total_codex_invocations": 3, "max_total_claude_invocations": 3,
+            "max_processes": 512,
+        }},
+    )
+    command_dir = runs_root / "run1" / "execution" / "attempt_00" / "command_00"
+    on_disk = json.loads((command_dir / "limits.json").read_text())
+    assert on_disk["max_processes"] == 512
+    # every other rlimit stays at its fixed harness default -- only
+    # max_processes is ever spec-configurable
+    assert on_disk["cpu_seconds"] == 10
+    assert on_disk["address_space_bytes"] == 1_000_000_000
+    assert report.overall_status == "PASS"
+
+
+def test_max_processes_cannot_exceed_bounded_ceiling_at_spec_load():
+    from pydantic import ValidationError
+
+    from research_agent.models import ExecutionLimits
+
+    with pytest.raises(ValidationError):
+        ExecutionLimits(max_processes=100_000)  # far above the le=8192 bound
+    with pytest.raises(ValidationError):
+        ExecutionLimits(max_processes=1)  # below the ge=8 bound -- can't be near-zero either
+
+    ExecutionLimits(max_processes=None)  # unset is always valid: means "use the harness default"
+    ExecutionLimits(max_processes=8192)  # the bound itself is valid
+
+
 # ── 17/18/19. artifact created / path escape / symlink escape ──────────────
 
 def test_artifact_created_in_allowed_directory_recorded_in_manifest(tmp_path):
