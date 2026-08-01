@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "description": "Fixed grasp-candidate poses (x, y, z, yaw) for the LGGSN Tier-3 per-candidate IK reachability pilot (experiments/lggsn_tier3_ik_pilot.yaml). Hand-picked, not sampled at runtime -- no RNG, no seed needed. Each pose is a sim-world-frame (x, y, z) jaw-midpoint target in metres plus a yaw in radians, in the same units and frame EnvironmentSoArm.compute_ik_reachability_per_candidate / HeadlessIKSolver.solve_ik_jaw_topdown expect.",
+  "source": "Chosen within the reachable table region scripts/collect_lggsn_data.py's real candidate sampler uses (_CENTRE_Y=-0.40, _SPREAD_XY=0.06, z near TABLE_TOP_Z + GRASP_Z_TABLE_MARGIN = 0.785 + 0.02), then hand-verified against HeadlessIKSolver.solve_ik_jaw_topdown (tango_robot/headless_ik.py, exact-parity extraction of EnvironmentSoArm._solve_ik_jaw_topdown -- see tests/test_headless_ik_topdown_parity.py) to yield a genuine mix of converged and non-converged outcomes, so convergence_rate is not trivially 0 or 1. This is deterministic, hardcoded input data, not a research result and not sampled from any dataset.",
+  "candidates": [
+    {"x": 0.02, "y": -0.40, "z": 0.805, "yaw": 0.0},
+    {"x": -0.02, "y": -0.38, "z": 0.81, "yaw": 0.6},
+    {"x": 0.05, "y": -0.42, "z": 0.80, "yaw": -0.4},
+    {"x": -0.05, "y": -0.36, "z": 0.82, "yaw": 1.0},
+    {"x": 0.0, "y": -0.40, "z": 0.805, "yaw": -1.2},
+    {"x": 0.03, "y": -0.44, "z": 0.83, "yaw": 0.3},
+    {"x": -0.03, "y": -0.34, "z": 0.80, "yaw": -0.8}
+  ]
+}
