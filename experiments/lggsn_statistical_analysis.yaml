@@ -1,0 +1,178 @@
+# MVP2 execute-flow experiment for the TANGO Experiment Agent
+# (research_agent.execute_flow / `execute` CLI command).
+#
+# PHASE 1 ONLY. Scope deliberately reduced from the original full-suite
+# goal to just the deterministic statistical core plus its tests:
+# loader.py, alignment.py, statistics.py, and
+# tests/test_lggsn_statistical_analysis.py. Explicitly OUT of scope for
+# this spec/phase (do not implement): plots, PNG/PDF figures, LaTeX
+# tables, publication tables, full report generation, and any analysis of
+# a real pair_results.jsonl (no such file is committed in this checkout --
+# see below). A later phase may re-expand this spec's goal/paths to add
+# those; until then, this spec's acceptance criteria are exactly the
+# Phase 1 items below. This spec only describes and bounds the
+# *implementation* task; it does not run the analysis or any research
+# experiment itself -- `execute` never invokes spec.smoke_command (see
+# execute_flow.py's module docstring), and no execution/MVP4 field is set
+# on this spec. smoke_command below is a harmless liveness placeholder
+# only (writes one bool to metrics.json so the separate `smoke` flow's
+# deterministic artifact contract stays satisfiable) -- it is NOT the
+# analysis suite and is never run by `execute`.
+#
+# Two supported data modes for Phase 1, both real, neither fabricated:
+#   * aggregate-only mode: reads the already-committed aggregate outputs
+#     -- research_agent_pilots/lggsn_suite/eval_outputs/{base,nodist,
+#     nozrel,full_v2}/metrics.json and .../matrix_summary.json -- no
+#     pair-level data is available here, so only aggregate-level
+#     statistics (whatever loader.py/statistics.py genuinely support from
+#     these fields) may be produced in this mode.
+#   * aligned pair fixtures mode: deterministic, hand-authored or
+#     evaluator-regenerated pair-level fixtures (e.g. under tests/) used
+#     to exercise alignment.py/statistics.py's pair-level logic (exact
+#     McNemar, paired bootstrap, win/tie/loss) end-to-end. This is test
+#     fixture data, not the real pair_results.jsonl -- analyzing real
+#     pair_results.jsonl is explicitly out of scope for Phase 1.
+# In both modes, and per checkpoint pair, the suite must fail closed
+# (raise, not silently degrade or fabricate) whenever pair-level data is
+# requested but missing, or whenever two checkpoints' pair-level records
+# do not align (same query set, same pair identities/order).
+
+task_id: lggsn_statistical_analysis
+goal: >
+  Phase 1 only: implement research_agent_pilots/lggsn_analysis/loader.py,
+  research_agent_pilots/lggsn_analysis/alignment.py, and
+  research_agent_pilots/lggsn_analysis/statistics.py, plus
+  tests/test_lggsn_statistical_analysis.py, forming the deterministic
+  statistical core of the LGGSN checkpoint-comparison suite. loader.py
+  must support both aggregate-only mode (reading the already-committed
+  research_agent_pilots/lggsn_suite/eval_outputs/{base,nodist,nozrel,
+  full_v2}/metrics.json and .../matrix_summary.json) and aligned pair
+  fixtures mode (deterministic pair-level fixture data, not a real
+  pair_results.jsonl -- analyzing real pair_results.jsonl is out of scope
+  for this phase). alignment.py must validate that two checkpoints'
+  pair-level records are genuinely aligned (same queries, same pair
+  identities/order) and fail closed -- raise, never silently degrade or
+  fabricate -- whenever pair-level data is missing or misaligned.
+  statistics.py must implement an exact McNemar test, a deterministic
+  paired bootstrap confidence interval, and win/tie/loss counts, all
+  computed only from real aligned pair-level data (fixture or
+  regenerated), never invented. Do not implement plots, PNG/PDF figures,
+  LaTeX tables, publication tables, full report generation, or any
+  analysis of a real pair_results.jsonl in this phase. Do not modify any
+  file under research_agent_pilots/lggsn_suite/eval_outputs/ (the inputs)
+  or any other forbidden path. Do not run the analysis suite itself as
+  part of this task -- only create it, together with its tests, so it can
+  be run and reviewed later.
+
+allowed_paths:
+  - research_agent_pilots/lggsn_analysis
+  - tests
+  - experiments
+
+forbidden_paths:
+  - research_agent
+  - causal_validity_audit
+  - grasp_6dof/models
+  - data
+  - datasets
+  - results
+  - checkpoints
+  - paperA_data
+  - paper_final.tex
+  - paper_final.pdf
+  - paper_advanced_robotics.tex
+  - paper_tro.tex
+  - paper_tro.pdf
+  - paper_tro_draft.md
+  - paper_draft.md
+  - paper_risk_gated_vla_draft.md
+  - tango_robot
+
+allowed_modify_paths:
+  - research_agent_pilots/lggsn_analysis
+  - tests
+  - experiments/lggsn_statistical_analysis.yaml
+
+# Phase 1 is four source files (loader.py, alignment.py, statistics.py,
+# tests/test_lggsn_statistical_analysis.py) plus a handful of small,
+# deterministic pair-level fixture files (e.g. under tests/) -- no plots,
+# figures, or generated reports, so both budgets are well below the
+# original full-suite spec's.
+max_changed_files: 15
+max_changed_bytes: 500000
+
+# The only three commands this task may run, byte-for-byte, as argv arrays
+# (never a shell string). All three are already covered by MVP2's own fixed
+# executor allowlist (research_agent.policies.execution_policy
+# ._FIXED_ALLOWLIST_EXACT / ._FIXED_ALLOWLIST_PREFIXES / ._PYTEST_PREFIX);
+# they are listed here explicitly so the spec is self-documenting about the
+# exact bound, not because the fixed allowlist would otherwise reject them.
+allowed_executor_commands:
+  - - python
+    - "-m"
+    - compileall
+    - "-q"
+    - research_agent_pilots/lggsn_analysis
+    - tests
+  - - python
+    - "-m"
+    - pytest
+    - "-q"
+    - tests/test_lggsn_statistical_analysis.py
+  - - git
+    - diff
+    - "--check"
+
+# Static checks the harness independently runs after implementation:
+# "compileall" (built from spec.allowed_paths) and the one committed pytest
+# target below.
+required_executor_checks:
+  - compileall
+  - "pytest:tests/test_lggsn_statistical_analysis.py"
+
+# `execute` never runs this command (see execute_flow.py's module
+# docstring) -- it exists only to keep this spec internally consistent as a
+# general ExperimentSpec/task contract, since research_agent.tasks
+# .verification.verify_artifacts (used by the separate `smoke` flow)
+# unconditionally requires artifacts/metrics.json to exist regardless of
+# whether required_metrics is empty. A no-op `python -c pass` smoke_command
+# can never satisfy that, so deterministic smoke verification would always
+# fail; this command exists solely to make that check pass and carries NO
+# scientific meaning -- it is a build-task liveness smoke check only, never
+# the statistical-analysis suite itself and never a result to cite.
+smoke_command:
+  - python
+  - "-c"
+  - |
+    import json
+    import os
+
+    artifacts_dir = os.environ["RESEARCH_AGENT_ARTIFACTS_DIR"]
+    metrics = {"implementation_smoke_ok": True}
+    out_path = os.path.join(artifacts_dir, "metrics.json")
+    with open(out_path, "w") as f:
+        json.dump(metrics, f)
+
+confirmatory_command: null
+
+seeds: [0]
+
+timeouts:
+  planner_seconds: 60
+  executor_seconds: 300
+  smoke_seconds: 30
+  verifier_seconds: 60
+  reviewer_seconds: 60
+
+# Not a scientific result -- just confirms the smoke_command above ran and
+# wrote its artifact, satisfying verify_artifacts's unconditional
+# metrics.json requirement.
+required_metrics:
+  - name: implementation_smoke_ok
+    type: bool
+
+approval:
+  required_for_confirmatory: true
+  approved_by: null
+
+max_run_count: 10
