@@ -161,13 +161,14 @@ def build_executor_prompt(
     ])
 
 
-def _strict_output_schema() -> dict:
+def _strict_output_schema(model_cls=ExecutorImplementationResult) -> dict:
     """Same "required must list every property" transformation as
     agents.codex._strict_output_schema, and for the same reason: the JSON
     Schema handed to --json-schema is a structured-output contract, not the
-    Python-side optionality Pydantic itself enforces. ExecutorImplementationResult
-    .model_validate() on the response remains authoritative regardless."""
-    schema = ExecutorImplementationResult.model_json_schema()
+    Python-side optionality Pydantic itself enforces. `model_cls`
+    .model_validate() on the response remains authoritative regardless --
+    ExecutorImplementationResult for execute(), RepairResult for repair()."""
+    schema = model_cls.model_json_schema()
     schema["required"] = list(schema.get("properties", {}).keys())
     return schema
 
@@ -232,7 +233,7 @@ def _extract_structured_payload(stdout_text: str) -> dict:
             return result
         if "verdict" in outer:
             return outer
-    raise ValueError("no structured ExecutorImplementationResult payload found in claude output")
+    raise ValueError("no structured result payload found in claude output")
 
 
 class RealClaudeExecutorAgent(ClaudeExecutorAgent):
@@ -324,13 +325,104 @@ class RealClaudeExecutorAgent(ClaudeExecutorAgent):
 
         return implementation
 
+    def repair(
+        self, *, prompt: str, worktree_dir: Path, run_paths: RunPaths, timeout: float, task_id: str, run_id: str,
+        attempt_index: int,
+    ) -> "RepairResult":
+        """MVP3 repair role: runs in the SAME shared execution worktree
+        already created for attempt 0 (never a fresh worktree per round --
+        `worktree_dir`/`cwd` here is always the caller's one persistent
+        execution worktree). Produces RepairResult, not
+        ExecutorImplementationResult. The actual Git diff in that shared
+        worktree remains authoritative regardless of what this returns --
+        see research_agent.repair_flow."""
+        from research_agent.models import RepairResult  # local import: avoid a cycle with models importing agents
+
+        run_paths.prompts_dir.mkdir(parents=True, exist_ok=True)
+        name = f"claude_repair_{attempt_index:02d}"
+        prompt_path = run_paths.prompts_dir / f"{name}_prompt.md"
+        prompt_path.write_text(prompt)
+
+        resolved_binary = shutil.which(self._binary)
+        command = [
+            resolved_binary or self._binary,
+            "-p",
+            "--output-format", "json",
+            "--permission-mode", "acceptEdits",
+            "--tools", "Read,Write,Edit",
+            "--strict-mcp-config",
+            "--no-session-persistence",
+            "--json-schema", json.dumps(_strict_output_schema(RepairResult)),
+        ]
+
+        commands_dir = run_paths.commands_dir
+        commands_dir.mkdir(parents=True, exist_ok=True)
+        (commands_dir / f"{name}.command.json").write_text(json.dumps(command, indent=2) + "\n")
+
+        try:
+            result = subprocess_runner.run_command(
+                command, cwd=worktree_dir, run_dir=commands_dir, name=name, timeout=timeout, input_path=prompt_path,
+            )
+        except subprocess_runner.ExecutableNotFoundError as e:
+            self._write_launch_failure_artifacts(commands_dir, command, worktree_dir, resolved_binary, message=str(e), name=name)
+            raise
+        except subprocess_runner.CommandTimeoutError:
+            self._write_completed_or_timeout_artifacts(commands_dir, resolved_binary, name=name)
+            raise
+
+        self._write_completed_or_timeout_artifacts(commands_dir, resolved_binary, result=result, name=name)
+
+        if result.returncode != 0:
+            stderr_text = Path(result.stderr_path).read_text()
+            if _looks_like_auth_failure(result.returncode, stderr_text):
+                raise ClaudeExecutorError(
+                    "CLAUDE_AUTHENTICATION_FAILED", f"claude exited {result.returncode}; see commands/{name}.stderr",
+                )
+            raise ClaudeExecutorError("CLAUDE_NONZERO_EXIT", f"claude exited {result.returncode}; see commands/{name}.stderr")
+
+        stdout_text = Path(result.stdout_path).read_text()
+        if not stdout_text.strip():
+            raise ClaudeExecutorError("CLAUDE_OUTPUT_MISSING", "claude produced no stdout output")
+
+        raw_path = run_paths.run_dir / f"{name}.raw.json"
+        try:
+            payload = _extract_structured_payload(stdout_text)
+        except (json.JSONDecodeError, ValueError) as e:
+            raw_path.write_text(stdout_text)
+            raise ClaudeExecutorError("CLAUDE_OUTPUT_MALFORMED", f"could not parse claude output as JSON: {e}") from e
+
+        raw_path.write_text(json.dumps(payload, indent=2) + "\n")
+
+        try:
+            repair_result = RepairResult.model_validate(payload)
+        except ValidationError as e:
+            raise ClaudeExecutorError("CLAUDE_SCHEMA_INVALID", str(e)) from e
+
+        if repair_result.task_id != task_id:
+            raise ClaudeExecutorError(
+                "CLAUDE_TASK_ID_MISMATCH", f"expected task_id={task_id!r}, got {repair_result.task_id!r}"
+            )
+        if repair_result.run_id != run_id:
+            raise ClaudeExecutorError(
+                "CLAUDE_RUN_ID_MISMATCH", f"expected run_id={run_id!r}, got {repair_result.run_id!r}"
+            )
+        if repair_result.attempt_index != attempt_index:
+            raise ClaudeExecutorError(
+                "CLAUDE_ATTEMPT_INDEX_MISMATCH",
+                f"expected attempt_index={attempt_index!r}, got {repair_result.attempt_index!r}",
+            )
+
+        return repair_result
+
     @staticmethod
-    def _write_launch_failure_artifacts(commands_dir: Path, command, cwd, resolved_binary, *, message: str) -> None:
-        (commands_dir / "claude_executor.stdout").write_text("")
-        (commands_dir / "claude_executor.stderr").write_text(message)
-        (commands_dir / "claude_executor.exit_code").write_text("")
+    def _write_launch_failure_artifacts(
+        commands_dir: Path, command, cwd, resolved_binary, *, message: str, name: str = "claude_executor"
+    ) -> None:
+        (commands_dir / f"{name}.stdout").write_text("")
+        (commands_dir / f"{name}.stderr").write_text(message)
+        (commands_dir / f"{name}.exit_code").write_text("")
         payload = {
-            "name": "claude_executor",
+            "name": name,
             "command": [str(tok) for tok in command],
             "cwd": str(cwd),
             "returncode": None,
@@ -341,11 +433,11 @@ class RealClaudeExecutorAgent(ClaudeExecutorAgent):
             "resolved_executable": resolved_binary,
             "error": message,
         }
-        (commands_dir / "claude_executor.result.json").write_text(json.dumps(payload, indent=2) + "\n")
+        (commands_dir / f"{name}.result.json").write_text(json.dumps(payload, indent=2) + "\n")
 
     @staticmethod
     def _write_completed_or_timeout_artifacts(
-        commands_dir: Path, resolved_binary, *, result: Optional[CommandResult] = None
+        commands_dir: Path, resolved_binary, *, result: Optional[CommandResult] = None, name: str = "claude_executor"
     ) -> None:
         if result is not None:
             exit_code_text = "" if result.returncode is None else str(result.returncode)
@@ -361,29 +453,76 @@ class RealClaudeExecutorAgent(ClaudeExecutorAgent):
                 "resolved_executable": resolved_binary,
             }
         else:
-            meta_path = commands_dir / "claude_executor.meta.json"
+            meta_path = commands_dir / f"{name}.meta.json"
             meta = json.loads(meta_path.read_text()) if meta_path.exists() else {}
             exit_code_text = ""
             payload = {**meta, "resolved_executable": resolved_binary}
-        (commands_dir / "claude_executor.exit_code").write_text(exit_code_text)
-        (commands_dir / "claude_executor.result.json").write_text(json.dumps(payload, indent=2) + "\n")
+        (commands_dir / f"{name}.exit_code").write_text(exit_code_text)
+        (commands_dir / f"{name}.result.json").write_text(json.dumps(payload, indent=2) + "\n")
 
 
 class MockClaudeExecutorAgent(ClaudeExecutorAgent):
     """Deterministic, offline stand-in -- the execute flow's default
-    (`--claude mock`). Never spawns a subprocess and makes no filesystem
+    (`--claude mock`). With no MVP3 write parameters given (the MVP2
+    default, unchanged), never spawns a subprocess and makes no filesystem
     writes of its own inside the execution worktree, so a mock-executor run
-    always has zero changed files."""
+    always has zero changed files -- existing MVP2 tests rely on exactly
+    this behavior. `execute_write_*`/`repair_write_*` are new, additive,
+    opt-in MVP3 parameters used only by research_agent.repair_flow's fake-
+    agent tests to deterministically simulate "attempt 0 writes wrong
+    content, the repair round writes correct content" without a real CLI."""
 
-    def __init__(self, verdict: str = "IMPLEMENTATION_PASS"):
+    def __init__(
+        self,
+        verdict: str = "IMPLEMENTATION_PASS",
+        *,
+        execute_write_relpath: Optional[str] = None,
+        execute_write_content: Optional[str] = None,
+        repair_verdict: str = "REPAIR_PASS",
+        repair_write_relpath: Optional[str] = None,
+        repair_write_content: Optional[str] = None,
+    ):
         self._verdict = verdict
+        self._execute_write_relpath = execute_write_relpath
+        self._execute_write_content = execute_write_content
+        self._repair_verdict = repair_verdict
+        self._repair_write_relpath = repair_write_relpath
+        self._repair_write_content = repair_write_content
 
     def execute(
         self, *, prompt, worktree_dir, run_paths, timeout, task_id, run_id
     ) -> ExecutorImplementationResult:
+        changed_files: list[str] = []
+        if self._execute_write_relpath is not None:
+            target = Path(worktree_dir) / self._execute_write_relpath
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(self._execute_write_content or "")
+            changed_files = [self._execute_write_relpath]
         return ExecutorImplementationResult(
             task_id=task_id,
             run_id=run_id,
             verdict=self._verdict,
-            summary="mock executor: no source changes required for this execute-flow specification",
+            summary="mock executor: no source changes required for this execute-flow specification"
+            if not changed_files else f"mock executor: wrote {self._execute_write_relpath}",
+            changed_files=changed_files,
+        )
+
+    def repair(
+        self, *, prompt, worktree_dir, run_paths, timeout, task_id, run_id, attempt_index
+    ) -> "RepairResult":
+        from research_agent.models import RepairResult  # local import: avoid a cycle with models importing agents
+
+        changed_files: list[str] = []
+        if self._repair_write_relpath is not None:
+            target = Path(worktree_dir) / self._repair_write_relpath
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(self._repair_write_content or "")
+            changed_files = [self._repair_write_relpath]
+        return RepairResult(
+            task_id=task_id,
+            run_id=run_id,
+            attempt_index=attempt_index,
+            verdict=self._repair_verdict,
+            summary="mock repair: no changes made" if not changed_files else f"mock repair: wrote {self._repair_write_relpath}",
+            changed_files=changed_files,
         )

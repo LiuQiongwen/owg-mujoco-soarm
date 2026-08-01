@@ -41,6 +41,25 @@ class RequiredMetric(StrictModel):
     max_value: Optional[float] = None
 
 
+# ── MVP3 repair-loop budget (defined before ExperimentSpec, which embeds it
+# as `repair_limits`) ────────────────────────────────────────────────────────
+
+class RepairLimits(StrictModel):
+    """Bounded-retry configuration for research_agent.repair_flow. Every
+    field has a conservative default so a spec written before MVP3 existed
+    (or a `repair` CLI invocation with no override flags) still gets a
+    finite, small repair budget -- see the MVP3 task contract's "Repair
+    limits" section: max_repair_rounds in {1,2}, max_total_claude_invocations
+    and max_total_codex_invocations <= 2 for live validation."""
+
+    max_repair_rounds: int = Field(2, ge=0, le=5)
+    max_total_claude_invocations: int = Field(3, ge=1, le=10)
+    max_total_codex_invocations: int = Field(4, ge=1, le=10)
+    max_total_changed_files: int = Field(10, ge=1, le=1000)
+    max_total_changed_bytes: int = Field(200_000, ge=1)
+    max_wall_clock_seconds: int = Field(900, ge=1, le=7200)
+
+
 class ExperimentSpec(StrictModel):
     task_id: str = Field(..., min_length=1, pattern=r"^[a-zA-Z0-9_\-]+$")
     goal: str = Field(..., min_length=1)
@@ -70,6 +89,33 @@ class ExperimentSpec(StrictModel):
     max_changed_bytes: int = Field(200_000, ge=1)
     allowed_executor_commands: list[list[str]] = Field(default_factory=list)
     required_executor_checks: list[str] = Field(default_factory=list)
+
+    # ── MVP3 repair-flow (diagnose/repair/reverify) fields ─────────────────
+    # All additive with defaults so existing MVP0/1/2 specs keep validating
+    # unchanged. expected_file_contents/required_artifacts drive the
+    # deterministic repair verifier (research_agent.tasks.repair_verification);
+    # an empty dict/list means "no MVP3-specific content/artifact checks",
+    # so a pre-MVP3 spec run through `repair` still validates, it just never
+    # produces an EXPECTED_CONTENT_MISMATCH/ARTIFACT_MISSING failure record.
+    expected_file_contents: dict[str, str] = Field(default_factory=dict)
+    required_artifacts: list[str] = Field(default_factory=list)
+    repair_limits: RepairLimits = Field(default_factory=RepairLimits)
+
+    @field_validator("expected_file_contents")
+    @classmethod
+    def _expected_file_contents_paths_are_repo_relative(cls, value: dict[str, str]) -> dict[str, str]:
+        for p in value:
+            if not p or p.startswith("/") or ".." in Path(p).parts:
+                raise ValueError(f"expected_file_contents key must be a non-empty, repo-relative path with no '..': {p!r}")
+        return value
+
+    @field_validator("required_artifacts")
+    @classmethod
+    def _required_artifacts_paths_are_repo_relative(cls, value: list[str]) -> list[str]:
+        for p in value:
+            if not p or p.startswith("/") or ".." in Path(p).parts:
+                raise ValueError(f"required_artifacts entry must be a non-empty, repo-relative path with no '..': {p!r}")
+        return value
 
     @field_validator("allowed_paths", "forbidden_paths", "allowed_modify_paths")
     @classmethod
@@ -411,3 +457,271 @@ class RunPaths:
     @property
     def report_path(self) -> Path:
         return self.run_dir / "report.json"
+
+
+# ── MVP3 repair-loop: state machine, failure taxonomy, diagnosis/repair ────
+#
+# Terminal-state guarantee (task contract: "No run may remain in an active
+# state after process exit"): research_agent.repair_flow only ever leaves
+# state.json in one of REPAIR_TERMINAL_STATES before returning, including on
+# an unexpected internal exception -- see repair_flow.repair_flow's outer
+# try/except.
+
+RepairState = Literal[
+    "PLANNING",
+    "PLAN_VALIDATED",
+    "IMPLEMENTING",
+    "VERIFYING",
+    "DIAGNOSING",
+    "REPAIRING",
+    "REVERIFYING",
+    "PASS",
+    "BLOCKED",
+    "RETRY_EXHAUSTED",
+    "INFRASTRUCTURE_FAILURE",
+    "POLICY_FAILURE",
+]
+
+REPAIR_TERMINAL_STATES = ("PASS", "BLOCKED", "RETRY_EXHAUSTED", "INFRASTRUCTURE_FAILURE", "POLICY_FAILURE")
+REPAIR_ACTIVE_STATES = ("PLANNING", "PLAN_VALIDATED", "IMPLEMENTING", "VERIFYING", "DIAGNOSING", "REPAIRING", "REVERIFYING")
+
+FailureClass = Literal[
+    "TEST_FAILURE",
+    "STATIC_CHECK_FAILURE",
+    "ARTIFACT_MISSING",
+    "ARTIFACT_MALFORMED",
+    "EXPECTED_CONTENT_MISMATCH",
+    "DIFF_MISMATCH",
+    "IMPLEMENTATION_SCHEMA_FAILURE",
+    "PLAN_SCHEMA_FAILURE",
+    "CODEX_INFRASTRUCTURE_FAILURE",
+    "CLAUDE_INFRASTRUCTURE_FAILURE",
+    "COMMAND_POLICY_FAILURE",
+    "PATH_POLICY_FAILURE",
+    "MAIN_WORKTREE_CHANGED",
+    "WORKTREE_INVALID",
+    "SYMLINK_ESCAPE",
+    "NESTED_GIT",
+    "GIT_METADATA_TAMPERING",
+    "RETRY_LIMIT_REACHED",
+    "UNKNOWN_FAILURE",
+]
+
+
+class FailureRecord(StrictModel):
+    """Structured record every verification failure must produce -- see
+    research_agent.failure_taxonomy.build_failure_record. `retriable` is
+    always computed from `failure_class` via
+    failure_taxonomy.RETRIABLE_FAILURE_CLASSES, never set ad hoc by a
+    caller, so "unknown/unclassified defaults to non-retriable" is
+    enforced in exactly one place."""
+
+    schema_version: str = SCHEMA_VERSION
+    task_id: str = Field(..., min_length=1)
+    run_id: str = Field(..., min_length=1)
+    attempt_index: int = Field(..., ge=0)
+    failure_class: FailureClass
+    summary: str = Field(..., min_length=1)
+    evidence: list[str] = Field(default_factory=list)
+    failed_checks: list[str] = Field(default_factory=list)
+    retriable: bool
+    recommended_action: str = Field(..., min_length=1)
+
+
+DiagnosisVerdict = Literal[
+    "DIAGNOSE_REPAIRABLE",
+    "DIAGNOSE_BLOCKED",
+    "DIAGNOSE_NOT_REPRODUCIBLE",
+    "DIAGNOSE_POLICY_FAILURE",
+    "DIAGNOSE_INFRASTRUCTURE_FAILURE",
+]
+
+
+class DiagnosisResult(StrictModel):
+    """Strict structured output required from the real (or fake/mock, in
+    tests) Codex diagnosis role -- distinct from PlanResult (the original
+    planner). Advisory only: research_agent.repair_flow independently
+    re-validates files_allowed_to_touch/commands_allowed_to_run against the
+    ORIGINAL experiment specification before ever letting a repair attempt
+    proceed -- a diagnosis can narrow scope but never broaden it."""
+
+    schema_version: str = SCHEMA_VERSION
+    task_id: str = Field(..., min_length=1)
+    run_id: str = Field(..., min_length=1)
+    attempt_index: int = Field(..., ge=0)
+    verdict: DiagnosisVerdict
+    failure_class: FailureClass
+    root_cause: str = Field(..., min_length=1)
+    evidence: list[str] = Field(default_factory=list)
+    repair_instructions: list[str] = Field(default_factory=list)
+    files_allowed_to_touch: list[str] = Field(default_factory=list)
+    commands_allowed_to_run: list[list[str]] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+
+    @field_validator("commands_allowed_to_run")
+    @classmethod
+    def _commands_are_argv_arrays(cls, value: list[list[str]]) -> list[list[str]]:
+        for command in value:
+            if not command or any(not isinstance(tok, str) or not tok for tok in command):
+                raise ValueError(f"commands_allowed_to_run entries must be non-empty argv arrays: {command!r}")
+        return value
+
+
+RepairVerdict = Literal["REPAIR_PASS", "REPAIR_REVISE", "REPAIR_BLOCKED"]
+
+
+class RepairResult(StrictModel):
+    """Strict structured output required from the real (or fake/mock, in
+    tests) Claude repair role -- distinct from ExecutorImplementationResult
+    (the initial-implementation schema; attempt 0 still uses that one).
+    Advisory only: the actual Git diff in the shared execution worktree
+    remains authoritative -- see research_agent.repair_flow."""
+
+    schema_version: str = SCHEMA_VERSION
+    task_id: str = Field(..., min_length=1)
+    run_id: str = Field(..., min_length=1)
+    attempt_index: int = Field(..., ge=1)
+    verdict: RepairVerdict
+    summary: str = Field(..., min_length=1)
+    changed_files: list[str] = Field(default_factory=list)
+    commands_run: list[list[str]] = Field(default_factory=list)
+    tests_run: list[str] = Field(default_factory=list)
+    issues: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    assumptions: list[str] = Field(default_factory=list)
+
+    @field_validator("commands_run")
+    @classmethod
+    def _commands_are_argv_arrays(cls, value: list[list[str]]) -> list[list[str]]:
+        for command in value:
+            if not command or any(not isinstance(tok, str) or not tok for tok in command):
+                raise ValueError(f"commands_run entries must be non-empty argv arrays: {command!r}")
+        return value
+
+
+class VerifierResult(StrictModel):
+    """Deterministic per-attempt verification outcome for the MVP3 repair
+    flow -- authoritative, never trusting an agent's own claim. Distinct
+    from VerificationResult (the MVP0/1 smoke-flow's research-metric
+    verifier, which checks spec.required_metrics against artifacts/metrics.json
+    produced by an actual experiment run; the repair flow never runs one)."""
+
+    schema_version: str = SCHEMA_VERSION
+    task_id: str
+    run_id: str
+    attempt_index: int
+    verdict: Literal["PASS", "FAIL"]
+    checks_passed: list[str] = Field(default_factory=list)
+    checks_failed: list[str] = Field(default_factory=list)
+    changed_file_count: int = 0
+    changed_byte_count: int = 0
+    details: list[str] = Field(default_factory=list)
+
+
+class AttemptRecord(StrictModel):
+    """Immutable per-attempt summary stored in RepairFinalReport.attempts.
+    attempt_index 0 is always the initial implementation (kind=
+    "implementation"); attempt_index >= 1 is always a repair round (kind=
+    "repair")."""
+
+    attempt_index: int = Field(..., ge=0)
+    kind: Literal["implementation", "repair"]
+    verdict: Optional[str] = None
+    verifier_verdict: Optional[Literal["PASS", "FAIL"]] = None
+    failure_class: Optional[FailureClass] = None
+    retriable: Optional[bool] = None
+    changed_file_count: int = 0
+    changed_byte_count: int = 0
+    started_at: str
+    ended_at: str
+    duration_seconds: float
+
+
+class RunStateRecord(StrictModel):
+    """The sole content of state.json, rewritten atomically after every
+    state-machine transition (research_agent.tasks.repair.persist_state)."""
+
+    schema_version: str = SCHEMA_VERSION
+    run_id: str = Field(..., min_length=1)
+    task_id: str = Field(..., min_length=1)
+    state: RepairState
+    attempt_index: int = Field(0, ge=0)
+    updated_at: str
+    history: list[str] = Field(default_factory=list)
+    detail: Optional[str] = None
+
+
+class RepairFinalReport(StrictModel):
+    """final_report.json -- the MVP3 repair flow's terminal report. Must
+    always identify exactly which attempt (if any) passed, and never claims
+    PASS unless VerifierResult.verdict == "PASS" for that attempt."""
+
+    schema_version: str = SCHEMA_VERSION
+    run_id: str
+    task_id: str
+    overall_status: Literal["PASS", "FAIL", "BLOCKED"]
+    final_state: RepairState
+    stage: Optional[str] = None
+    reason: Optional[str] = None
+
+    passing_attempt_index: Optional[int] = None
+    attempts: list[AttemptRecord] = Field(default_factory=list)
+
+    plan: Optional[PlanResult] = None
+    execution_worktree: Optional[ExecutionWorktreeRecord] = None
+    main_worktree_unchanged: bool = True
+
+    total_claude_invocations: int = 0
+    total_codex_invocations: int = 0
+    changed_file_count: int = 0
+    changed_byte_count: int = 0
+    wall_clock_seconds: float = 0.0
+    repair_limits: RepairLimits
+
+    manual_action_required: bool = False
+
+    run_dir: str
+    created_at: str
+
+
+@dataclass(frozen=True)
+class RepairRunPaths(RunPaths):
+    """Extends RunPaths (root/run_id unchanged) with the MVP3 repair-flow's
+    additional directory layout: attempts/, diagnoses/, repairs/, state.json,
+    final_report.json. Reuses RunPaths' existing properties (spec_path,
+    commands_dir, prompts_dir, plan_path, execution_worktree_record_path,
+    ignored_file_manifest_*_path, ...) unchanged for the shared parts of the
+    layout (planning + the single shared execution worktree)."""
+
+    @property
+    def attempts_dir(self) -> Path:
+        return self.run_dir / "attempts"
+
+    def attempt_dir(self, attempt_index: int) -> Path:
+        return self.attempts_dir / f"attempt_{attempt_index:02d}"
+
+    def attempt_command_results_dir(self, attempt_index: int) -> Path:
+        return self.attempt_dir(attempt_index) / "command_results"
+
+    @property
+    def diagnoses_dir(self) -> Path:
+        return self.run_dir / "diagnoses"
+
+    def diagnosis_path(self, attempt_index: int) -> Path:
+        return self.diagnoses_dir / f"diagnosis_{attempt_index:02d}.json"
+
+    @property
+    def repairs_dir(self) -> Path:
+        return self.run_dir / "repairs"
+
+    def repair_result_path(self, attempt_index: int) -> Path:
+        return self.repairs_dir / f"repair_{attempt_index:02d}.json"
+
+    @property
+    def state_path(self) -> Path:
+        return self.run_dir / "state.json"
+
+    @property
+    def final_report_path(self) -> Path:
+        return self.run_dir / "final_report.json"

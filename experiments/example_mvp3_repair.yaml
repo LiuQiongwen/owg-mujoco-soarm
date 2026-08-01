@@ -1,0 +1,79 @@
+# Harmless deterministic sandbox experiment for the TANGO Experiment Agent's
+# MVP3 bounded repair flow (research_agent.repair_flow / `repair` CLI
+# command). Used by tests/test_repair_flow.py and by the default mock/mock
+# `repair` demonstration.
+#
+# The task is intentionally trivial and self-contained: the ONLY approved
+# modification is a single file, research_agent_sandbox/mvp3_validation.txt,
+# whose exact final content must be "TANGO_MVP3_REPAIR_PASS". A fake first
+# implementation (see tests/test_repair_flow.py) deliberately writes the
+# WRONG content ("TANGO_MVP3_WRONG") so the deterministic verifier detects
+# EXPECTED_CONTENT_MISMATCH, a mock/fake Codex diagnosis marks it repairable,
+# and a mock/fake Claude repair round corrects it -- exercising the full
+# diagnose/repair/reverify loop without running any research code.
+
+task_id: example_mvp3_repair
+goal: >
+  Inside the assigned execution worktree, create or update exactly one file
+  at research_agent_sandbox/mvp3_validation.txt whose entire content is the
+  single line "TANGO_MVP3_REPAIR_PASS" (a single trailing newline is fine).
+  Do not run any command. Do not modify any other file.
+
+allowed_paths:
+  - research_agent_sandbox
+
+forbidden_paths:
+  - research_agent
+  - tests
+  - tango_robot
+  - grasp_6dof
+  - world_model
+
+allowed_modify_paths:
+  - research_agent_sandbox/mvp3_validation.txt
+
+max_changed_files: 1
+max_changed_bytes: 200
+
+allowed_executor_commands: []
+required_executor_checks:
+  - compileall
+
+expected_file_contents:
+  research_agent_sandbox/mvp3_validation.txt: "TANGO_MVP3_REPAIR_PASS"
+required_artifacts: []
+
+repair_limits:
+  max_repair_rounds: 2
+  max_total_claude_invocations: 3
+  max_total_codex_invocations: 4
+  max_total_changed_files: 5
+  max_total_changed_bytes: 2000
+  max_wall_clock_seconds: 300
+
+# Placeholder only -- `repair` (like `execute`) never runs this command;
+# smoke_command is a required ExperimentSpec field inherited from the
+# MVP0/MVP1 schema.
+smoke_command:
+  - python
+  - "-c"
+  - "pass"
+
+confirmatory_command: null
+
+seeds: [0]
+
+timeouts:
+  planner_seconds: 60
+  executor_seconds: 120
+  smoke_seconds: 30
+  verifier_seconds: 30
+  reviewer_seconds: 60
+
+required_metrics: []
+
+approval:
+  required_for_confirmatory: true
+  approved_by: null
+
+max_run_count: 10
