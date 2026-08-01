@@ -1,0 +1,86 @@
+# The single harmless live-agent validation task for MVP3 (see the task
+# contract's "Live validation" section). Run only after ALL deterministic
+# fake-agent tests pass, and only as:
+#
+#   python -m research_agent.cli repair experiments/example_mvp3_live_repair.yaml \
+#       --codex real --claude real --max-repair-rounds 1 \
+#       --max-total-claude-invocations 2 --max-total-codex-invocations 2
+#
+# The controlled initial failure is produced by a test fixture / the
+# deterministic fake-first-implementation stage feeding this same spec, NOT
+# by asking the live agents to deliberately write wrong content -- a real
+# Claude may simply write the correct content immediately, which is an
+# acceptable outcome too (repair_flow.py always tolerates a verifier PASS at
+# attempt 0; the task contract only requires "exactly one repair round" when
+# the run is deliberately seeded to fail first, e.g. by a mock initial
+# implementation feeding into a real diagnosis+repair round).
+#
+# The only permitted modification is a single file with exact, deterministic,
+# non-sensitive content -- no command execution beyond the harness's own
+# read-only inspection/static checks, no commit, no push, no research
+# experiment, no GPU, no robot, no network access.
+
+task_id: example_mvp3_live_repair
+goal: >
+  Inside the assigned execution worktree, create or update exactly one file
+  at research_agent_sandbox/mvp3_live_validation.txt whose entire content is
+  the single line "TANGO_MVP3_LIVE_REPAIR_PASS" (a single trailing newline is
+  fine, no other text, no other file created or modified). Do not run any
+  command.
+
+allowed_paths:
+  - research_agent_sandbox
+
+forbidden_paths:
+  - research_agent
+  - tests
+  - tango_robot
+  - grasp_6dof
+  - world_model
+
+allowed_modify_paths:
+  - research_agent_sandbox/mvp3_live_validation.txt
+
+max_changed_files: 1
+max_changed_bytes: 200
+
+allowed_executor_commands: []
+required_executor_checks:
+  - compileall
+
+expected_file_contents:
+  research_agent_sandbox/mvp3_live_validation.txt: "TANGO_MVP3_LIVE_REPAIR_PASS"
+required_artifacts: []
+
+repair_limits:
+  max_repair_rounds: 1
+  max_total_claude_invocations: 2
+  max_total_codex_invocations: 2
+  max_total_changed_files: 3
+  max_total_changed_bytes: 500
+  max_wall_clock_seconds: 600
+
+# Placeholder only -- `repair` never runs this command.
+smoke_command:
+  - python
+  - "-c"
+  - "pass"
+
+confirmatory_command: null
+
+seeds: [0]
+
+timeouts:
+  planner_seconds: 60
+  executor_seconds: 180
+  smoke_seconds: 30
+  verifier_seconds: 30
+  reviewer_seconds: 60
+
+required_metrics: []
+
+approval:
+  required_for_confirmatory: true
+  approved_by: null
+
+max_run_count: 3
