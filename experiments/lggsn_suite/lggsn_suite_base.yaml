@@ -1,0 +1,167 @@
+# LGGSN ablation-matrix evaluation: base (EVALUATABLE_WITH_VERIFIED_PROVENANCE, 12-dim).
+#
+# TANGO's role for this spec is strictly downstream of the actual
+# computation: the approved command below is publish_eval.py, a torch-free
+# script that verifies the deterministic_digest of an ALREADY-COMPUTED
+# evaluator.py output (research_agent_pilots/lggsn_suite/eval_outputs/base/)
+# against the pinned value below, then copies it into this run's artifacts
+# directory. It does not run the LGGSN model and does not touch torch.
+#
+# The actual forward-pass computation ran as a normal, UNRESTRICTED OS
+# subprocess (research_agent_pilots/lggsn_suite/evaluator.py), OUTSIDE
+# MVP4's restricted execution -- torch (libtorch_cpu.so, 428MB) cannot fit
+# inside research_agent/restricted_subprocess.py's fixed RLIMIT_AS=1GB, and
+# research_agent is not modified by this suite. See
+# docs/LGGSN_EVAL_SUITE.md for the full architecture rationale and
+# docs/CAUSAL_VALIDITY_REGISTRY_BUG.md for a related, separately-tracked,
+# NOT-fixed-here registry bug this evaluator deliberately avoids interacting
+# with (it never imports train_lggsn_pairwise.py or causal_validity_audit).
+#
+# Do NOT read this spec's PASS as "the torch computation ran through MVP4."
+# It did not, and structurally cannot on this harness. What MVP4 verifies
+# here is that the committed, pinned evaluator output is exactly what this
+# spec declares it to be, and relays it as a tracked, verified artifact.
+#
+# Checkpoint: grasp_6dof/models/lggsn_ablation_base.pt
+# Feature columns (12): x, y, z, roll, pitch, yaw, width, score, dz, dz_lift, need_dz, H
+# Dataset: snapshots/lggsn_live_dataset_v1/lggsn_live_candidates.jsonl (sha256 30ca2c398de4bc451691ae6e802e619e7838e0b8bce12a4eba8115b6ff4c42b5)
+
+task_id: lggsn_suite_base
+goal: >
+  Verify and publish the already-computed, digest-pinned LGGSN checkpoint
+  evaluation for 'base' (EVALUATABLE_WITH_VERIFIED_PROVENANCE) -- a torch-free integrity
+  check and artifact relay, not a live re-computation. No source code,
+  dataset, or checkpoint is modified; no training, GPU, robot, or network
+  access is ever invoked. This is a pipeline-validation and reporting step,
+  not a scientific claim about grasp performance beyond what is stated in
+  docs/LGGSN_EVAL_SUITE.md.
+
+allowed_paths:
+  - research_agent_pilots/lggsn_suite
+
+forbidden_paths:
+  - research_agent
+  - tests
+  - grasp_6dof
+  - world_model
+  - data
+  - datasets
+  - results
+  - checkpoints
+  - paperA_data
+
+smoke_command:
+  - python
+  - "-c"
+  - "pass"
+
+confirmatory_command: null
+
+seeds: [42]
+
+timeouts:
+  planner_seconds: 60
+  executor_seconds: 60
+  smoke_seconds: 30
+  verifier_seconds: 30
+  reviewer_seconds: 60
+
+required_metrics: []
+
+approval:
+  required_for_confirmatory: true
+  approved_by: null
+
+max_run_count: 5
+
+execution:
+  execution_mode: restricted
+  confirmatory: false
+  cpu_only: true
+  network_allowed: false
+  gpu_allowed: false
+  robot_allowed: false
+  training_allowed: false
+  working_directory_policy: isolated_run_directory
+
+  approved_commands:
+    - - /usr/bin/python3
+      - ${REPO_ROOT}/research_agent_pilots/lggsn_suite/publish_eval.py
+
+  allowed_output_paths:
+    - metrics.json
+    - checkpoint_manifest.json
+    - evaluation_manifest.json
+
+  required_artifacts:
+    - metrics.json
+    - checkpoint_manifest.json
+    - evaluation_manifest.json
+
+  required_metrics:
+    - key: checkpoint_name
+      check: str_equals
+      value: "base"
+    - key: provenance_status
+      check: str_equals
+      value: "EVALUATABLE_WITH_VERIFIED_PROVENANCE"
+    - key: input_dim
+      check: int_equals
+      value: 12
+    - key: eligible_group_count
+      check: int_equals
+      value: 297
+    - key: eligible_pair_count
+      check: int_equals
+      value: 582
+    - key: pair_accuracy
+      check: float_equals
+      value: 0.654639175257732
+      tolerance: 0.000001
+    - key: ties_count
+      check: int_equals
+      value: 0
+    - key: malformed_group_count
+      check: int_equals
+      value: 0
+    - key: skipped_row_count
+      check: int_equals
+      value: 0
+    - key: all_scores_finite
+      check: bool_equals
+      value: true
+    - key: pilot_ok
+      check: bool_equals
+      value: true
+    - key: dataset_sha256
+      check: str_equals
+      value: "30ca2c398de4bc451691ae6e802e619e7838e0b8bce12a4eba8115b6ff4c42b5"
+    - key: deterministic_digest
+      check: str_equals
+      value: "96fa1a877c0cc41af8273c5faa674bd1ea68fcdb26a6c4e4273acd280bddd86a"
+
+  environment_allowlist: []
+  environment_overrides:
+    # Without this, publish_eval.py writes a .pyc into __pycache__/,
+    # which the harness's mutation detection flags as a POLICY_FAILURE
+    # even though __pycache__/ is gitignored -- same fix as the IK pilot.
+    PYTHONDONTWRITEBYTECODE: "1"
+    LGGSN_PUBLISH_CHECKPOINT_NAME: "base"
+    LGGSN_PUBLISH_EXPECTED_DIGEST: "96fa1a877c0cc41af8273c5faa674bd1ea68fcdb26a6c4e4273acd280bddd86a"
+
+  limits:
+    max_commands: 1
+    max_execution_attempts: 1
+    max_wall_clock_seconds: 30
+    per_command_timeout_seconds: 15
+    max_total_command_runtime_seconds: 20
+    max_output_bytes: 100000
+    max_artifact_files: 3
+    max_artifact_bytes: 100000
+    max_artifact_file_bytes: 50000
+    max_repair_rounds: 0
+    max_total_codex_invocations: 2
+    max_total_claude_invocations: 1
+
+  retry_policy:
+    allow_timeout_retry: false
