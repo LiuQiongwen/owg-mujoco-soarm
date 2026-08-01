@@ -33,7 +33,16 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import mujoco
-import mujoco.viewer
+# mujoco.viewer is NOT imported at module level: it transitively imports
+# glfw, which runs a subprocess-based version probe as an import-time side
+# effect. That probe can fail (BlockingIOError: Resource temporarily
+# unavailable) under fork/process-count-restricted environments -- e.g. the
+# MVP4 restricted-execution harness's rlimits
+# (research_agent/restricted_subprocess.py) -- even for callers that never
+# construct a viewer (vis=False), including tango_robot.headless_ik, which
+# imports plain constants (HOME_QPOS, ...) from this module specifically to
+# stay usable in exactly those environments. Imported lazily at each of the
+# two vis=True call sites below instead.
 
 # ── paths ────────────────────────────────────────────────────────────────────
 _DIR = os.path.dirname(os.path.abspath(__file__))
@@ -588,7 +597,11 @@ class EnvironmentSoArm:
         self._rebuild_model()
 
         if vis:
-            self._viewer = mujoco.viewer.launch_passive(self.model, self.data)
+            # Aliased (not `import mujoco.viewer`): a bare `import mujoco.viewer`
+            # here would make `mujoco` a local name for this ENTIRE method,
+            # shadowing the module-level `mujoco` even before this line runs.
+            import mujoco.viewer as _mj_viewer
+            self._viewer = _mj_viewer.launch_passive(self.model, self.data)
 
         self.reset_robot()
 
@@ -662,7 +675,8 @@ class EnvironmentSoArm:
                 self._viewer.close()
             except Exception:
                 pass
-            self._viewer = mujoco.viewer.launch_passive(self.model, self.data)
+            import mujoco.viewer as _mj_viewer
+            self._viewer = _mj_viewer.launch_passive(self.model, self.data)
 
     def _cache_ids(self):
         self._arm_jnt_ids   = [self.model.joint(n).id for n in ARM_JOINTS]
