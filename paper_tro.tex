@@ -80,7 +80,27 @@ strongest predictor in the entire investigation ($r{=}-0.55$) -- only for
 a within/between-scene decomposition to reveal zero real selection-relevant
 signal, a sharper demonstration of this paper's thesis than the finding it
 was built to test. We validate the criterion externally against two recent
-published systems, report a further, independently discovered bug (a
+published systems, then apply it prospectively, from the start of a new
+investigation rather than after the fact: a predecessor critic pipeline's
+reported $+15.6$ point gain is shown invalid on two independent grounds
+(a seed-coupling defect and a saturating success criterion), and a
+rebuilt, causally-admissible-by-construction critic --- object-relative
+pose, point-cloud statistics, and object identity, trained with a
+within-scene pairwise term --- beats a geometric baseline live-executed on
+two disjoint held-out batches ($+15.6$ points, $p=0.00258$; $+14.0$ points
+on a frozen confirmatory batch, $p=3.24\times10^{-4}$), while an
+uncertainty-based risk gate and a small-data imitation-policy pilot are
+reported as negative and incomplete, respectively, with equal rigor.
+Extending to a fourth object added after the design was frozen replicates
+the gain (live-executed, $p{<}10^{-6}$ pooled) with an object-dependent
+magnitude, while a zero-shot probe on a held-out fifth object shows a
+clean negative: the critic loses to the geometric baseline outright,
+a boundary we report rather than obscure; a learned auxiliary robustness
+head and an uncertainty-penalized aggregator both beat the baseline but
+add no measurable benefit over the simplest neighborhood-perturbation
+heuristic already established, reported as consolidating negatives with
+the same rigor as the positive findings. We
+report a further, independently discovered bug (a
 silent unit-scaling error in a widely used composite robot controller) as
 a case study in the same discipline, and report eleven independently
 tested and ruled-out
@@ -226,9 +246,31 @@ analogue in a train/test framework. Second, mechanism: Roth's grammar
 requires authoring a pipeline against his primitives (reference
 implementations for Python and R); our tool statically analyzes arbitrary,
 already-written code via a single per-function marker, requiring no
-pipeline rewrite. We are not aware of prior work stating our specific
-criterion for grasp-candidate scoring features, nor of an automated tool
-for detecting the violation from unmodified source code in this domain.
+pipeline rewrite. Also relevant, at the level of general practice rather
+than a formal criterion: LeakageDetector \cite{leakagedetector2025} is a
+PyCharm plugin that flags generic train/test-split leakage patterns in
+tabular ML code via static analysis, and closely related notebook-specific
+work does the same for Jupyter pipelines -- both operate on the same
+generic train/test boundary as Roth, not the temporal,
+already-executed-or-not boundary this domain requires, and neither targets
+robot-manipulation pipelines specifically. Concurrent work by Jiang et
+al.~\cite{benchmarkaudit2026} audits five robot-manipulation benchmarks
+(LIBERO, CALVIN, SimplerEnv, RoboCasa, RoboTwin~2.0) for four largely
+orthogonal failure modes -- shortcut solvability, insufficient statistical
+power, creeping overfitting, and data-source dependence -- via empirical
+probes (a weak language-blind model matching reported SOTA on LIBERO;
+performance collapse under in-distribution pose randomization on CALVIN),
+not static code analysis, and does not check whether individual training
+or scoring features are computable before an action is taken. We view this
+as a complementary, not competing, direction: their diagnostics answer
+whether a benchmark's *reported numbers* are trustworthy; ours answers
+whether a *specific pipeline's input features* could not have been known
+before the choice they inform, a narrower and, in our experience
+(\cref{sec:external}), more direct route to the specific failure mode this
+paper's central finding depends on. We are not aware of prior work stating
+our specific criterion for grasp-candidate scoring features, nor of an
+automated tool for detecting the violation from unmodified source code in
+this domain.
 
 \textbf{Perception uncertainty for grasping.} Closest to our planned
 real-noise-characterization extension (\cref{sec:conclusion}) is
@@ -525,6 +567,363 @@ real selection-relevant signal once correctly decomposed -- a sharper
 demonstration of this paper's thesis than the original finding it was
 built to test.
 
+\subsection{Prospective application: an object-relative counterfactual grasp critic}
+\label{sec:critic}
+
+\Cref{sec:retro,sec:selfcorrections,sec:rngbug} show the criterion catching
+mistakes \emph{after} they were made. This section applies it \emph{from
+the start}, on a different learned-critic pipeline (\texttt{world\_model/},
+predating \cref{sec:method} entirely) that reported a $+15.6$ percentage
+point improvement over a geometric heuristic. Reproducing this claim
+directly against the original data, we found it invalid on two grounds,
+neither of which is itself a causal-validity violation. First, the
+evaluation harness's random seed encoded the compared method's identity, so
+paired ``geometry'' and ``world-model'' trials never shared a scene or
+candidate pool: of 250 nominally paired trials, zero shared even the
+executed candidate position. Second, the success criterion counted
+transient post-close gripper contact, checked before any lift, as success
+--- a criterion that saturates to $150/150$ regardless of candidate
+quality, independent of the pairing defect. Correcting the harness alone,
+this study's execution-density (roughly thirteen executions per scene, an
+order of magnitude above prior usage) surfaced a further,
+shared-infrastructure bug: the production
+\texttt{physics\_weld\_after\_bilateral} grasp primitive's weld-attach gate
+accepted single-jaw contact, not the bilateral contact its name and
+protocol require. We fixed it in \texttt{env\_soarm.py}; we flag, but do
+not re-verify here, that this may affect other results computed with the
+same primitive elsewhere in this project.
+
+We rebuilt the critic to be causally admissible by construction: candidate
+pose expressed relative to the target object rather than in world frame,
+point-cloud statistics, and object identity --- every field registered
+\texttt{PRE\_EXECUTION} in \texttt{provenance.py} and checked by the same
+gate as \cref{sec:method}'s other pipelines --- trained with a within-scene
+Bradley--Terry/BPR-style pairwise term over successful and failed
+candidates from the same scene, plus binary cross-entropy on outcome. Under
+the corrected, paired, live-executed harness, the original checkpoint fails
+a pre-registered gate outright: AUROC $=0.4996$ on 1{,}500 real
+per-candidate labels, chance level, fully explained by contamination from
+the criterion in the paragraph above rather than left as a mystery. The
+rebuilt critic, evaluated live --- not offline-rescored --- on two scene
+batches disjoint from training, from model selection, and from each other
+(disjointness independently key-intersection-verified, not asserted),
+beats the geometric baseline on both (\cref{tab:critic_results}):
+$+15.6$ points on an independent
+development-test batch ($44/90$ vs.\ $30/90$; McNemar's exact
+$p=0.00258$), and $+14.0$ points on a frozen confirmatory batch never
+inspected before this gate was evaluated ($75/150$ vs.\ $54/150$; 27 wins
+to 6 losses; McNemar's exact $p=3.24\times10^{-4}$). A small,
+physically-real non-determinism footnote applies to both: repeated
+identical-pose executions flip their boolean outcome at roughly
+$0.6$--$1\%$, the contact solver not being bit-reproducible on marginal
+grasps --- small enough not to change either conclusion, but stated rather
+than assumed away.
+
+\begin{table}[t]
+\centering
+\caption{Live-executed critic results (\cref{sec:critic}). The stale
+checkpoint is evaluated under the same corrected, paired harness as the
+rebuilt critic --- the harness fix alone does not save it.}
+\label{tab:critic_results}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Batch & $n$ & Geometry & Critic & McNemar exact $p$ \\
+\midrule
+Dev-test & 90 & $30/90$ (33.3\%) & $44/90$ (48.9\%) & $0.00258$ \\
+Confirmatory (frozen) & 150 & $54/150$ (36.0\%) & $75/150$ (50.0\%) & $3.24{\times}10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Stale checkpoint (pre-audit), same corrected harness: AUROC $=0.4996$ on 1{,}500 real per-candidate labels --- chance level.}
+\end{table}
+
+Consistent with this paper's discipline of reporting negative and
+incomplete findings with the same rigor as positive ones, three results
+from the same investigation do not support further claims
+(\cref{tab:critic_negative}). An
+ensemble-uncertainty risk gate, calibrated on held-out data, adds no
+measurable benefit over the ungated critic: its coverage is $98.7\%$, i.e.\
+it almost never fires. Whether the within-scene pairwise term is
+independently responsible for the gain, versus the object-relative feature
+representation alone, is unresolved: object-relative BCE with no pairwise
+term and the full counterfactual variant are statistically
+indistinguishable on the frozen confirmatory batch (2 wins, 3 losses,
+$p=1.0$) --- this paper's novelty claim in \cref{sec:critic} rests on
+object-centric, causally-admissible scoring beating geometry, not on the
+pairwise mechanism specifically. Finally, a small-data (15 demonstrations)
+ACT imitation-policy pilot integrates end-to-end with this pipeline but
+fails its first closed-loop rollout, knocking the target object off
+position; five demonstrations per object is not enough data for any
+closed-loop recovery behavior to have been learned. We report this as
+integration status, not as a result bearing on \cref{sec:critic}'s central
+claim.
+
+\begin{table}[t]
+\centering
+\caption{Negative and incomplete results from the same investigation (\cref{sec:critic}), reported with equal rigor.}
+\label{tab:critic_negative}
+\small
+\begin{tabular}{@{}p{0.24\linewidth}p{0.68\linewidth}@{}}
+\toprule
+Item & Result \\
+\midrule
+Uncertainty risk gate & No measurable benefit; coverage $98.7\%$ (almost never fires) \\
+Pairwise-loss contribution & Unresolved: BCE-only vs.\ full counterfactual indistinguishable (2W/3L, $p{=}1.0$) \\
+ACT imitation pilot (15 demos) & Fails first closed-loop rollout (single online trial, $dz{=}{-}0.0451$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Mechanistic analysis: multi-head contact/lift/success decomposition}
+\label{sec:multihead}
+
+\Cref{sec:critic} establishes \emph{that} the corrected critic beats
+geometry, live-executed --- this paper's primary quantitative claim. This
+section asks \emph{why and where it works}, via a second, complementary,
+explicitly \emph{offline re-scoring} experiment that must not be merged
+with or presented as confirming \cref{sec:critic}'s live-executed numbers.
+Using the same causally-admissible features, we train four prediction
+heads instead of one: binary \texttt{bilateral\_contact}, binary
+\texttt{lifted}, binary \texttt{success}, and a three-class
+\texttt{failure\_type} (\texttt{success} / \texttt{no\_contact} /
+\texttt{weld\_no\_lift}). Two further classes originally specified in this
+taxonomy, \texttt{contact\_no\_weld} and \texttt{lifted\_then\_dropped},
+were confirmed structurally absent from every collected batch: the weld
+gate is currently identical to bilateral contact by construction, and the
+post-grasp settle window's \texttt{fell\_off} threshold never triggers.
+The three-class scheme is what was actually trained; the six-class taxonomy
+remains documented future schema, not a current claim. Training uses the
+same base-100/dev-200/confirmatory-300 split chain as \cref{sec:critic},
+with checkpoint and loss-weighting choice frozen on dev-200 only and
+confirmatory-300 read exactly once (audit trail:
+\texttt{confirmatory\_run\_log.jsonl} confirms a single run).
+
+On the confirmatory-300 batch, the success head alone, used for top-1
+selection, beats geometry pooled by $+10.7$ points ($46.0\%$ vs.\ $35.3\%$;
+McNemar's exact $p=0.0052$) --- directionally and in rough magnitude
+consistent with \cref{sec:critic}'s live-executed $+14.0$ points, reported
+here as separate, complementary evidence for the same claim, not pooled or
+averaged with it (\cref{tab:multihead_vs_geom}). All three heads reach AUROC $0.90$--$0.93$ with
+$\mathrm{ECE}\approx 0.04$ (\cref{tab:multihead_auroc}). The decomposition's interpretability payoff is
+a specific, actionable asymmetry a single-head success critic cannot show:
+the model is conservative, not dangerously overconfident, on success --- it
+achieves $92.2\%$ recall on true \texttt{no\_contact}, but misclassifies
+$32\%$ of true successes as \texttt{no\_contact} (\cref{tab:confusion}). One limitation is
+load-bearing, not a footnote: every \texttt{weld\_no\_lift} training
+example ($118/118$) is drill-attributed; excluding the drill collapses
+that class's support to a single example. This must be read as a
+within-drill measurement, not a demonstrated cross-object generalization
+capability for that failure mode; a genuine leave-one-object-out test
+was not run in this pass. A methodological note we keep rather than hide:
+an \texttt{equal}-vs.-\texttt{success\_weighted} loss-weighting ablation
+produced measurably different trained parameters, confirmed by direct
+comparison, but \emph{identical} argmax top-1 accuracy at every one of 5
+seeds on the small internal validation split used during training --- only
+the larger dev-200 batch's continuous AUROC distinguished the two settings.
+Coarse top-1 metrics can be an insufficiently sensitive selection criterion
+for this class of ablation at small validation-set scale; this was caught
+by cross-checking against a second metric, not silently reported as ``no
+difference.'' Neither this section nor \cref{sec:critic} licenses a claim
+about risk-gate or imitation-policy performance --- \cref{sec:critic}'s own
+negative results on both stand unchanged; the gains reported here concern
+the critic's own outputs, not downstream gating or policy performance.
+
+\begin{table}[t]
+\centering
+\caption{Success head vs.\ geometry, offline re-scoring, confirmatory-300 (\cref{sec:multihead}). Cracker's exact tie reproduces the same object-level pattern seen in \cref{sec:critic}'s independent live-executed evaluation.}
+\label{tab:multihead_vs_geom}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+& Geometry & Critic (success head) & $\Delta$ & McNemar exact $p$ \\
+\midrule
+Pooled ($n{=}150$) & 35.3\% & 46.0\% & $+10.7$pp & $0.0052$ (23W/7L) \\
+Cracker ($n{=}50$) & 18.0\% & 18.0\% & $0.0$pp & $1.0$ (exact tie) \\
+Mustard ($n{=}50$) & 58.0\% & 80.0\% & $+22.0$pp & $0.0074$ \\
+Drill ($n{=}50$) & 30.0\% & 40.0\% & $+10.0$pp & $0.302$ (n.s.) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Per-head discrimination and calibration, confirmatory-300 (\cref{sec:multihead}).}
+\label{tab:multihead_auroc}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Head & AUROC & AUPRC & ECE \\
+\midrule
+\texttt{bilateral\_contact} & 0.934 & 0.861 & 0.037 \\
+\texttt{lifted} & 0.902 & 0.749 & 0.039 \\
+\texttt{success} & 0.903 & 0.749 & 0.040 \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Per-object AUROC for \texttt{lifted}/\texttt{success}: cracker $0.977$, mustard $0.92$--$0.923$, drill $0.788$ --- an in-distribution difficulty gradient (all three objects were trained on), not an OOD finding.}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{\texttt{failure\_type} confusion matrix, pooled confirmatory-300 (\cref{sec:multihead}). Rows are true labels.}
+\label{tab:confusion}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+True $\backslash$ Pred & success & no\_contact & weld\_no\_lift \\
+\midrule
+success ($n{=}339$) & 212 (62.5\%) & 109 & 18 \\
+no\_contact ($n{=}1043$) & 58 & 962 (92.2\%) & 23 \\
+weld\_no\_lift ($n{=}118$) & 19 & 10 & 89 (75.4\%) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{\texttt{weld\_no\_lift} object attribution, train-100 (\cref{sec:multihead}) --- the basis for this section's load-bearing limitation.}
+\label{tab:weldnolift}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Object & success & no\_contact & weld\_no\_lift \\
+\midrule
+Cracker & 64 & 335 & 1 \\
+Mustard & 108 & 292 & 0 \\
+Drill & 120 & 195 & 85 \\
+\midrule
+All three (used) & 292 & 822 & 86 \\
+Excluding drill & 172 & 627 & \textbf{1} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Generalization to a fourth object, and a clean out-of-distribution boundary}
+\label{sec:fourobj}
+
+\Cref{sec:critic,sec:multihead} establish the causally-admissible critic on
+three objects (cracker, mustard, drill). This section asks whether the
+result generalizes to an object added after the critic's design was frozen,
+and whether it generalizes zero-shot to an object never trained on at all
+--- two different, and differently answered, questions. We added a fourth
+object, a real YCB Tomato Soup Can (internally keyed as
+\texttt{cylinder}, a pre-existing asset alias, not a substitute object),
+using an independent train/dev/confirmatory seed chain (701/801/901)
+disjoint from the three-object study. A YCB banana was considered and
+excluded before any critic training: a controlled asset sanity check
+produced zero bilateral contact under the current grasp protocol, an
+asset-geometry issue orthogonal to this section's claim. A YCB pear was
+held out entirely as a zero-shot out-of-distribution (OOD) probe --- never
+in the training, dev, or confirmatory pool for any checkpoint below.
+
+Retrained with a four-way object one-hot (three-object checkpoints and
+training code untouched), the isolated four-object critic reaches AUROC
+$=0.8903$, Brier $=0.1076$, and $\mathrm{ECE}=0.0304$ on an independent
+confirmatory set (offline re-scoring, 200 scenes, disjoint from dev
+selection --- the same methodology as \cref{sec:multihead}, not
+\cref{sec:critic}'s live-executed evaluation), with pooled offline top-1
+$52.5\%$ (cracker $18\%$, mustard $78\%$, drill $28\%$, Tomato Soup Can
+$86\%$).
+
+A separate, live-executed neighborhood-robustness evaluation (candidate
+selection under five local pose/yaw perturbations per scene, 30
+scenes/object, 120 scenes total, \cref{tab:fourobj_neighborhood}) beats
+geometry pooled for every critic variant (McNemar's exact
+$p{<}1{\times}10^{-6}$, Holm-adjusted). The gain is object-dependent:
+strong for cracker and drill, significant but smaller for Tomato Soup Can
+($p=0.0113$), and not significant for mustard (already near ceiling for
+geometry alone at this task). Evaluated zero-shot on the held-out pear ---
+an all-zero object one-hot, never seen in training --- every critic
+variant \emph{loses} to geometry (point $28.7\%$, mean $27.3\%$,
+worst-case $28.0\%$ vs.\ geometry's $40.0\%$; McNemar's exact
+$p<0.02$ for all three, favoring geometry). We report this as a clean,
+explicit negative boundary, not pooled with the in-distribution result:
+this critic improves candidate selection and local-perturbation robustness
+within its trained object distribution, and does not presently generalize
+zero-shot beyond it.
+
+\begin{table}[t]
+\centering
+\caption{Live-executed neighborhood-robustness selection, four-object critic vs.\ geometry (\cref{sec:fourobj}), and the zero-shot pear OOD probe (last row, not pooled with the rest).}
+\label{tab:fourobj_neighborhood}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Object ($n{=}150$ each) & Geometry & Point & Mean & Worst-case \\
+\midrule
+Cracker & $7.3\%$ & $29.3\%$ & $28.0\%$ & $30.7\%$ \\
+Mustard (n.s., all three) & $83.3\%$ & $80.0\%$ & $80.0\%$ & $83.3\%$ \\
+Drill & $43.3\%$ & $66.0\%$ & $64.7\%$ & $66.7\%$ \\
+Tomato Soup Can ($p{=}0.0113$) & $69.3\%$ & $80.0\%$ & $80.0\%$ & $80.0\%$ \\
+Pooled ($n{=}600$, $p{<}10^{-6}$) & $50.8\%$ & $63.8\%$ & $63.2\%$ & $65.2\%$ \\
+\midrule
+Pear OOD ($n{=}150$, zero-shot) & $\mathbf{40.0\%}$ & $28.7\%$ & $27.3\%$ & $28.0\%$ \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Row-level $p$-values are object-stratified tests over all three critic variants jointly, not per-column; pooled $p$-values (bottom two rows) are Holm-adjusted paired McNemar per variant, all $p{<}10^{-6}$. Bold marks the winning column for pear, the one row where geometry beats every critic variant ($p<0.02$ for all three), reported as an explicit negative boundary.}
+\end{table}
+
+A further question is whether a learned auxiliary head that directly
+predicts local-perturbation survival (\texttt{local\_perturbation\_survival},
+trained on an exhaustive candidate-level label set that executes every
+candidate rather than only the selected one, removing the selection bias
+this project's own audit criterion exists to catch) adds value beyond the
+neighborhood-aggregation methods already reported above. Offline, on a
+frozen four-object confirmatory split (four independent object batches,
+500 candidate labels each, no confirmatory labels used for training or
+model selection), the head discriminates well above chance: pooled AUROC
+$=0.8896$ ($n=2{,}000$), strongest on Tomato Soup Can ($0.9656$) and
+weakest on drill ($0.7854$). Used live, as a candidate-selection method in
+its own right, on a fresh 120-scene evaluation disjoint from the head's
+own training and dev data, it beats geometry pooled (McNemar's exact
+$p<0.0001$, driven mainly by mustard and Tomato Soup Can), but is
+statistically indistinguishable from the already-reported neighborhood
+mean/point aggregators (pooled $p=0.857$; per object, only mustard reaches
+significance against geometry among the head-vs-geometry comparisons, and
+none of the head-vs-neighborhood-method comparisons reach significance in
+either direction). A related uncertainty-penalized score,
+$\mathrm{mean}-0.5{\times}\mathrm{std}$ over the same five perturbations,
+shows the identical pattern: it beats geometry (McNemar's exact
+$p=0.00012$) but is not distinguishable from the plain neighborhood mean or
+worst-case aggregators already in \cref{tab:fourobj_neighborhood} (all
+$p\geq1.0$ against those two). We report both as consolidating negatives,
+following \cref{sec:critic}'s pairwise-loss-contribution finding: a
+learned robustness signal and an uncertainty-penalized heuristic both
+recover the same benefit as the simpler neighborhood aggregators already
+established above, not a further, separable improvement over them
+(\cref{tab:fourobj_negative}).
+
+\begin{table}[t]
+\centering
+\caption{Consolidating negative results, robustness-head and uncertainty-penalized extensions (\cref{sec:fourobj}), reported with equal rigor to the positive findings above.}
+\label{tab:fourobj_negative}
+\small
+\begin{tabular}{@{}p{0.32\linewidth}p{0.6\linewidth}@{}}
+\toprule
+Item & Result \\
+\midrule
+Robustness head vs.\ geometry & Beats geometry pooled ($p{<}0.0001$); driven by mustard ($p{=}0.0051$) and Tomato Soup Can ($p{=}0.0001$) \\
+Robustness head vs.\ neighborhood mean/point & Statistically indistinguishable (pooled $p{=}0.857$); no per-object comparison reaches significance either direction \\
+Uncertainty-penalized score ($\mathrm{mean}-0.5\mathrm{std}$) vs.\ geometry & Beats geometry ($p{=}0.00012$) \\
+Uncertainty-penalized score vs.\ neighborhood mean/worst-case & Statistically indistinguishable ($p\geq1.0$ both) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Taken together, this section supports a bounded version of \cref{sec:critic}'s
+claim: an object-centric, causally-admissible critic improves candidate
+selection and local-perturbation robustness on a fourth object added after
+the design was frozen, the benefit is object-dependent (near-ceiling
+objects show no measurable gain), it does not generalize zero-shot to an
+unseen object class, and neither a learned auxiliary robustness head nor an
+uncertainty-penalized heuristic measurably improves on the simplest
+neighborhood-aggregation baseline already established. All results in this
+section are simulation-only, live-executed unless stated otherwise as
+offline re-scoring, consistent with \cref{sec:critic,sec:multihead}'s own
+distinction between the two.
+
 % =============================================================================
 \section{Case Study: A Silent Gripper-Controller Scaling Bug}
 \label{sec:gripperbug}
@@ -759,6 +1158,17 @@ S.~Roth,
 ``A Grammar of Machine Learning Workflows: Rejecting Data Leakage at
   Call Time,''
 \emph{arXiv:2603.10742}, 2026.
+
+\bibitem{leakagedetector2025}
+E.~A.~AlOmar, C.~DeMario, R.~Shagawat, and B.~Kreiser,
+``LeakageDetector: An Open Source Data Leakage Analysis Tool in
+  Machine Learning Pipelines,''
+\emph{arXiv:2503.14723}, 2025.
+
+\bibitem{benchmarkaudit2026}
+T.~Jiang, X.~Tan, S.~Wheeler, L.~Sun, T.~W.~Ayalew, and M.~Walter,
+``What Are We Actually Benchmarking in Robot Manipulation?,''
+\emph{arXiv:2606.04233}, 2026.
 
 \bibitem{consensusuncertainty2025}
 E.~C.~Joyce, Q.~Zhao, N.~Burgdorfer, L.~Wang, and P.~Mordohai,
