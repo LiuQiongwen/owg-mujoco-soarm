@@ -9,7 +9,7 @@ import open3d as o3d
 import time
 from PIL import Image
 from typing import List, Union, Dict, Any, Optional, Tuple
-from tango.gpt_utils import request_gpt
+from tango.gpt_utils import request_gpt, request_claude
 from tango.utils.config import load_config
 from tango.utils.grasp import Grasp2D, grasp_to_mat
 from tango.utils.image import (
@@ -169,16 +169,33 @@ class VisualPrompter:
         Do not output any extra text.
         """
 
-        response = request_gpt(
-            images=image_prompt,
-            prompt=text_prompt,
-            system_prompt=system_prompt,
-            detail="auto",
-            temp=temperature,
-            n_tokens=max_tokens,
-            n=n,
-            model_name=model_name,
-        )
+        # VLM_BACKEND=claude switches the semantic-grounding call to Claude
+        # instead of the OpenAI-compatible relay, without touching config
+        # yaml (model_name there stays "gpt-4o" either way -- request_claude
+        # ignores it and defaults to claude-opus-5, override via
+        # CLAUDE_MODEL_NAME if a different Claude model is wanted).
+        backend = os.environ.get("VLM_BACKEND", "openai").lower()
+        if backend == "claude":
+            response = request_claude(
+                images=image_prompt,
+                prompt=text_prompt,
+                system_prompt=system_prompt,
+                temp=temperature,
+                n_tokens=max_tokens,
+                n=n,
+                model_name=os.environ.get("CLAUDE_MODEL_NAME", "claude-opus-5"),
+            )
+        else:
+            response = request_gpt(
+                images=image_prompt,
+                prompt=text_prompt,
+                system_prompt=system_prompt,
+                detail="auto",
+                temp=temperature,
+                n_tokens=max_tokens,
+                n=n,
+                model_name=model_name,
+            )
 
         # If the backend already returned structured data (list/dict), skip regex parsing.
         if not isinstance(response, str):

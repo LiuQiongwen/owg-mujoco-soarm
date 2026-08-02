@@ -7,6 +7,11 @@ from typing import List, Union, Optional, Any
 from PIL import Image
 import json, re, ast, logging
 
+try:
+    import anthropic
+except ImportError:
+    anthropic = None
+
 
 _JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*([\s\S]*?)\s*```", re.IGNORECASE)
 logging.basicConfig(level=logging.INFO)  # 或 DEBUG
@@ -247,7 +252,7 @@ def compose_payload(images: List[np.ndarray], prompt: str, system_prompt: str, d
 
 
 def request_gpt(images: Union[np.ndarray, List[np.ndarray]], prompt: str, system_prompt: str, detail: str = "auto", temp: float = 0.0, n_tokens: int = 256, n: int = 1, return_logprobs: bool = False, in_context_examples: List[dict] = None, model_name: str = "gpt-4o", seed: Optional[int] = None) -> str:
-    api_key = "sk-A9q5TscQFLIV7ZTAB29f5c93E1D44f4880F91c24FcAa4eDd"
+    api_key = os.environ.get('OPENAI_API_KEY', 'sk-A9q5TscQFLIV7ZTAB29f5c93E1D44f4880F91c24FcAa4eDd')
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
@@ -315,4 +320,119 @@ def request_gpt(images: Union[np.ndarray, List[np.ndarray]], prompt: str, system
     else:
         logging.error("LLM request failed: %s", response.text)
         raise ValueError(f"请求失败，状态码：{response.status_code}，错误信息：{response.text}")
+
+
+def _build_claude_content(
+    images: List[Union[Image.Image, np.ndarray]],
+    prompt: Optional[str],
+    in_context_examples: Optional[List[dict]] = None,
+) -> List[dict]:
+    """Build a Claude Messages API user-turn content list (image + text blocks).
+    Mirrors prepare_prompt()'s text-then-image ordering, but uses Claude's
+    {"type": "image", "source": {...}} block shape instead of OpenAI's
+    {"type": "image_url", "image_url": {...}}."""
+
+    def _append_pair(content, imgs, text):
+        if text:
+            content.append({"type": "text", "text": text})
+        else:
+            assert len(imgs) > 0, "Both images and text prompts are empty."
+        for image in imgs:
+            base64_image = encode_image_to_base64(image)
+            content.append({
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": base64_image,
+                },
+            })
+        return content
+
+    content: List[dict] = []
+    if in_context_examples:
+        for example in in_context_examples:
+            _append_pair(content, example['images'], example['prompt'])
+            content.append({
+                "type": "text",
+                "text": f"The answer should be: {example['response']}\n",
+            })
+    _append_pair(content, images, prompt)
+    return content
+
+
+def request_claude(
+    images: Union[np.ndarray, List[np.ndarray]],
+    prompt: str,
+    system_prompt: str,
+    detail: str = "auto",
+    temp: float = 0.0,
+    n_tokens: int = 256,
+    n: int = 1,
+    return_logprobs: bool = False,
+    in_context_examples: List[dict] = None,
+    model_name: str = "claude-opus-5",
+    seed: Optional[int] = None,
+) -> str:
+    """Claude Messages API equivalent of request_gpt(). Same call signature
+    (so visual_prompt.py can switch backends without touching call sites),
+    but several OpenAI-only knobs have no Claude equivalent and are ignored:
+    - `detail` (image resolution hint): Claude has no per-image detail param.
+    - `n` (multiple completions per call): Claude only returns one completion
+      per request; a value other than 1 is logged and ignored.
+    - `return_logprobs`, `seed`: not exposed by the Claude API.
+    """
+    if anthropic is None:
+        raise RuntimeError(
+            "The 'anthropic' package is not installed. Run "
+            "`conda run -n tango pip install anthropic` (or pip install anthropic "
+            "in your environment) to use request_claude()."
+        )
+    if n != 1:
+        logging.warning("request_claude: n=%d requested but Claude only returns "
+                         "one completion per call; ignoring.", n)
+    if not model_name.startswith("claude-"):
+        logging.warning("request_claude: model_name=%r doesn't look like a Claude "
+                         "model id; falling back to claude-opus-5.", model_name)
+        model_name = "claude-opus-5"
+
+    # Resolves ANTHROPIC_API_KEY (or an `ant auth login` profile) automatically.
+    client = anthropic.Anthropic()
+
+    if not isinstance(images, List):
+        assert isinstance(images, np.ndarray), "Provide either a numpy array, a PIL image, an image path string or a list of the above."
+        images = [images]
+
+    content = _build_claude_content(images, prompt, in_context_examples)
+
+    response = client.messages.create(
+        model=model_name,
+        max_tokens=n_tokens,
+        system=system_prompt,
+        # Fast, deterministic-leaning grounding call — no need for extended
+        # reasoning on a single-object JSON extraction task.
+        thinking={"type": "disabled"},
+        output_config={"effort": "low"},
+        messages=[{"role": "user", "content": content}],
+    )
+
+    if response.stop_reason == "refusal":
+        logging.error("Claude declined the request: %s", response.stop_details)
+        raise ValueError(f"Claude request refused: {response.stop_details}")
+
+    text_content = "".join(
+        block.text for block in response.content if block.type == "text"
+    )
+
+    parsed = None
+    if text_content.strip():
+        parsed = _extract_json_from_text(text_content)
+
+    if parsed is not None:
+        return parsed
+    elif text_content.strip():
+        return text_content
+    else:
+        logging.error("Claude returned empty content. stop_reason=%s", response.stop_reason)
+        return ""
 
