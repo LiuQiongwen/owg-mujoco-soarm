@@ -164,7 +164,8 @@ def main():
     print(f"[grounding] resolved object: {resolved_obj_name!r} -- "
           f"handing off to run_pick_and_place (unmodified Piper execution pipeline)")
 
-    result = run_pick_and_place(env, resolved_obj_name, use_oriented_grasp=True, verbose=True)
+    result = run_pick_and_place(env, resolved_obj_name, use_oriented_grasp=True,
+                                 wrist_friendly_orientation=True, verbose=True)
     print(f"[execution] result = {result}")
     return result
 
