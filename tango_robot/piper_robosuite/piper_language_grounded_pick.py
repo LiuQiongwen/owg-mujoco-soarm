@@ -113,7 +113,15 @@ def main():
                           "fast path, no API call) for wiring tests. Pass this flag "
                           "once the segmentation mapping is fixed and verified, to "
                           "exercise the real GPT grounding call.")
+    ap.add_argument("--seed", type=int, default=None,
+                     help="Fix the scene-placement RNG for a reproducible object "
+                          "layout across runs (must be set before env construction "
+                          "-- see piper_multi_object_scene.py's np.random.seed() "
+                          "fix note). Omit for a freshly randomized scene each run.")
     args = ap.parse_args()
+
+    if args.seed is not None:
+        np.random.seed(args.seed)
 
     ycb_objects = args.objects.split(",")
     env, obs = build_scene(ycb_objects)

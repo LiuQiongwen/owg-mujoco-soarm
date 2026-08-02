@@ -405,14 +405,20 @@ def request_claude(
 
     content = _build_claude_content(images, prompt, in_context_examples)
 
+    # medium effort + adaptive thinking, not low/disabled: a seeded 5x-repeat
+    # test (2026-08-02) on a borderline visual-attribute instruction ("the
+    # yellow bottle") showed 3/5 correct at low/disabled vs 5/5 correct at
+    # medium/adaptive on the identical scene -- worth the extra latency/cost
+    # since this is called once per pick attempt, not in a tight loop.
+    # Still overridable via env vars for further experimentation.
+    effort = os.environ.get("CLAUDE_EFFORT", "medium")
+    thinking_type = os.environ.get("CLAUDE_THINKING", "adaptive")
     response = client.messages.create(
         model=model_name,
         max_tokens=n_tokens,
         system=system_prompt,
-        # Fast, deterministic-leaning grounding call — no need for extended
-        # reasoning on a single-object JSON extraction task.
-        thinking={"type": "disabled"},
-        output_config={"effort": "low"},
+        thinking={"type": thinking_type},
+        output_config={"effort": effort},
         messages=[{"role": "user", "content": content}],
     )
 
