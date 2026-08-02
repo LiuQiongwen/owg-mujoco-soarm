@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from research_agent_pilots.lggsn_analysis import alignment, loader, real_analysis, reporting
+from research_agent_pilots.lggsn_analysis import alignment, latex_tables, loader, power_analysis, real_analysis, reporting
 from research_agent_pilots.lggsn_analysis import statistics as lggsn_statistics
 
 EVAL_OUTPUTS_DIR = REPO_ROOT / "research_agent_pilots" / "lggsn_suite" / "eval_outputs"
@@ -802,3 +802,290 @@ def test_phase3_manifest_records_all_required_provenance_fields(real_run):
     assert set(manifest["checkpoint_sha256"].keys()) == set(loader.CORE_CHECKPOINT_NAMES)
     assert len(manifest["dataset_sha256"]) == 64  # sha256 hex digest
     assert len(manifest["pair_identity_digest"]) == 64
+
+
+# ── Phase 4: LaTeX tables (pure stdlib) and PNG/PDF figures (matplotlib) ────
+#
+# latex_tables.py has no extra dependency, so its tests run under the
+# standard `python -m pytest` command like everything above. figures.py
+# needs matplotlib, which the research-agent venv does not have -- its
+# tests use pytest.importorskip so the standard command still passes
+# cleanly (skipping, not failing) when matplotlib is absent; they only
+# actually execute when pytest is run under an environment that has it
+# (e.g. the `tango` conda env), matching how figures.py itself is meant to
+# be run (see that module's docstring).
+
+REAL_OUTPUTS_DIR = REPO_ROOT / "research_agent_pilots" / "lggsn_analysis" / "outputs"
+
+
+def _latex_data_rows(rendered: str) -> list[str]:
+    """Lines strictly between \\midrule and \\bottomrule -- i.e. data rows
+    only, excluding the header row (which also ends in \\\\)."""
+    lines = rendered.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.strip() == r"\midrule") + 1
+    end = next(i for i, line in enumerate(lines) if line.strip() == r"\bottomrule")
+    return [line for line in lines[start:end] if line.strip()]
+
+
+def test_phase4_escape_latex_handles_special_characters():
+    assert latex_tables.escape_latex("a_b") == r"a\_b"
+    assert latex_tables.escape_latex("50%") == r"50\%"
+    assert latex_tables.escape_latex("a&b") == r"a\&b"
+    assert latex_tables.escape_latex("$5") == r"\$5"
+    assert latex_tables.escape_latex(r"back\slash") == r"back\textbackslash{}slash"
+
+
+def test_phase4_pairwise_summary_table_is_deterministic(real_run):
+    first = latex_tables.render_pairwise_summary_table(real_run.comparisons)
+    second = latex_tables.render_pairwise_summary_table(real_run.comparisons)
+    assert first == second
+
+
+def test_phase4_pairwise_summary_table_has_one_row_per_comparison(real_run):
+    rendered = latex_tables.render_pairwise_summary_table(real_run.comparisons)
+    data_rows = _latex_data_rows(rendered)
+    assert len(data_rows) == len(real_run.comparisons)
+    for comparison in real_run.comparisons:
+        # checkpoint names are LaTeX-escaped in the rendered table (e.g. full_v2 -> full\_v2)
+        assert latex_tables.escape_latex(comparison["checkpoint_a"]) in rendered
+        assert latex_tables.escape_latex(comparison["checkpoint_b"]) in rendered
+
+
+def test_phase4_per_query_table_has_correct_row_count(real_run):
+    rendered = latex_tables.render_per_query_table(real_run.comparisons)
+    data_rows = _latex_data_rows(rendered)
+    expected_rows = sum(len(c["per_query_breakdown"]) for c in real_run.comparisons)
+    assert expected_rows == len(real_analysis.PLANNED_COMPARISONS) * 6
+    assert len(data_rows) == expected_rows
+
+
+def test_phase4_pairwise_summary_table_values_match_real_output(real_run):
+    rendered = latex_tables.render_pairwise_summary_table(real_run.comparisons)
+    first = real_run.comparisons[0]
+    assert f"{first['accuracy_a']:.4f}" in rendered
+    assert f"{first['accuracy_b']:.4f}" in rendered
+
+
+def test_phase4_write_functions_match_render_functions(tmp_path, real_run):
+    latex_tables.write_pairwise_summary_tex(real_run.comparisons, tmp_path / "summary.tex")
+    latex_tables.write_per_query_tex(real_run.comparisons, tmp_path / "per_query.tex")
+    assert (tmp_path / "summary.tex").read_text() == latex_tables.render_pairwise_summary_table(real_run.comparisons)
+    assert (tmp_path / "per_query.tex").read_text() == latex_tables.render_per_query_table(real_run.comparisons)
+
+
+def test_phase4_latex_tables_main_writes_both_files_from_real_committed_output(tmp_path):
+    comparisons_json = REAL_OUTPUTS_DIR / "pairwise_comparisons.json"
+    if not comparisons_json.exists():
+        pytest.skip("research_agent_pilots/lggsn_analysis/outputs/pairwise_comparisons.json not generated yet")
+    out_dir = tmp_path / "tables"
+    exit_code = latex_tables.main(["--comparisons-json", str(comparisons_json), "--output-dir", str(out_dir)])
+    assert exit_code == 0
+    assert (out_dir / "pairwise_summary.tex").exists()
+    assert (out_dir / "per_query_breakdown.tex").exists()
+    assert (out_dir / "pairwise_summary.tex").read_text().startswith("% Auto-generated")
+
+
+try:
+    from research_agent_pilots.lggsn_analysis import figures
+    _HAS_MATPLOTLIB = True
+except ImportError:
+    figures = None
+    _HAS_MATPLOTLIB = False
+
+_requires_matplotlib = pytest.mark.skipif(not _HAS_MATPLOTLIB, reason="matplotlib is not installed in this environment")
+
+
+@_requires_matplotlib
+def test_phase4_generate_all_figures_writes_valid_png_and_pdf(tmp_path, real_run):
+    figures.generate_all_figures(real_run.comparisons, tmp_path)
+    png_files = ["win_tie_loss.png", "bootstrap_ci_forest.png"]
+    pdf_files = ["win_tie_loss.pdf", "bootstrap_ci_forest.pdf"]
+    for name in png_files:
+        data = (tmp_path / name).read_bytes()
+        assert data[:8] == b"\x89PNG\r\n\x1a\n", name
+        assert len(data) > 1000, name
+    for name in pdf_files:
+        data = (tmp_path / name).read_bytes()
+        assert data[:5] == b"%PDF-", name
+        assert len(data) > 1000, name
+
+
+@_requires_matplotlib
+def test_phase4_figures_are_byte_deterministic_in_this_environment(tmp_path, real_run):
+    out_1, out_2 = tmp_path / "run1", tmp_path / "run2"
+    figures.generate_all_figures(real_run.comparisons, out_1)
+    figures.generate_all_figures(real_run.comparisons, out_2)
+    for name in ("win_tie_loss.png", "win_tie_loss.pdf", "bootstrap_ci_forest.png", "bootstrap_ci_forest.pdf"):
+        assert (out_1 / name).read_bytes() == (out_2 / name).read_bytes(), name
+
+
+@_requires_matplotlib
+def test_phase4_figures_main_writes_from_real_committed_output(tmp_path):
+    comparisons_json = REAL_OUTPUTS_DIR / "pairwise_comparisons.json"
+    if not comparisons_json.exists():
+        pytest.skip("research_agent_pilots/lggsn_analysis/outputs/pairwise_comparisons.json not generated yet")
+    out_dir = tmp_path / "figures"
+    exit_code = figures.main(["--comparisons-json", str(comparisons_json), "--output-dir", str(out_dir)])
+    assert exit_code == 0
+    assert (out_dir / "win_tie_loss.png").exists()
+    assert (out_dir / "bootstrap_ci_forest.pdf").exists()
+
+
+# ── Phase 5: exact power analysis for McNemar's test (statistics.py) ────────
+
+def test_phase5_mcnemar_power_rejection_region_matches_exact_p_value_boundary():
+    # Cross-check the float/log-space rejection region against the
+    # existing exact-Fraction p-value at and around the boundary, for a
+    # spread of n (including the real data's actual discordant counts).
+    for n in (10, 25, 50, 119, 140, 171):
+        k_lower, k_upper = lggsn_statistics.mcnemar_exact_rejection_region(n, alpha=0.05)
+        for k in {max(0, k_lower - 1), k_lower, k_lower + 1, k_upper - 1, k_upper, min(n, k_upper + 1)}:
+            if k < 0 or k > n:
+                continue
+            p_exact = lggsn_statistics._exact_mcnemar_p_value(k, n - k)
+            predicted_reject = (k <= k_lower) or (k >= k_upper)
+            assert predicted_reject == (p_exact < 0.05), (n, k, p_exact, predicted_reject)
+
+
+def test_phase5_mcnemar_power_at_null_stays_near_alpha_for_large_n():
+    for n in (1000, 20000):
+        power = lggsn_statistics.mcnemar_power(n, 0.5, alpha=0.05)
+        assert 0.03 < power < 0.06
+
+
+def test_phase5_mcnemar_power_increases_with_effect_size():
+    n = 200
+    powers = [lggsn_statistics.mcnemar_power(n, p, alpha=0.05) for p in (0.5, 0.55, 0.6, 0.7, 0.9)]
+    assert powers == sorted(powers)
+    assert powers[0] < powers[-1]
+
+
+def test_phase5_mcnemar_power_handles_large_n_without_overflow():
+    # This used to raise OverflowError before switching to log-space pmf.
+    power = lggsn_statistics.mcnemar_power(100_000, 0.5, alpha=0.05)
+    assert 0.0 <= power <= 1.0
+
+
+def test_phase5_mcnemar_power_rejects_invalid_params():
+    with pytest.raises(lggsn_statistics.StatisticsError):
+        lggsn_statistics.mcnemar_power(-1, 0.5, alpha=0.05)
+    with pytest.raises(lggsn_statistics.StatisticsError):
+        lggsn_statistics.mcnemar_power(10, 1.5, alpha=0.05)
+    with pytest.raises(lggsn_statistics.StatisticsError):
+        lggsn_statistics.mcnemar_power(10, 0.5, alpha=0.0)
+
+
+def test_phase5_minimum_detectable_proportion_is_none_when_unreachable():
+    # n=1 can never reach 80% power at alpha=0.05 even at the most extreme
+    # possible true_proportion=1.0.
+    assert lggsn_statistics.mcnemar_minimum_detectable_proportion(1, alpha=0.05, target_power=0.8) is None
+
+
+def test_phase5_minimum_detectable_proportion_is_between_half_and_one():
+    mdp = lggsn_statistics.mcnemar_minimum_detectable_proportion(119, alpha=0.05, target_power=0.8)
+    assert mdp is not None
+    assert 0.5 < mdp < 1.0
+    # at that proportion, power must actually reach target_power
+    assert lggsn_statistics.mcnemar_power(119, mdp, alpha=0.05) >= 0.8
+
+
+def test_phase5_required_n_for_power_returns_none_at_null_proportion():
+    assert lggsn_statistics.mcnemar_required_n_for_power(0.5, alpha=0.05, target_power=0.8) is None
+
+
+def test_phase5_required_n_for_power_is_the_smallest_such_n():
+    true_proportion = 0.58
+    required_n = lggsn_statistics.mcnemar_required_n_for_power(true_proportion, alpha=0.05, target_power=0.8)
+    assert required_n is not None
+    assert lggsn_statistics.mcnemar_power(required_n, true_proportion, alpha=0.05) >= 0.8
+    assert lggsn_statistics.mcnemar_power(required_n - 1, true_proportion, alpha=0.05) < 0.8
+
+
+def test_phase5_required_n_for_power_near_null_effect_hits_n_max_bound():
+    # base-vs-full_v2's real observed effect (phat ~ 0.507) is close enough
+    # to null that required n exceeds a small n_max -- must return None,
+    # not hang or raise.
+    result = lggsn_statistics.mcnemar_required_n_for_power(0.507, alpha=0.05, target_power=0.8, n_max=1000)
+    assert result is None
+
+
+def test_phase5_required_n_for_power_completes_quickly_for_real_comparisons(real_run):
+    import time
+    t0 = time.monotonic()
+    for comparison in real_run.comparisons:
+        n = comparison["discordant_a_correct_b_wrong"] + comparison["discordant_a_wrong_b_correct"]
+        if n == 0:
+            continue
+        phat = comparison["discordant_a_wrong_b_correct"] / n
+        if phat == 0.5:
+            continue
+        lggsn_statistics.mcnemar_required_n_for_power(phat, alpha=0.05, target_power=0.8, n_max=200_000)
+    assert time.monotonic() - t0 < 10.0
+
+
+# ── Phase 5: power_analysis.py orchestration ────────────────────────────────
+
+def test_phase5_build_power_report_has_one_entry_per_comparison(real_run):
+    reports = power_analysis.build_power_report(real_run.comparisons)
+    assert len(reports) == len(real_run.comparisons)
+    for report, comparison in zip(reports, real_run.comparisons):
+        assert report["checkpoint_a"] == comparison["checkpoint_a"]
+        assert report["checkpoint_b"] == comparison["checkpoint_b"]
+        expected_n = comparison["discordant_a_correct_b_wrong"] + comparison["discordant_a_wrong_b_correct"]
+        assert report["n_discordant_pairs"] == expected_n
+
+
+def test_phase5_build_power_report_null_results_are_underpowered(real_run):
+    # Documents the real data's actual finding: every NOT_SIGNIFICANT
+    # comparison (under the raw p-value) has post-hoc power below the 0.8
+    # target -- i.e. these null results are at least partly attributable
+    # to limited sample size, not proof of a true zero effect.
+    reports = {(r["checkpoint_a"], r["checkpoint_b"]): r for r in power_analysis.build_power_report(real_run.comparisons)}
+    for comparison in real_run.comparisons:
+        if comparison["interpretation_raw"] == "NOT_SIGNIFICANT":
+            report = reports[(comparison["checkpoint_a"], comparison["checkpoint_b"])]
+            assert report["post_hoc_power"] is not None
+            assert report["post_hoc_power"] < power_analysis.TARGET_POWER
+
+
+def test_phase5_build_power_report_significant_results_have_high_power(real_run):
+    reports = {(r["checkpoint_a"], r["checkpoint_b"]): r for r in power_analysis.build_power_report(real_run.comparisons)}
+    for comparison in real_run.comparisons:
+        if comparison["interpretation_raw"] != "NOT_SIGNIFICANT":
+            report = reports[(comparison["checkpoint_a"], comparison["checkpoint_b"])]
+            # a result significant at alpha under the actually-observed effect
+            # must have nontrivial post-hoc power by construction
+            assert report["post_hoc_power"] > 0.5
+
+
+def test_phase5_power_analysis_is_deterministic(real_run):
+    first = power_analysis.build_power_report(real_run.comparisons)
+    second = power_analysis.build_power_report(real_run.comparisons)
+    assert first == second
+
+
+def test_phase5_power_analysis_main_writes_outputs_from_real_committed_data(tmp_path):
+    comparisons_json = REAL_OUTPUTS_DIR / "pairwise_comparisons.json"
+    if not comparisons_json.exists():
+        pytest.skip("research_agent_pilots/lggsn_analysis/outputs/pairwise_comparisons.json not generated yet")
+    out_dir = tmp_path / "power"
+    exit_code = power_analysis.main(["--comparisons-json", str(comparisons_json), "--output-dir", str(out_dir)])
+    assert exit_code == 0
+    assert (out_dir / "power_analysis.json").exists()
+    assert (out_dir / "power_analysis.csv").exists()
+    assert (out_dir / "power_analysis.md").exists()
+
+
+def test_phase5_power_analysis_json_csv_agree(tmp_path, real_run):
+    reports = power_analysis.build_power_report(real_run.comparisons)
+    reporting.write_power_analysis_json(reports, tmp_path / "power_analysis.json")
+    reporting.write_power_analysis_csv(reports, tmp_path / "power_analysis.csv")
+
+    json_payload = json.loads((tmp_path / "power_analysis.json").read_text())["power_analysis"]
+    with (tmp_path / "power_analysis.csv").open(newline="") as f:
+        csv_rows = list(csv.DictReader(f))
+    assert len(json_payload) == len(csv_rows)
+    for json_row, csv_row in zip(json_payload, csv_rows):
+        assert json_row["checkpoint_a"] == csv_row["checkpoint_a"]
+        assert json_row["checkpoint_b"] == csv_row["checkpoint_b"]
+        assert json_row["n_discordant_pairs"] == int(csv_row["n_discordant_pairs"])

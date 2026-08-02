@@ -1,0 +1,6 @@
+checkpoint_a,checkpoint_b,n_discordant_pairs,alpha,target_power,observed_proportion_favor_b,post_hoc_power,min_detectable_proportion_favor_b,required_discordant_pairs_for_target_power,additional_discordant_pairs_needed,note
+base,nodist,283,0.05,0.8,0.3674911660777385,0.9938427238756059,0.5847,112,0,
+base,nozrel,119,0.05,0.8,0.5798319327731093,0.3921920390053506,0.6296,314,195,
+base,full_v2,140,0.05,0.8,0.5071428571428571,0.03680264781869906,0.6237,38528,38388,
+nodist,full_v2,263,0.05,0.8,0.6463878326996197,0.9979056972862239,0.5864,99,0,
+nozrel,full_v2,171,0.05,0.8,0.4502923976608187,0.24553797665785937,0.6074,824,653,

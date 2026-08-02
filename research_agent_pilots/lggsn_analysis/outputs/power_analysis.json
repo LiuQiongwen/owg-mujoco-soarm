@@ -1,0 +1,69 @@
+{
+  "power_analysis": [
+    {
+      "additional_discordant_pairs_needed": 0,
+      "alpha": 0.05,
+      "checkpoint_a": "base",
+      "checkpoint_b": "nodist",
+      "min_detectable_proportion_favor_b": 0.5847,
+      "n_discordant_pairs": 283,
+      "note": null,
+      "observed_proportion_favor_b": 0.3674911660777385,
+      "post_hoc_power": 0.9938427238756059,
+      "required_discordant_pairs_for_target_power": 112,
+      "target_power": 0.8
+    },
+    {
+      "additional_discordant_pairs_needed": 195,
+      "alpha": 0.05,
+      "checkpoint_a": "base",
+      "checkpoint_b": "nozrel",
+      "min_detectable_proportion_favor_b": 0.6296,
+      "n_discordant_pairs": 119,
+      "note": null,
+      "observed_proportion_favor_b": 0.5798319327731093,
+      "post_hoc_power": 0.3921920390053506,
+      "required_discordant_pairs_for_target_power": 314,
+      "target_power": 0.8
+    },
+    {
+      "additional_discordant_pairs_needed": 38388,
+      "alpha": 0.05,
+      "checkpoint_a": "base",
+      "checkpoint_b": "full_v2",
+      "min_detectable_proportion_favor_b": 0.6237,
+      "n_discordant_pairs": 140,
+      "note": null,
+      "observed_proportion_favor_b": 0.5071428571428571,
+      "post_hoc_power": 0.03680264781869906,
+      "required_discordant_pairs_for_target_power": 38528,
+      "target_power": 0.8
+    },
+    {
+      "additional_discordant_pairs_needed": 0,
+      "alpha": 0.05,
+      "checkpoint_a": "nodist",
+      "checkpoint_b": "full_v2",
+      "min_detectable_proportion_favor_b": 0.5864,
+      "n_discordant_pairs": 263,
+      "note": null,
+      "observed_proportion_favor_b": 0.6463878326996197,
+      "post_hoc_power": 0.9979056972862239,
+      "required_discordant_pairs_for_target_power": 99,
+      "target_power": 0.8
+    },
+    {
+      "additional_discordant_pairs_needed": 653,
+      "alpha": 0.05,
+      "checkpoint_a": "nozrel",
+      "checkpoint_b": "full_v2",
+      "min_detectable_proportion_favor_b": 0.6074,
+      "n_discordant_pairs": 171,
+      "note": null,
+      "observed_proportion_favor_b": 0.4502923976608187,
+      "post_hoc_power": 0.24553797665785937,
+      "required_discordant_pairs_for_target_power": 824,
+      "target_power": 0.8
+    }
+  ]
+}

@@ -66,63 +66,105 @@
 # spec's allowed_executor_commands below. This spec still never runs it
 # automatically as part of `execute` -- `execute` never invokes
 # spec.smoke_command (see execute_flow.py's module docstring), and no
-# execution/MVP4 field is set on this spec. smoke_command below is
-# unchanged from Phase 1/2: a harmless liveness placeholder that writes one
-# bool to metrics.json so the separate `smoke` flow's deterministic
-# artifact contract stays satisfiable -- it is NOT the analysis suite and
-# is never run by `execute`.
+# execution/MVP4 field is set on this spec.
+#
+# PHASE 3 continued: explicitly OUT of scope was any plot, PNG/PDF figure,
+# or LaTeX/publication table -- deferred to a later phase.
+#
+# PHASE 4 (this revision): that later phase, split into two independent
+# outputs, both formatted-only from Phase 3's already-computed
+# pairwise_comparisons.json (neither recomputes a statistic):
+#   * latex_tables.py -- pure stdlib, no extra dependency, deterministic
+#     string formatting. Runs (and is tested) exactly like real_analysis.py
+#     -- it IS one of this spec's allowed_executor_commands below.
+#   * figures.py -- needs matplotlib, which is NOT installed in the
+#     research-agent venv this spec's compileall/pytest/real_analysis.py
+#     commands run under. Exactly like Phase 2's evaluator.py regeneration,
+#     it is therefore run directly via the `tango` conda env (which does
+#     have matplotlib) and is deliberately NOT one of this spec's
+#     allowed_executor_commands. Its tests use pytest-skipif so the
+#     standard `pytest` command in this spec's allowlist still passes
+#     cleanly (skip, not fail) without matplotlib -- they were separately,
+#     manually verified to actually pass (not just skip) by running
+#     `conda run -n tango python -m pytest -q
+#     tests/test_lggsn_statistical_analysis.py` before this revision was
+#     written; that verification command is itself outside this spec's
+#     allowlist for the same reason as evaluator.py.
+# PDF/PNG metadata (CreationDate) is pinned to a fixed datetime, never
+# datetime.now(), so repeated figures.py runs in the same environment are
+# byte-identical -- verified, not merely assumed; see figures.py's
+# docstring for the explicit same-environment-only scope of that claim.
+# PHASE 4 continued: explicitly OUT of scope was any statistical follow-up
+# on the three NOT_SIGNIFICANT comparisons -- deferred to a later phase.
+#
+# PHASE 5 (this revision): that later phase -- power analysis. Answers,
+# for all five comparisons (not just the three null ones, so nothing is
+# selectively reported): given the discordant-pair count and effect size
+# Phase 3 already computed, was this study's sample size adequate to
+# detect that effect at 80% power, and how many more discordant pairs
+# would a follow-up need? New modules: power_analysis.py (the computation
+# + CLI, reading ONLY outputs/pairwise_comparisons.json, never
+# recomputing McNemar's own p-value/discordant counts) and reporting.py
+# gained three writer functions (JSON/CSV/Markdown -- same
+# formatting-only role as its Phase 3 functions). statistics.py gained
+# four additions: mcnemar_exact_rejection_region, mcnemar_power,
+# mcnemar_minimum_detectable_proportion, mcnemar_required_n_for_power.
+# Unlike _exact_mcnemar_p_value (which uses exact Fraction arithmetic,
+# essential for a value this analysis reports as a finding), these use
+# float/log-space arithmetic (math.lgamma) -- exact rational arithmetic
+# with 2**n for n in the thousands is both computationally infeasible
+# (confirmed empirically: an early Fraction-based draft either raised
+# OverflowError converting a many-hundred-digit math.comb(n, k) to float,
+# or, for the rejection-region search alone, took too long) and
+# unnecessary for this module's exploratory sample-size questions --
+# verified to reproduce _exact_mcnemar_p_value's own significance
+# boundary decisions exactly (within float64 precision) by a dedicated
+# cross-check test. Like real_analysis.py, power_analysis.py involves no
+# torch, no checkpoint loading, no research experiment -- pure
+# deterministic CPU-only stdlib computation over an already-committed
+# JSON file -- so it IS one of this spec's allowed_executor_commands.
+# smoke_command below is unchanged from Phase 1-4: a harmless liveness
+# placeholder that writes one bool to metrics.json so the separate `smoke`
+# flow's deterministic artifact contract stays satisfiable -- it is NOT
+# the analysis suite and is never run by `execute`.
 
 task_id: lggsn_statistical_analysis
 goal: >
-  Phase 3 only (Phase 1's loader.py/alignment.py/alignment tests and Phase
-  2's committed pair_results.jsonl/provenance.json are unchanged by this
-  phase, except statistics.py gaining two additive functions): implement
-  research_agent_pilots/lggsn_analysis/real_analysis.py and
-  research_agent_pilots/lggsn_analysis/reporting.py, computing and
-  reporting the five planned pairwise comparisons (base-vs-nodist,
-  base-vs-nozrel, base-vs-full_v2, nodist-vs-full_v2, nozrel-vs-full_v2)
-  from the real, provenance-pinned pair_results.jsonl files only. Every
-  comparison must reuse the exact same 582 aligned pair identities (one
-  alignment.align_pairs call across all four checkpoints), and report:
-  aligned pair count; accuracy for both checkpoints and their difference;
-  win/tie/loss counts; both discordant counts (A-correct-B-wrong,
-  A-wrong-B-correct); the exact two-sided McNemar p-value; a deterministic
-  cluster (block) bootstrap 95% CI for the accuracy difference, clustered
-  by query (the finest unit reconstructable from pair_results.jsonl's own
-  columns, since LGGSN pairs are a cartesian product of same-query episode
-  pairs and are therefore correlated within a query -- document this
-  choice, do not resample individual pairs i.i.d.); mean/median
-  score-margin difference over pairs with finite scores on both sides
-  (excluding, never zeroing, any pair with a missing/non-finite score, and
-  reporting the exclusion count); a per-query breakdown; and a predeclared
-  alpha=0.05 interpretation label (SIGNIFICANT_FAVORS_A /
-  SIGNIFICANT_FAVORS_B / NOT_SIGNIFICANT) that is never changed post-hoc.
-  Report both the raw p-value/interpretation and a separately labeled
-  Holm-Bonferroni-adjusted p-value/interpretation across the five planned
-  comparisons -- never apply the correction silently. Do not report
-  McNemar for any comparison where binary correctness cannot be exactly
-  reconstructed (loader.load_pair_fixture_jsonl already fails closed on
-  this, so this is an invariant, not a runtime branch). Never convert
-  pair_accuracy into a grasp success rate, and never claim causal
-  feature-importance from one checkpoint per ablation. Write
-  research_agent_pilots/lggsn_analysis/outputs/pairwise_comparisons.json,
-  pairwise_comparisons.csv, per_query_breakdown.csv, statistical_summary.md,
-  and analysis_manifest.json (the manifest recording: git commit; input
-  file, checkpoint, and dataset SHA-256 values; a pair-identity digest;
-  the bootstrap seed and resampling unit; alpha; the multiple-comparison
-  method; the exact command used; and runtime). Update
-  tests/test_lggsn_statistical_analysis.py with coverage for alignment
-  consistency across all five comparisons, McNemar and Holm-Bonferroni
-  fixtures, bootstrap determinism, zero-discordance handling,
-  missing/non-finite score handling, per-query reconciliation, JSON/CSV
-  agreement, output byte-determinism across repeated runs, input-file
-  immutability, and that no comparison is ever labeled significant unless
-  its own declared rule (raw or Holm) is actually satisfied. Do not
-  implement plots, PNG/PDF figures, or LaTeX/publication tables in this
-  phase. Do not modify research_agent_pilots/lggsn_suite/eval_outputs/,
-  grasp_6dof/models/, checkpoints/, causal_validity_audit/, research_agent/,
-  or any paper file -- this phase only ever reads pair_results.jsonl/
-  provenance.json, and does not retrain or regenerate any checkpoint.
+  Phase 5 only (Phases 1-4 are unchanged by this phase, including
+  outputs/pairwise_comparisons.json, whose discordant counts and p-values
+  this phase only reads, never recomputes): implement
+  research_agent_pilots/lggsn_analysis/power_analysis.py, computing, for
+  all five planned comparisons, an exact (float/log-space, not the
+  headline exact-Fraction McNemar p-value's arithmetic) power analysis
+  from each comparison's already-computed discordant-pair counts: the
+  observed proportion of discordant pairs favoring checkpoint B; post-hoc
+  power to detect that observed effect at alpha=0.05 (reported with an
+  explicit caveat that post-hoc power is a monotonic rescaling of the
+  p-value, not independent evidence); the minimum proportion this
+  particular study's actual discordant-pair count could detect at 80%
+  power; and the number of discordant pairs that would be required to
+  detect the observed effect at 80% power (None, with an explicit note,
+  if the observed effect is exactly null or the requirement exceeds a
+  bounded search). Add mcnemar_exact_rejection_region, mcnemar_power,
+  mcnemar_minimum_detectable_proportion, and
+  mcnemar_required_n_for_power to statistics.py, and three writer
+  functions (write_power_analysis_json/csv/markdown) to reporting.py.
+  Write research_agent_pilots/lggsn_analysis/outputs/power_analysis.json,
+  power_analysis.csv, and power_analysis.md. Update
+  tests/test_lggsn_statistical_analysis.py with coverage for: the new
+  rejection-region/power functions cross-checked against the existing
+  exact McNemar p-value at and around the significance boundary; power
+  increasing monotonically with effect size; no overflow/hang for large n
+  (the bug this phase's design deliberately fixed); the null-proportion
+  and search-bound-exceeded None cases; that every NOT_SIGNIFICANT
+  comparison's post-hoc power is documented as below 80% (the real
+  finding motivating this phase) and every significant comparison's
+  post-hoc power is not trivially low; determinism; and JSON/CSV
+  agreement. Do not modify research_agent_pilots/lggsn_suite/
+  eval_outputs/, grasp_6dof/models/, checkpoints/, causal_validity_audit/,
+  research_agent/, or any paper file. Do not retrain or regenerate any
+  checkpoint, and do not recompute or alter any statistic Phase 3 already
+  computed -- this phase only ever reads outputs/pairwise_comparisons.json.
 
 allowed_paths:
   - research_agent_pilots/lggsn_analysis
@@ -153,30 +195,33 @@ allowed_modify_paths:
   - tests
   - experiments/lggsn_statistical_analysis.yaml
 
-# Phase 3 adds real_analysis.py + reporting.py (source), a larger
-# tests/ update, and the five generated files under
-# research_agent_pilots/lggsn_analysis/outputs/ (~30KB for 582-pair-scale
-# JSON/CSV/Markdown/manifest output) -- still no plots/figures/LaTeX, so
-# both budgets stay well below the original full-suite spec's, just raised
-# again from Phase 2's data-only budget to fit this phase's extra source
-# and generated-output files.
-max_changed_files: 30
-max_changed_bytes: 1500000
+# Phase 5 adds power_analysis.py (source, small), reporting.py/statistics.py
+# additions, a larger tests/ update, and three small generated files under
+# outputs/ (power_analysis.{json,csv,md}, all plain text, a few KB total) --
+# no images this time, so the byte budget barely needs to move; kept at
+# Phase 4's level since there is ample headroom already.
+max_changed_files: 40
+max_changed_bytes: 3000000
 
-# The only four commands this task may run, byte-for-byte, as argv arrays
-# (never a shell string). The first, second, and fourth are already
-# covered by MVP2's own fixed executor allowlist
+# The only five commands this task may run, byte-for-byte, as argv arrays
+# (never a shell string). The first, second, and fifth are already covered
+# by MVP2's own fixed executor allowlist
 # (research_agent.policies.execution_policy._FIXED_ALLOWLIST_EXACT /
 # ._FIXED_ALLOWLIST_PREFIXES / ._PYTEST_PREFIX); they are listed here
 # explicitly so the spec is self-documenting about the exact bound, not
 # because the fixed allowlist would otherwise reject them. The third
-# (real_analysis.py) is new this phase and is NOT part of the fixed
-# baseline allowlist -- it is deliberately added here because, unlike
-# Phase 2's evaluator.py regeneration (torch, checkpoint loading, kept
-# entirely outside this spec's command allowlist), it is pure,
-# deterministic, CPU-only stdlib computation over already-committed
-# pair_results.jsonl files: no torch, no checkpoint/dataset access, no
-# research experiment.
+# (real_analysis.py, Phase 3) and fourth (power_analysis.py, this phase)
+# are both pure, deterministic, CPU-only stdlib computation over
+# already-committed JSON/JSONL files -- no torch, no checkpoint/dataset
+# access, no research experiment -- so both are allowed_executor_commands.
+# latex_tables.py (Phase 4, also pure stdlib) would be exactly as safe to
+# add here, but stays deliberately absent for the same reason it always
+# has been: this spec's execute/build-code task is to create the module,
+# not to also run it as part of `execute` (it was run directly, once, to
+# produce the committed outputs/tables/ files -- see the Phase 4 header
+# comment above). figures.py (matplotlib) remains absent for the reason
+# given in its own header comment (not installed in this spec's own
+# compileall/pytest/real_analysis.py/power_analysis.py environment).
 allowed_executor_commands:
   - - python
     - "-m"
@@ -194,6 +239,13 @@ allowed_executor_commands:
     - research_agent_pilots.lggsn_analysis.real_analysis
     - "--repo-root"
     - "."
+    - "--output-dir"
+    - research_agent_pilots/lggsn_analysis/outputs
+  - - python
+    - "-m"
+    - research_agent_pilots.lggsn_analysis.power_analysis
+    - "--comparisons-json"
+    - research_agent_pilots/lggsn_analysis/outputs/pairwise_comparisons.json
     - "--output-dir"
     - research_agent_pilots/lggsn_analysis/outputs
   - - git

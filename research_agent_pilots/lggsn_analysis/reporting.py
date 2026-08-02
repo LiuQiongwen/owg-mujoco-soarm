@@ -1,5 +1,5 @@
-"""Phase 3 output formatting: JSON/CSV/Markdown writers for
-real_analysis.py's already-computed pairwise comparison records.
+"""Output formatting: JSON/CSV/Markdown writers for real_analysis.py's
+(Phase 3) and power_analysis.py's (Phase 5) already-computed records.
 
 Pure formatting only -- no statistics are computed here (see statistics.py)
 and no input file under research_agent_pilots/lggsn_analysis/pair_results/
@@ -304,3 +304,131 @@ def write_analysis_manifest_json(manifest: Mapping[str, Any], path: Path) -> Non
     with Path(path).open("w", encoding="utf-8", newline="\n") as f:
         json.dump(manifest, f, indent=2, sort_keys=True)
         f.write("\n")
+
+
+# ── Phase 5: power analysis (power_analysis.py) ─────────────────────────────
+
+POWER_ANALYSIS_CSV_FIELDS: tuple[str, ...] = (
+    "checkpoint_a",
+    "checkpoint_b",
+    "n_discordant_pairs",
+    "alpha",
+    "target_power",
+    "observed_proportion_favor_b",
+    "post_hoc_power",
+    "min_detectable_proportion_favor_b",
+    "required_discordant_pairs_for_target_power",
+    "additional_discordant_pairs_needed",
+    "note",
+)
+
+
+def write_power_analysis_json(reports: Sequence[Mapping[str, Any]], path: Path) -> None:
+    with Path(path).open("w", encoding="utf-8", newline="\n") as f:
+        json.dump({"power_analysis": list(reports)}, f, indent=2, sort_keys=True)
+        f.write("\n")
+
+
+def write_power_analysis_csv(reports: Sequence[Mapping[str, Any]], path: Path) -> None:
+    with Path(path).open("w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(POWER_ANALYSIS_CSV_FIELDS), lineterminator="\n")
+        writer.writeheader()
+        for report in reports:
+            writer.writerow({field: report.get(field) for field in POWER_ANALYSIS_CSV_FIELDS})
+
+
+def _fmt_opt(value: Any, digits: int = 4) -> str:
+    if value is None:
+        return "n/a"
+    if isinstance(value, float):
+        return f"{value:.{digits}f}"
+    return str(value)
+
+
+def render_power_analysis_markdown(reports: Sequence[Mapping[str, Any]]) -> str:
+    lines: list[str] = []
+    lines.append("# LGGSN Core-Matrix McNemar Power Analysis (Phase 5)")
+    lines.append("")
+    lines.append(
+        "Follow-up to the three NOT_SIGNIFICANT comparisons in "
+        "`statistical_summary.md` (Phase 3): does a null result here mean "
+        "\"no real effect\" or \"underpowered study\"? Computed for all five "
+        "planned comparisons, not just the null ones, so nothing is "
+        "selectively reported. Every number below is read from or "
+        "recomputed only from `pairwise_comparisons.json`'s discordant "
+        "counts -- no new data, no re-run of McNemar's test itself."
+    )
+    lines.append("")
+    lines.append("## Method and caveats")
+    lines.append("")
+    lines.append(
+        "- All power/sample-size math treats the n discordant pairs as "
+        "independent draws -- the same assumption McNemar's test itself "
+        "makes. It does not separately model the query-level clustering "
+        "that the cluster bootstrap CIs (`statistical_summary.md`) "
+        "account for; if discordant pairs are positively correlated "
+        "within a query, true power is likely somewhat lower than "
+        "reported here."
+    )
+    lines.append(
+        "- **Post-hoc power** (power to detect the effect actually "
+        "observed) is a monotonic rescaling of the p-value, not "
+        "independent evidence -- reported because it is commonly "
+        "requested, but should not be over-interpreted on its own. The "
+        "**minimum detectable proportion** (smallest effect this study's "
+        "actual sample size *could* have detected at 80% power) and "
+        "**required discordant pairs** (how many would be needed to "
+        "detect the observed effect at 80% power) are less circular and "
+        "more actionable."
+    )
+    lines.append(
+        "- \"Required discordant pairs\" assumes the *true* effect equals "
+        "the *observed* effect exactly; it is a what-if calculation for "
+        "planning a follow-up study, not a claim about what the true "
+        "effect actually is."
+    )
+    lines.append("")
+    lines.append("## Summary table")
+    lines.append("")
+    lines.append("| A | B | n (discordant) | observed p(favor B) | post-hoc power | min detectable p | required n | additional pairs needed |")
+    lines.append("|---|---|---|---|---|---|---|---|")
+    for r in reports:
+        lines.append(
+            f"| {r['checkpoint_a']} | {r['checkpoint_b']} | {r['n_discordant_pairs']} | "
+            f"{_fmt_opt(r['observed_proportion_favor_b'])} | {_fmt_opt(r['post_hoc_power'])} | "
+            f"{_fmt_opt(r['min_detectable_proportion_favor_b'])} | "
+            f"{_fmt_opt(r['required_discordant_pairs_for_target_power'], 0)} | "
+            f"{_fmt_opt(r['additional_discordant_pairs_needed'], 0)} |"
+        )
+    lines.append("")
+    for r in reports:
+        lines.append(f"## {r['checkpoint_a']} vs {r['checkpoint_b']}")
+        lines.append("")
+        lines.append(f"- Discordant pairs: {r['n_discordant_pairs']}")
+        if r["note"] and r["n_discordant_pairs"] == 0:
+            lines.append(f"- {r['note']}")
+        else:
+            lines.append(f"- Observed proportion favoring B (of discordant pairs): {_fmt_opt(r['observed_proportion_favor_b'])}")
+            lines.append(
+                f"- Post-hoc power to detect this effect at alpha={r['alpha']}: "
+                f"{_fmt_opt(r['post_hoc_power'])}"
+            )
+            lines.append(
+                f"- Minimum detectable proportion at this study's actual n, for "
+                f"{int(r['target_power']*100)}% power: {_fmt_opt(r['min_detectable_proportion_favor_b'])}"
+            )
+            if r["required_discordant_pairs_for_target_power"] is not None:
+                lines.append(
+                    f"- Discordant pairs required for {int(r['target_power']*100)}% power at the "
+                    f"observed effect: {r['required_discordant_pairs_for_target_power']} "
+                    f"({r['additional_discordant_pairs_needed']} more than currently available)"
+                )
+            else:
+                lines.append(f"- Required discordant pairs for {int(r['target_power']*100)}% power: {r['note']}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def write_power_analysis_markdown(reports: Sequence[Mapping[str, Any]], path: Path) -> None:
+    with Path(path).open("w", encoding="utf-8", newline="\n") as f:
+        f.write(render_power_analysis_markdown(reports))

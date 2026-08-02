@@ -23,9 +23,10 @@ from __future__ import annotations
 
 import math
 import random
+import statistics as _stdlib_statistics
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Callable, Sequence
+from typing import Callable, Optional, Sequence
 
 from research_agent_pilots.lggsn_analysis.alignment import AlignedPair
 
@@ -345,3 +346,167 @@ def holm_bonferroni_adjust(p_values: Sequence[float]) -> list[float]:
         running_max = max(running_max, raw_adjusted)
         adjusted[idx] = running_max
     return adjusted
+
+
+# ── Phase 5: exact power analysis for McNemar's test ────────────────────────
+#
+# All power/rejection-region math below treats the n discordant pairs as
+# independent draws -- exactly the same assumption exact_mcnemar itself
+# makes. It does NOT model the query-level clustering that
+# paired_bootstrap_ci_clustered accounts for; if discordant pairs are
+# positively correlated within a query (plausible, given LGGSN's
+# cartesian-product pair construction -- see that function's docstring),
+# true power is likely somewhat lower than what is reported here. This is
+# the power of the test as actually computed, not a claim about the
+# underlying clustered data-generating process.
+
+
+def _log_binomial_pmf(n: int, k: int, p: float) -> float:
+    """log(P(X=k)) for X ~ Binomial(n, p), via math.lgamma -- never forms
+    math.comb(n, k) as an actual (potentially astronomically large)
+    integer, so this stays fast and overflow-free for n up to at least the
+    hundreds of thousands. -inf means probability 0 (e.g. k>0 when p=0)."""
+    if k < 0 or k > n:
+        return float("-inf")
+    if p <= 0.0:
+        return 0.0 if k == 0 else float("-inf")
+    if p >= 1.0:
+        return 0.0 if k == n else float("-inf")
+    log_comb = math.lgamma(n + 1) - math.lgamma(k + 1) - math.lgamma(n - k + 1)
+    return log_comb + k * math.log(p) + (n - k) * math.log(1.0 - p)
+
+
+def mcnemar_exact_rejection_region(n: int, *, alpha: float) -> tuple[int, int]:
+    """The two-sided rejection region for McNemar's test on n discordant
+    pairs at significance level alpha under the null p=0.5: reject H0
+    whenever the observed n01 <= k_lower or n01 >= k_upper. Returns
+    k_lower=-1, k_upper=n+1 (an empty rejection region) if n is too small
+    for any outcome to reach significance at this alpha.
+
+    Uses log-space float arithmetic (math.lgamma), not the exact Fraction
+    arithmetic _exact_mcnemar_p_value uses for the headline reported
+    p-value: that exactness is essential for a result this analysis
+    actually reports as a finding, but is computationally infeasible here
+    (2**n for n in the thousands is a many-thousand-digit integer, making
+    exact rational reduction far too slow) and unnecessary for this
+    module's purpose -- exploratory power/sample-size estimates, not a
+    reported test statistic. Float64 precision (~1e-15) is more than
+    adequate for that. Matches _exact_mcnemar_p_value's boundary decisions
+    to within float precision; see the cross-check test against it."""
+    if n < 0:
+        raise StatisticsError(f"n must be >= 0: {n}")
+    if not (0.0 < alpha < 1.0):
+        raise StatisticsError(f"alpha must be in (0, 1): {alpha}")
+    if n == 0:
+        return (-1, 1)
+
+    cumulative = 0.0
+    k_lower = -1
+    for k in range(0, n // 2 + 1):
+        cumulative += math.exp(_log_binomial_pmf(n, k, 0.5))
+        p_value = min(1.0, 2.0 * cumulative)
+        if p_value < alpha:
+            k_lower = k
+        else:
+            break
+    k_upper = n - k_lower if k_lower >= 0 else n + 1
+    return k_lower, k_upper
+
+
+def mcnemar_power(n: int, true_proportion: float, *, alpha: float) -> float:
+    """Power of McNemar's test on n discordant pairs at significance level
+    alpha, assuming the true probability that a discordant pair favors
+    checkpoint B is `true_proportion` (0.5 = no effect). See
+    mcnemar_exact_rejection_region's docstring for why this uses
+    float/log-space arithmetic rather than exact Fractions."""
+    if n < 0:
+        raise StatisticsError(f"n must be >= 0: {n}")
+    if not (0.0 <= true_proportion <= 1.0):
+        raise StatisticsError(f"true_proportion must be in [0, 1]: {true_proportion}")
+    if not (0.0 < alpha < 1.0):
+        raise StatisticsError(f"alpha must be in (0, 1): {alpha}")
+    if n == 0:
+        return 0.0
+
+    k_lower, k_upper = mcnemar_exact_rejection_region(n, alpha=alpha)
+    if k_lower < 0:
+        return 0.0
+
+    def _pmf(k: int) -> float:
+        return math.exp(_log_binomial_pmf(n, k, true_proportion))
+
+    power = sum(_pmf(k) for k in range(0, k_lower + 1)) + sum(_pmf(k) for k in range(k_upper, n + 1))
+    return min(1.0, power)
+
+
+def mcnemar_minimum_detectable_proportion(
+    n: int, *, alpha: float, target_power: float = 0.8, tolerance: float = 1e-4
+) -> Optional[float]:
+    """Smallest true_proportion > 0.5 at which mcnemar_power(n,
+    true_proportion, alpha=alpha) >= target_power, given the fixed n this
+    analysis actually has -- i.e. how large an effect this study's sample
+    size could actually detect. None if not reachable even at
+    true_proportion=1.0 (n is too small to ever reach target_power)."""
+    if n <= 0:
+        raise StatisticsError(f"n must be > 0: {n}")
+    if not (0.0 < target_power < 1.0):
+        raise StatisticsError(f"target_power must be in (0, 1): {target_power}")
+    if mcnemar_power(n, 1.0, alpha=alpha) < target_power:
+        return None
+    lo, hi = 0.5, 1.0
+    while hi - lo > tolerance:
+        mid = (lo + hi) / 2.0
+        if mcnemar_power(n, mid, alpha=alpha) >= target_power:
+            hi = mid
+        else:
+            lo = mid
+    return round(hi, 4)
+
+
+def _normal_approx_required_n(true_proportion: float, *, alpha: float, target_power: float) -> int:
+    """Closed-form normal-approximation guess for the required n, used
+    ONLY to seed a search bracket for mcnemar_required_n_for_power's exact
+    binary search -- the value that function returns is always verified
+    against the exact binomial power calculation, never this approximation
+    alone. Uses statistics.NormalDist (stdlib) purely for the normal
+    quantile function; no other computation in this module relies on a
+    normal approximation."""
+    z_alpha = _stdlib_statistics.NormalDist().inv_cdf(1.0 - alpha / 2.0)
+    z_power = _stdlib_statistics.NormalDist().inv_cdf(target_power)
+    effect = abs(true_proportion - 0.5)
+    numerator = z_alpha * 0.5 + z_power * math.sqrt(true_proportion * (1.0 - true_proportion))
+    return max(2, math.ceil((numerator / effect) ** 2))
+
+
+def mcnemar_required_n_for_power(
+    true_proportion: float, *, alpha: float, target_power: float = 0.8, n_max: int = 200_000
+) -> Optional[int]:
+    """Smallest n (discordant pair count) at which mcnemar_power(n,
+    true_proportion, alpha=alpha) >= target_power -- i.e. how many
+    discordant pairs would be needed to reliably detect an effect this
+    size. None if true_proportion == 0.5 (no effect -- unreachable at any
+    n) or if the required n exceeds n_max (searched via exact binary
+    search over a bracket seeded by _normal_approx_required_n, so this
+    stays fast even when the answer is in the tens of thousands)."""
+    if not (0.0 <= true_proportion <= 1.0):
+        raise StatisticsError(f"true_proportion must be in [0, 1]: {true_proportion}")
+    if not (0.0 < target_power < 1.0):
+        raise StatisticsError(f"target_power must be in (0, 1): {target_power}")
+    if true_proportion == 0.5:
+        return None
+
+    guess = _normal_approx_required_n(true_proportion, alpha=alpha, target_power=target_power)
+    hi = min(n_max, max(guess * 2, 4))
+    while mcnemar_power(hi, true_proportion, alpha=alpha) < target_power:
+        if hi >= n_max:
+            return None
+        hi = min(n_max, hi * 2)
+
+    lo = 1
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if mcnemar_power(mid, true_proportion, alpha=alpha) >= target_power:
+            hi = mid
+        else:
+            lo = mid + 1
+    return lo
