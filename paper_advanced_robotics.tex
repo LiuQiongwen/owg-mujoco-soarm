@@ -18,6 +18,11 @@
 %%      reproducible phenomenon. Do not write this subsection from the earlier framing. If Sec. 4.2 is
 %%      kept, it should instead report the ~12.5% single-run instability finding itself, which IS real
 %%      and IS worth reporting honestly as a limitation of the evaluation protocol.
+%%      FIXED 2026-08-02: the Abstract still described the cancelled "unresolved counter-example ...
+%%      motivates future work in micro-scale contact sensing" framing after Sec. 4.2 itself had already
+%%      been correctly rewritten around the real ~12.5% single-run-instability finding -- a real,
+%%      internal contradiction between the Abstract and the body. Corrected so the Abstract matches
+%%      Sec. 4.2; do not reintroduce the micro-scale-contact-sensing framing without new evidence.
 %% See tango_robot/piper_robosuite/README.md's CR-CFM entries for the full, dated history this paper
 %% is drawn from -- read the LATEST entries first, since at least one earlier finding in that file was
 %% itself later corrected (exactly the discipline this paper's own Sec. 4 should demonstrate).
@@ -49,10 +54,13 @@ rejected over-regularization hypothesis, receding-horizon control instability, a
 conditioning gap, and a second training-distribution gap in sub-segment coverage -- we raise success
 rate from 0\% to a held-out-validated 50\%. This remains below our own existing interpolation-based
 baseline (75\%), and we report that honestly rather than obscure it. We isolate the primary remaining
-bottleneck to approach-angle data sparsity in the training distribution, and document a specific,
-unresolved counter-example (two near-identical approach configurations with opposite outcomes) that
-rules out a purely angle-deterministic explanation and motivates future work in micro-scale contact
-sensing.
+bottleneck to approach-angle data sparsity in the training distribution -- necessary but not
+sufficient to explain failure on its own, since a nontrivial fraction of failures still occur inside
+the dense arc. Diagnosing this further, we find that $\sim$12.5\% of single-run trial classifications
+disagree across otherwise-identical repeats: a genuine evaluation-protocol reliability limit for this
+class of system, not an artifact of any one trial, which we report as a methodological finding in its
+own right and which motivates repeat-based, majority-vote evaluation as standard practice rather than
+trusting any single run.
 \end{abstract}
 
 \begin{keywords}

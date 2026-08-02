@@ -474,9 +474,10 @@ plainly, at every step, what the evidence does and does not support.
   independently re-verified from raw `scenes.jsonl`, this draft was not (yet).
 - Do not add real-hardware numbers to Section 5 or the Abstract until Section 7 actually produces
   them — this is the exact discipline this paper's own Section 4 is about.
-- Venue/template: decided 2026-08-02 — reuse this project's `interact`-class LaTeX infrastructure
-  (as `paper_tro.tex`/`paper_advanced_robotics.tex` already do) rather than RA-L's `paper_final.tex`
-  template, targeting a workshop or a modest-tier evaluation-rigor-focused venue rather than
+- Venue/template: decided 2026-08-02 — reuse this project's IEEEtran-based LaTeX infrastructure (as
+  `paper_tro.tex`/`paper_final.tex` already do — corrected 2026-08-02: `interact` is
+  `paper_advanced_robotics.tex`'s class, not theirs) rather than RA-L's exact `paper_final.tex`
+  content, targeting a workshop or a modest-tier evaluation-rigor-focused venue rather than
   T-RO/RA-L tier (per the standalone-vs-merged analysis this decision followed from). No hard page
   limit assumed for the first LaTeX pass; trim Section 2/4/6 to fit once an actual venue and its
   page limit are chosen.
