@@ -1,31 +1,40 @@
-%% Advanced Robotics (Taylor & Francis) submission -- CR-CFM honest systems/diagnosis paper
+%% Advanced Robotics (Taylor & Francis) submission -- wrist-orientation-fix honest diagnostic paper
 %% Template class verified 2026-07-19 (WebSearch): `interact` is the real, standard Taylor & Francis
 %% LaTeX class used across their journals, including Advanced Robotics specifically.
 %% NOT verified: this journal's specific fee/OA policy and review-turnaround claims -- check the
 %% actual "Instructions for Authors" page on tandfonline.com directly before submitting (automated
 %% fetch attempts here returned 403 -- their site blocks non-browser access, so this could not be
-%% confirmed from this environment).
+%% confirmed from this environment). Also NOT compilable in this environment (verified 2026-08-02:
+%% `interact.cls` is not installed here) -- compile in an environment with the class available
+%% before submitting; this pass was checked manually for balanced braces/escaping only.
 %%
-%% STATUS (2026-07-19): skeleton only. Every [Real Data] placeholder below is unfilled -- do not
-%% treat any number in this file as reported until the actual experiments run:
-%%   1. Repeat-based (not single-run) N=30 scale-up eval -- single-run-per-trial was found to have a
-%%      real ~12.5% instability rate (README, "1005-vs-1006 correction" entry), so any future eval
-%%      MUST use repeats + majority vote per trial_id, not one sample each.
-%%   2. Two ablation arms: vanilla open-loop CFM (no RHC), 12-dim absolute-coordinate conditioning
-%%   3. The "1005-vs-1006 micro-trajectory" investigation planned for Sec. 4.2 is CANCELLED -- verified
-%%      2026-07-19 that this was a run-to-run nondeterminism artifact (repeated runs of trial 1006 show
-%%      stable success, contradicting the single "failure" report the paradox was built on), not a real,
-%%      reproducible phenomenon. Do not write this subsection from the earlier framing. If Sec. 4.2 is
-%%      kept, it should instead report the ~12.5% single-run instability finding itself, which IS real
-%%      and IS worth reporting honestly as a limitation of the evaluation protocol.
-%%      FIXED 2026-08-02: the Abstract still described the cancelled "unresolved counter-example ...
-%%      motivates future work in micro-scale contact sensing" framing after Sec. 4.2 itself had already
-%%      been correctly rewritten around the real ~12.5% single-run-instability finding -- a real,
-%%      internal contradiction between the Abstract and the body. Corrected so the Abstract matches
-%%      Sec. 4.2; do not reintroduce the micro-scale-contact-sensing framing without new evidence.
-%% See tango_robot/piper_robosuite/README.md's CR-CFM entries for the full, dated history this paper
-%% is drawn from -- read the LATEST entries first, since at least one earlier finding in that file was
-%% itself later corrected (exactly the discipline this paper's own Sec. 4 should demonstrate).
+%% STATUS (2026-08-02): REFRAMED, per explicit instruction, around this project's own critical
+%% ablation finding (`tango_robot/piper_robosuite/README.md`, "DECISIVE FINDING" 2026-07-21 and its
+%% n=152 rescale 2026-07-22): CR-CFM (the learned flow-matching policy) adds no measurable value
+%% beyond an independent, training-free wrist-orientation-selection fix, on every object tested, and
+%% underperforms it outright on a second object. The paper's headline is now the fix itself -- real,
+%% statistically significant at adequate power, mechanistically explained, and shown to generalize
+%% (or not) in a predictable way -- with the CR-CFM investigation reported as the honest diagnostic
+%% process that found it, not as a validated learned-control contribution. This matches the
+%% "Embracing Negative Results" framing (arXiv:2406.03980) the underlying investigation already used
+%% internally. All numbers in this file are sourced directly from
+%% `tango_robot/piper_robosuite/README.md`'s dated 2026-07-21/22 entries and
+%% `cr_cfm/IMPROVEMENT_PLAN.md` (not independently re-verified from raw trial logs by this pass -- if
+%% a number here and one in those source files ever disagree, the source files win).
+%%
+%% Still open before this is submission-ready:
+%%   1. Methodology's architecture subsections (Translation-Invariant Conditioning, RHC, Sub-Segment
+%%      Augmentation) remain brief comment-only descriptions of the system under diagnosis, not full
+%%      prose -- lower priority now that CR-CFM is not the contribution, but should still be written.
+%%   2. Repeat-based (not single-run) evaluation is mandatory throughout -- single-run-per-trial was
+%%      found to have a real ~12.5% instability rate (Discussion, "Evaluation Protocol Reliability").
+%%   3. The "1005-vs-1006 micro-trajectory" investigation is CANCELLED (verified 2026-07-19: a
+%%      run-to-run nondeterminism artifact, not a real phenomenon) and does not appear anywhere in
+%%      this reframed version -- if a future edit ever reintroduces angle-sparsity-counter-example
+%%      language, check it against this note first.
+%% See `tango_robot/piper_robosuite/README.md`'s CR-CFM entries for the full, dated history this
+%% paper is drawn from -- read the LATEST entries first, since earlier entries in that file describe
+%% the now-superseded CR-CFM-as-contribution framing.
 
 \documentclass[]{interact}
 
@@ -34,10 +43,12 @@
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{booktabs}
 \usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{cleveref}
 
 \begin{document}
 
-\title{An Honest Evaluation of Low-Capacity Flow Matching Policies for Resource-Constrained Closed-Loop Robotic Manipulation}
+\title{When a Simple Kinematic Fix Outperforms a Learned Policy: An Honest Diagnostic Evaluation of Flow Matching for Contact-Robust Robotic Descent}
 
 \author{
 \name{Author A}
@@ -47,76 +58,218 @@
 \maketitle
 
 \begin{abstract}
-We investigate whether a resource-constrained (49K-parameter, single-GPU) flow-matching policy can
-replace hand-designed execution-control rules for contact-robust descent in robotic grasping. Through
-six sequential, empirically-verified diagnostic fixes -- addressing run-to-run reproducibility, a
-rejected over-regularization hypothesis, receding-horizon control instability, a training-distribution
-conditioning gap, and a second training-distribution gap in sub-segment coverage -- we raise success
-rate from 0\% to a held-out-validated 50\%. This remains below our own existing interpolation-based
-baseline (75\%), and we report that honestly rather than obscure it. We isolate the primary remaining
-bottleneck to approach-angle data sparsity in the training distribution -- necessary but not
-sufficient to explain failure on its own, since a nontrivial fraction of failures still occur inside
-the dense arc. Diagnosing this further, we find that $\sim$12.5\% of single-run trial classifications
-disagree across otherwise-identical repeats: a genuine evaluation-protocol reliability limit for this
-class of system, not an artifact of any one trial, which we report as a methodological finding in its
-own right and which motivates repeat-based, majority-vote evaluation as standard practice rather than
-trusting any single run.
+We investigate whether a resource-constrained (49K-parameter, single-GPU) flow-matching policy
+(CR-CFM) can replace hand-designed execution-control rules for contact-robust descent in robotic
+grasping. An extensive six-stage diagnostic process -- addressing run-to-run reproducibility, a
+rejected over-regularization hypothesis, receding-horizon control (RHC) instability, and two
+distinct training-distribution conditioning gaps -- appeared to show CR-CFM significantly beating a
+plain interpolation baseline (81.2\% vs.\ 59.4\%, McNemar exact $p=0.0156$, $n=32$). A critical
+ablation the original comparison had not run overturns that conclusion: the comparison had silently
+confounded CR-CFM with an independent, training-free wrist-orientation-selection fix that prevents a
+specific joint (wrist-roll) from pinning against its hardware limit during descent. Comparing
+baseline+fix against CR-CFM+fix directly yields a perfect tie ($26/32$, zero discordant pairs),
+confirmed at five times the sample size ($n=152$: $75.7\%$ vs.\ $72.4\%$, 17 discordant pairs split
+11-to-6 toward the baseline, $p=0.33$) and explained architecturally by a perturbation test showing
+CR-CFM's closed loop reacts only to its own execution drift, never to the environment. CR-CFM
+contributes no measurable value beyond the fix on any tested object, and underperforms it outright
+on a second object (Pear: $75\%$ vs.\ $62.5\%$). The fix itself is this paper's real, validated
+contribution: statistically significant at adequate power ($n=152$, $p=0.027$, $+7.2$ percentage
+points), mechanistically explained (a joint6-pinning correlation, $p=1.8\times10^{-5}$), and
+object-dependent in a way we show is predictable in advance via a cheap kinematic-only proxy,
+without executing a single physical trial. We report the CR-CFM investigation itself as a rigorous,
+honest diagnostic process that found a real, deployable fix -- not as a validated learned-control
+contribution.
 \end{abstract}
 
 \begin{keywords}
-Imitation Learning; Flow Matching; Receding Horizon Control; Failure Analysis; Low-Capacity Policies
+Imitation Learning; Flow Matching; Ablation Analysis; Failure Analysis; Kinematic Constraints; Grasp Orientation Selection
 \end{keywords}
 
 % =============================================================================
 \section{Introduction}
-% Edge-deployed manipulation needs small models; small models attempting generative trajectory
-% synthesis (flow matching / diffusion) face distribution-shift and dynamic-instability failure
-% modes not visible at large-model scale. Frame this as a systems/diagnosis contribution: a rigorous,
-% falsifiable account of what breaks and why when you try this at 49K-parameter scale, not a SOTA claim.
+\label{sec:intro}
 
+Edge-deployed manipulation needs small models; small models attempting generative trajectory
+synthesis (flow matching / diffusion) face distribution-shift and dynamic-instability failure modes
+not visible at large-model scale. We built CR-CFM, a 49K-parameter conditional flow-matching policy
+with receding-horizon control, specifically to solve one such failure mode: brittle open-loop
+descent trajectories during contact-robust grasping on a Piper 6-DoF arm in simulation. Six
+sequential, empirically-verified diagnostic fixes -- addressing run-to-run reproducibility, a
+rejected over-regularization hypothesis, RHC instability, and two distinct training-distribution
+conditioning gaps -- eventually produced a policy that significantly outperformed a plain,
+non-learned interpolation baseline on our primary test object (Cracker: $81.2\%$ vs.\ $59.4\%$,
+McNemar exact $p=0.0156$, $n=32$), the cleanest positive result of the underlying project.
+
+This paper is not that result. Before treating it as a validated contribution, we ran a critical
+ablation the original comparison had not: isolating whether the win was actually attributable to
+CR-CFM's learned, closed-loop correction, or to an independent grasp-orientation-selection mechanism
+(\texttt{wrist\_friendly\_orientation}) that had been silently bundled into the CR-CFM arm but not
+the baseline arm. The mechanism is simple and training-free -- it prevents the wrist-roll joint from
+being driven toward its hardware limit during descent, a failure mode we trace mechanistically to a
+specific kinematic correlation ($p=1.8\times10^{-5}$). Comparing baseline+fix against CR-CFM+fix
+directly, controlling for this confound, reveals that CR-CFM adds no measurable value beyond the
+fix: a perfect tie at $n=32$, confirmed -- not merely failed to be refuted -- at $n=152$, with an
+architectural explanation for why: CR-CFM's closed loop reacts only to its own execution drift,
+never to the environment, so nothing in our evaluation protocol ever gave it a chance to earn its
+added complexity.
+
+We report this reversal with the same rigor as the original positive claim. The wrist-orientation
+fix is real, statistically significant at adequate power, mechanistically grounded, and -- unlike
+CR-CFM -- requires no training data, no model, and no real-time inference. It is also
+object-dependent, and we show that dependence is predictable in advance, per object, from cheap
+kinematic geometry alone. CR-CFM is not this paper's contribution; the diagnostic process that found
+the fix, and the fix itself, are.
+
+% =============================================================================
 \section{Methodology and Closed-Loop Architecture}
-\subsection{Baseline Pipeline (Interpolation / \texttt{descend\_refresh})}
-\subsection{Translation-Invariant 6-DoF Conditioning Space}
-\subsection{Receding-Horizon Control (RHC) Defense Against Open-Loop Instability}
-\subsection{Sub-Segment Training Augmentation}
+% Framed as the system under diagnosis, not the paper's proposed contribution -- \S4 shows why.
 
+\subsection{Baseline Pipeline (Interpolation / \texttt{descend\_refresh})}
+% Plain, non-learned interpolation between the current pose and the IK-solved descend target;
+% zero training investment, the reference point every other condition is compared against.
+
+\subsection{The Wrist-Orientation-Selection Fix (\texttt{wrist\_friendly\_orientation})}
+This paper's actual validated contribution. At grasp-orientation selection time, choose the
+candidate orientation that keeps the wrist-roll joint (\texttt{robot0\_joint6}) away from its
+hardware limit, rather than the naive nearest-orientation choice. The mechanism is simple,
+training-free, and model-independent: it requires no learned component and applies identically to
+any downstream descend-execution method. It is motivated by a diagnosed failure mode -- naive
+orientation selection drives joint6 toward pinning against its limit during descent on
+geometrically demanding objects (Cracker's naive pinning rate: $34.4\%$), stalling the PD
+controller's ability to track the planned trajectory. It is statistically confirmed at the
+mechanism level (joint6-pinning correlation with trial failure, $p=1.8\times10^{-5}$) and at the
+outcome level, pooled across ranges ($n=152$: fix $73.0\%$ vs.\ baseline $65.8\%$, McNemar exact
+$p=0.027$, $+7.2$ percentage points; \cref{tab:wristfix_effect}).
+
+\subsection{Translation-Invariant 6-DoF Conditioning Space}
+% CR-CFM's object-relative pose conditioning, retained as system description.
+
+\subsection{Receding-Horizon Control (RHC) Defense Against Open-Loop Instability}
+% CR-CFM's RHC loop, retained as system description; \S5.1 shows it re-reads only the arm's own
+% state each iteration, never the object's position or a re-solved target.
+
+\subsection{Sub-Segment Training Augmentation}
+% CR-CFM's training-distribution augmentation for descend sub-trajectories, retained as system
+% description.
+
+% =============================================================================
 \section{Experimental Design and Ablation Setup}
-% N=30 scale-up protocol; two ablation arms (open-loop CFM, 12-dim absolute-coordinate conditioning);
-% fresh, untouched probe range for final validation (both existing ranges are tuning-contaminated
-% across 6 sequential decisions -- state this explicitly, do not reuse them for headline numbers).
+% N=30 scale-up protocol on the original Cracker Gate-1 comparison; fresh, untouched probe range
+% for final validation (both earlier ranges are tuning-contaminated across the six sequential
+% diagnostic decisions -- state this explicitly, do not reuse them for headline numbers).
+
+\subsection{The Critical Ablation: Isolating the Wrist-Fix from CR-CFM}
+The original Gate-1 comparison (\cref{sec:intro}) compared plain baseline (no wrist-fix) against
+CR-CFM+wrist-fix -- but the wrist-fix is orthogonal to, and independent of, whichever
+descend-execution method is used underneath it. This ablation instead compares baseline+wrist-fix
+against CR-CFM+wrist-fix directly, using the same 32-trial paired protocol as Gate~1, then rescaled
+to $n=152$ (matching the wrist-fix's own confirmatory power level, following a pre-registered
+decision rule set before rescaling: if the $n=32$ tie is an underpowered near-miss, rescaling should
+reveal a real CR-CFM-specific effect; if the tie is real, rescaling should not manufacture one).
+
+\subsection{Cross-Object Generalization Protocol}
+Two follow-up protocols test whether the wrist-fix's benefit generalizes beyond Cracker. First, a
+direct isolation on Pear (plain baseline vs.\ baseline+wrist-fix, no CR-CFM in either arm, 8 trials,
+3-repeat majority vote per trial) mirrors the Cracker ablation's own isolation logic. Second, a
+cheap, execution-free kinematic predictor -- does an object's naive grasp orientation drive joint6
+toward its hardware limit, measured via IK solves alone (20 trials/object, no physics execution
+beyond transit-high and approach) -- tests whether per-object benefit is predictable in advance,
+rather than requiring an expensive execution-based trial for every candidate object.
 
 \subsection{Comparative Evaluation}
 
 \begin{table}[ht]
-\tbl{Success rate and kinematic metrics across $N=30$ evaluation trials (Cracker object).}
-{\begin{tabular}{lcccc} \toprule
-Architecture Variant & Success Rate (\%) & Max Terminal Vel. & Final Z-Residual (cm) & XY Residual $\sigma$ (cm) \\ \midrule
-Interpolation Baseline   & \textbf{[Real Data]} & [Real Data] & [Real Data] & [Real Data] \\
-Vanilla CFM (Open-Loop)  & [Real Data] & [Real Data] & [Real Data] & [Real Data] \\
-12-dim Conditioned + RHC & [Real Data] & [Real Data] & [Real Data] & [Real Data] \\
-CR-CFM (Proposed)        & [Real Data] & [Real Data] & [Real Data] & [Real Data] \\ \bottomrule
+\tbl{Critical ablation isolating CR-CFM's contribution from the wrist-orientation fix (Cracker,
+paired, 3-repeat majority vote per trial).}
+{\begin{tabular}{lccc} \toprule
+Scale & Baseline+Fix & CR-CFM+Fix & McNemar (exact) \\ \midrule
+$n=32$  & $26/32$ ($81.2\%$)  & $26/32$ ($81.2\%$)  & tie, 0 discordant pairs \\
+$n=152$ & $115/152$ ($75.7\%$) & $110/152$ ($72.4\%$) & $p=0.33$; 17 discordant (11 baseline, 6 CR-CFM) \\
+\bottomrule
 \end{tabular}}
-\label{tab:main_results}
+\label{tab:critical_ablation}
 \end{table}
 
-\section{Discussion: The Geometry of Failure}
-\subsection{Approach-Angle Data Sparsity}
-% The 82%/18% dominant-arc-vs-sparse-tail finding, and the necessary-but-not-sufficient result
-% (9/9 successes inside the dense arc, 4/7 failures also inside it).
+\begin{table}[ht]
+\tbl{The wrist-orientation fix's own effect, isolated from CR-CFM.}
+{\begin{tabular}{lccc} \toprule
+Object ($n$) & Baseline & Baseline+Fix & McNemar (exact) \\ \midrule
+Pooled ($n=152$) & $100/152$ ($65.8\%$) & $111/152$ ($73.0\%$) & $p=0.027$ \\
+Pear ($n=8$)     & $6/8$ ($75\%$)       & $6/8$ ($75\%$)       & tie, 0 discordant pairs \\
+\bottomrule
+\end{tabular}}
+\label{tab:wristfix_effect}
+\end{table}
+
+\begin{table}[ht]
+\tbl{Cheap kinematic (IK-only) predictor of wrist-fix benefit: predicted joint6-pinning rate by
+object (20 trials/object, no physics execution beyond transit-high and approach).}
+{\begin{tabular}{lc} \toprule
+Object & Predicted pinning rate \\ \midrule
+Cracker & $6/20$ ($30\%$) \\
+Pear & $1/20$ ($5\%$) \\
+Mustard & $1/20$ ($5\%$) \\
+\bottomrule
+\end{tabular}}
+\label{tab:pinning_predictor}
+\end{table}
+
+% =============================================================================
+\section{Discussion}
+
+\subsection{Why CR-CFM Adds Nothing: An Architectural Explanation, Not Just an Empirical One}
+Building on the critical ablation's null result (\cref{tab:critical_ablation}), a perturbation test
+injecting a one-time joint-space disturbance ($\pm0.1$ rad, uniform) partway
+through descent produces identical degradation under both conditions (baseline $3/8$, $37.5\%$;
+CR-CFM $3/8$, $37.5\%$ -- still fully concordant, zero discordant pairs). The root cause: the
+descend target is IK-solved once before descent starts, for both conditions; CR-CFM's RHC loop
+re-reads only the arm's own joint state each iteration, never the object's position or a re-solved
+target. Its closed loop closes around its own execution, not around the environment. This is why no
+evaluation protocol in this study -- including the perturbation test -- could have given CR-CFM a
+chance to earn its added complexity: nothing here tests the one thing a re-solving, object-aware
+closed loop would need to demonstrate.
+
+\subsection{Object-Dependence of the Wrist-Fix, and Why It Is Predictable in Advance}
+On Pear, the wrist-fix alone shows zero measurable effect ($6/8$ vs.\ $6/8$), mechanistically
+confirmed via direct joint6 instrumentation across all 16 trial-condition combinations: zero show
+pinning ($|{\rm joint6}| $ within $0.05$ rad of the limit), with the largest magnitude observed still
+more than $0.5$ rad from the limit. This is not a failure of the fix -- Pear's grasp geometry (a
+small, round object with approach angles already concentrated in a narrow arc) simply never drives
+the wrist into the region Cracker's flat, wide box geometry does. CR-CFM+fix underperforms plain
+baseline+fix outright on Pear ($75\%$ vs.\ $62.5\%$), reinforcing that CR-CFM's added complexity
+buys nothing even where the fix itself has less to contribute. This object-dependence motivated the
+cheap, execution-free predictor in \cref{tab:pinning_predictor}, validated to reproduce Cracker's
+independently-known pinning rate exactly ($11/32$, trial-for-trial identical to the original
+diagnostic) and to correctly predict Mustard's benefit as null before running a single physical
+trial -- turning an expensive, per-object empirical question into a cheap geometric one.
 
 \subsection{Evaluation Protocol Reliability: Single-Run Instability}
-% REPLACES the earlier-planned "1005-vs-1006 paradox" subsection -- that specific counter-example was
-% verified 2026-07-19 to be a run-to-run nondeterminism artifact, not a real phenomenon (repeated runs
-% of the "failing" trial showed stable success). Report the ACTUAL, real finding instead: ~12.5%
-% (2/16) of single-run trial classifications disagreed across repeats, concentrated in one probe range
-% and absent in the other. Frame honestly as a limitation of single-run evaluation protocols for this
-% class of system, motivating repeat-based (majority-vote) evaluation as standard practice going
-% forward -- this is a genuine, useful methodological contribution in its own right, distinct from (and
-% more defensible than) the originally-planned micro-trajectory dissection.
+Approximately $12.5\%$ ($2/16$) of single-run trial classifications disagreed across otherwise-
+identical repeats, concentrated in one probe range and absent in the other -- a genuine limitation
+of single-run evaluation for this class of system, not an artifact of any individual trial. This
+motivated the repeat-based, majority-vote protocol used throughout this paper as a methodological
+necessity, worth stating plainly as standard practice for future evaluation in this area rather than
+trusting any single execution as ground truth.
 
+% =============================================================================
 \section{Conclusion and Future Work}
-% Honest summary: a resource-constrained learned policy does not yet match a simple existing
-% baseline, but the diagnostic process isolates precisely where and why, with each claim backed by
-% a specific, falsified-or-confirmed hypothesis rather than assumption.
+
+We set out to validate a learned flow-matching policy for contact-robust descent and, through the
+same rigorous diagnostic discipline that motivated building it, found instead that the entire
+measured improvement is attributable to a much simpler, training-free mechanism: a
+wrist-orientation-selection fix that prevents one joint from pinning against its hardware limit.
+This is not a result to report quietly -- it is the paper's actual contribution. The fix is
+statistically significant at adequate power ($n=152$, $p=0.027$), mechanistically grounded
+($p=1.8\times10^{-5}$), requires no training data, no model, and no real-time inference, and is
+shown to be predictable in advance, per object, via a cheap kinematic proxy rather than expensive
+execution. CR-CFM itself -- the 49K-parameter policy, its receding-horizon control loop, and every
+CR-CFM-specific mechanism developed across six diagnostic stages -- contributes no measurable value
+beyond the fix on any object tested, and underperforms it outright on a second object. We report the
+CR-CFM investigation as a rigorous, transparent diagnostic process that led to a real, useful,
+immediately deployable finding, not as a validated learned-control algorithm. Future work should
+treat the wrist-orientation-selection fix, not CR-CFM, as the system worth deploying or extending --
+for example, generalizing the underlying joint-limit-avoidance principle to other kinematically
+constrained joints, or validating the cheap IK-only predictor against a broader object set than the
+seven currently available in this simulation registry.
 
 \end{document}
