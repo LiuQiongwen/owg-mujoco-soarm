@@ -149,6 +149,14 @@ criterion we apply here by construction: its discriminator's inference-time inpu
 point-cloud encoding and candidate pose only, with execution-derived signal confined to training
 labels. As in this project's companion T-RO work, we treat GraspGen as a confirmed-compliant
 reference case, not a counterexample — external validation of the criterion, not prior art for it.
+Pairwise ranking for grasp selection itself is not new — a 2018-filed patent [Toris, Elliott, and
+Kent, US10899011B2, Fetch Robotics] trains a binary classifier on pairwise comparisons derived from
+human-provided grasp preferences, using hand-designed heuristic features. The distinction from our
+approach is the supervision source and the criterion, not the pairwise mechanism itself: our
+pairwise signal is derived from physical execution outcomes within a scene, not human preference
+judgments, and every input feature is checked against the PRE_EXECUTION-admissibility criterion
+before training — a formal, checkable distinction absent from this and the other prior systems
+surveyed here.
 
 **Evaluation-protocol failures in offline policy/critic assessment.** Data leakage and unfair
 offline comparison are recognized general risks in sequential-decision-making evaluation.
@@ -227,7 +235,12 @@ Section 3.2), not the criterion itself.
   signal* for the critic, not the post-hoc explanation or formal potential-outcomes sense of
   "counterfactual" common in the 2025-2026 causal-ML and explainability literature — the pairwise
   comparison never requires estimating an outcome under an unobserved intervention, only comparing
-  two candidates both already scored against the same, already-observed scene.)
+  two candidates both already scored against the same, already-observed scene. A third, distinct
+  usage appears in concurrent work on policy robustness [arXiv:2607.27261], where "counterfactual"
+  means holding an expert's action fixed while perturbing visual nuisance factors — closer to
+  robustness auditing than to our within-scene candidate comparison. We flag all three usages here
+  because the term is not converging on one meaning across this literature, and a reader coming
+  from any one of them should not assume this paper means the same thing.)
 - Training/validation split: scene-grouped (never split a scene's candidates across train/val),
   stratified per object, reproducible per seed.
 

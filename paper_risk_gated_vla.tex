@@ -192,7 +192,16 @@ inputs are a point-cloud encoding and candidate pose only, with
 execution-derived signal confined to training labels. As in this project's
 companion T-RO work, we treat GraspGen as a confirmed-compliant reference
 case, not a counterexample -- external validation of the criterion, not
-prior art for it.
+prior art for it. Pairwise ranking for grasp selection itself is not new --
+a 2018-filed patent \cite{toris2021pairwisegrasp} trains a binary classifier
+on pairwise comparisons derived from human-provided grasp preferences,
+using hand-designed heuristic features. The distinction from our approach
+is the supervision source and the criterion, not the pairwise mechanism
+itself: our pairwise signal is derived from physical execution outcomes
+within a scene, not human preference judgments, and every input feature is
+checked against the PRE\_EXECUTION-admissibility criterion before training
+-- a formal, checkable distinction absent from this and the other prior
+systems surveyed here.
 
 \textbf{Evaluation-protocol failures in offline policy/critic assessment.}
 Data leakage and unfair offline comparison are recognized general risks in
@@ -300,7 +309,14 @@ the critic, not the post-hoc explanation or formal potential-outcomes sense
 of ``counterfactual'' common in the 2025--2026 causal-ML and
 explainability literature -- the pairwise comparison never requires
 estimating an outcome under an unobserved intervention, only comparing two
-candidates both already scored against the same, already-observed scene.
+candidates both already scored against the same, already-observed scene. A
+third, distinct usage appears in concurrent work on policy robustness
+\cite{cfnbc2607}, where ``counterfactual'' means holding an expert's action
+fixed while perturbing visual nuisance factors -- closer to robustness
+auditing than to our within-scene candidate comparison. We flag all three
+usages here because the term is not converging on one meaning across this
+literature, and a reader coming from any one of them should not assume
+this paper means the same thing.
 The training/validation split is scene-grouped (never splitting a scene's
 candidates across train/val), stratified per object, and reproducible per
 seed.
@@ -720,6 +736,18 @@ J.~A.~Gaus, J.~P.~F.~Charaja, and D.~Haeufle,
 ``Confidence-Gated Robot Autonomy: When Does Uncertainty Actually
   Help?,''
 \emph{ICRA 2026 Workshop, arXiv:2605.18045}, 2026.
+
+\bibitem{toris2021pairwisegrasp}
+R.~Toris, S.~Elliott, and D.~Kent,
+``Method and System for Selecting a Preferred Robotic Grasp of an
+  Object-of-Interest Using Pairwise Ranking,''
+U.S. Patent 10\,899\,011 B2, Fetch Robotics, Inc., filed 2018, issued 2021.
+
+\bibitem{cfnbc2607}
+G.~D'urso, K.~Roy, N.~Lawrance, and B.~Tidd,
+``It's Not Just More Demos: Counterfactual Action Sensitivity Coverage
+  for Data-Efficient Robust Robot Imitation,''
+\emph{arXiv:2607.27261}, 2026.
 
 \end{thebibliography}
 
