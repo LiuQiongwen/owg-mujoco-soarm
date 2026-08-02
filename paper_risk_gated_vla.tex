@@ -5,6 +5,32 @@
 %% Required packages (all in standard TeX Live):
 %%   IEEEtran, graphicx, booktabs, amsmath, amssymb,
 %%   microtype, hyperref, cleveref, xcolor, multirow, array
+%%
+%% TARGET VENUE (decided 2026-08-02): Robotica (Cambridge University Press), non-open-access
+%% (subscription) route -- chosen over IEEE T-RO/Advanced Robotics (already assigned to this
+%% project's other two papers) and over stretch-tier options (RAS, Autonomous Robots, IEEE T-ASE,
+%% IJRR) as the most realistic fit for this paper's actual weight (one real, twice-replicated
+%% positive result + substantial honest negative/incomplete results). Confirmed SCIE-indexed,
+%% confirmed hybrid with a no-cost subscription (non-OA) publishing option.
+%% Per Robotica's own author instructions (cambridge.org/core/journals/robotica/information/
+%% author-instructions/preparing-your-materials, checked 2026-08-02):
+%%   - Abstract must be <=250 words, single paragraph -- trimmed to fit (245 words as of this pass).
+%%   - Citation style: numbered, square brackets, consecutive -- already matches IEEEtran's default,
+%%     no change needed.
+%%   - Required declarations added below the Conclusion: Author Contributions, Financial Support,
+%%     Competing Interests, Data Availability Statement -- currently PLACEHOLDER TEXT, must be
+%%     filled in with real answers before submission.
+%%   - LaTeX class: Robotica requires `ROB-NEW.cls` for the final typeset version, but their own
+%%     instructions state the LaTeX source is NOT required for initial submission -- only a PDF is,
+%%     generated from any reasonable format. The class file is requested only upon provisional
+%%     acceptance. This file therefore stays on IEEEtran for now; do NOT attempt to reformat into
+%%     ROB-NEW.cls before acceptance, and do not assume this PDF fails to meet initial-submission
+%%     requirements just because it isn't in the journal's final class.
+%%   - No explicit overall manuscript length/page limit was found in Robotica's public author
+%%     instructions as of this check (two independent fetches of their author-instructions pages
+%%     came back without one) -- this pass did not cut body content for a page target that may not
+%%     exist; re-verify this directly with Robotica (or in the full PDF guide referenced from their
+%%     site) before assuming no limit applies.
 
 \documentclass[journal]{IEEEtran}
 
@@ -59,38 +85,27 @@ A learned critic that reranks grasp candidates before execution is only as
 good as the causal validity of its training labels and the fairness of the
 evaluation that measures it. We show both can silently break, and how to
 catch it. A pre-execution grasp critic trained on simulated MuJoCo outcomes
-initially appeared to improve top-1 grasp success by $+15.6$ percentage
-points over a geometric heuristic baseline -- a result that collapsed under
-scrutiny: the evaluation harness encoded the compared method into its random
-seed, so ``geometry'' and ``world-model'' trials never shared a candidate
-pool or scene, and the underlying success label counted mere post-close
-gripper contact as success regardless of whether the object was ever
-lifted. We formalize a causal-validity audit for this class of pipeline,
-rebuild the evaluation as a shared-candidate-pool paired design with a
-production, bilaterally-gated physics grasp primitive, and find the
-original critic's success probability carries no real signal at all
-(AUROC$=0.4996$ against 1,500 real per-candidate outcomes -- chance level).
-We then train an \textbf{object-relative counterfactual critic} -- pose
-features expressed relative to the target object, plus point-cloud
-statistics and object identity, trained with a within-scene
-Bradley--Terry-style pairwise loss on causally-admissible features only --
-and evaluate it on two disjoint, held-out scene batches never touched by
-training or model selection. The corrected critic significantly outperforms
-the geometric baseline on both: $+15.6$pp (McNemar exact $p{=}0.00258$,
-$n{=}90$) on an independent development-test batch, and $+14.0$pp (27
-paired wins vs.\ 6 losses, exact McNemar $p{=}3.24\text{e-}4$, $n{=}150$) on
-a frozen confirmatory batch never inspected before the gate was evaluated.
-A complementary offline multi-head decomposition explains \emph{where} and
-\emph{why} the critic works. We report negative and incomplete results with
-the same rigor: an ensemble-uncertainty risk gate calibrated on held-out
-data adds no measurable benefit over the ungated critic; whether a pairwise
-loss term is independently responsible for the gain (versus object-relative
-features alone) is not established, and is quantifiably not resolvable by
-modest additional data collection; and a small-data (15-demonstration)
-imitation policy pilot integrates end-to-end but fails its first
-closed-loop rollout. We release a causal-validity audit tool, the
-paired-evaluation harness, and a real-hardware validation protocol as a
-basis for future work.
+initially appeared to beat a geometric heuristic baseline by $+15.6$
+percentage points -- a result that collapsed under scrutiny: the evaluation
+harness encoded the compared method into its random seed, so paired trials
+never shared a scene, and the success label counted mere gripper contact
+regardless of whether the object was lifted. Under a rebuilt,
+shared-candidate-pool paired evaluation, the original critic's success
+probability carries no real signal (AUROC$=0.4996$ -- chance level). We
+then train an \textbf{object-relative counterfactual critic} -- pose
+relative to the target object, point-cloud statistics, and object identity,
+trained with a within-scene Bradley--Terry-style pairwise loss on
+causally-admissible features only -- and evaluate it on two disjoint,
+held-out scene batches. It significantly outperforms the geometric
+baseline on both: $+15.6$pp ($p{=}0.00258$, $n{=}90$) on an independent
+development-test batch, and $+14.0$pp ($p{=}3.24\text{e-}4$, $n{=}150$) on
+a frozen confirmatory batch never inspected before evaluation. A
+complementary offline decomposition explains where and why the critic
+works. We report negative results with equal rigor: an uncertainty-based
+risk gate adds no measurable benefit, and the pairwise loss term's
+independent contribution is quantifiably unresolvable at the current data
+scale. We release a causal-validity audit tool, a paired-evaluation
+harness, and a real-hardware validation protocol for future work.
 \end{abstract}
 
 % =============================================================================
@@ -623,6 +638,28 @@ the critic architecture or the loss function -- it is the practice of
 auditing an evaluation's construction before trusting its output, reporting
 a negative gate result with the same rigor as a positive one, and stating
 plainly, at every step, what the evidence does and does not support.
+
+% =============================================================================
+% Robotica (Cambridge University Press) requires these declarations at
+% submission -- see https://www.cambridge.org/core/journals/robotica/information/author-instructions/preparing-your-materials.
+% PLACEHOLDER TEXT: fill in with real answers before submission; do not
+% submit with placeholder content still in place.
+
+\section*{Author Contributions}
+[FILL IN: conception, methodology, software, analysis, writing -- per
+author, per CRediT taxonomy or equivalent.]
+
+\section*{Financial Support}
+[FILL IN: funding source(s), or "This research received no specific grant
+from any funding agency, commercial, or not-for-profit sectors," if true.]
+
+\section*{Competing Interests}
+[FILL IN: "The authors declare none," if true.]
+
+\section*{Data Availability Statement}
+[FILL IN: state whether/where \texttt{pair\_results.jsonl}, the trained
+critic checkpoints, and the evaluation harness will be made available, and
+under what conditions.]
 
 % =============================================================================
 \begin{thebibliography}{10}
