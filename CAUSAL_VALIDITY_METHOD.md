@@ -3,8 +3,11 @@
 ## The gap this fills
 
 Data leakage from features that are only knowable after the fact is a well-known general ML
-problem, and offline-RL has recent work on label leakage in policy evaluation
-(e.g. arXiv:2605.11479). But no prior work formalizes this specifically for **learned
+problem, and offline policy evaluation has adjacent recent work on other sources of evaluation
+bias — e.g. arXiv:2605.11479 (Wang, Bowden, Crosby, and Bansal), which addresses *truncation
+bias* from a discounted-liveness formulation, not feature leakage; it is evaluation-bias-adjacent
+but not a leakage paper, and should not be cited as one. But no prior work formalizes this
+specifically for **learned
 grasp-candidate scorers/rerankers** as an explicit, automatically-checkable criterion. The
 correct practice already exists as an *implicit* norm in careful published work — confirmed
 here against GraspGen (arXiv:2507.13097): its discriminator's inference-time inputs are point

@@ -57,37 +57,31 @@ with a Case Study in Cross-Embodiment Grasping}
 % =============================================================================
 \begin{abstract}
 A learned scorer that reranks grasp candidates before execution is valid
-only if every input feature is computable \emph{before} the chosen
-candidate is executed -- a constraint we call causal validity. It is easy
-to violate silently, because an offline accuracy evaluation looks identical
-whether a feature is causally valid or not: historical logs already
-contain the outcome of every candidate they describe. We formalize a
-pre-execution admissibility criterion, build a reference audit tool, and
-show its practical necessity on our own cross-embodiment grasp-reranking
-pipeline (a 5-DoF SO-ARM101 arm to a 6-DoF Piper arm, in simulation): a
-pooling effect that replicated five times at $p{<}0.0001$ collapses to an
-exact null ($p{=}1.0000$) once causally invalid features are removed. We
-then automate the audit with a static dataflow analyzer that infers
-feature provenance from source code rather than manual registration, and
-show it independently catches a contamination bug our own hand-built audit
-had missed and had already reported as clean -- with a measurable
-downstream consequence on a previously reported result. Another,
-independently discovered infrastructure bug (an unseeded placement
-sampler, invalidating an implicit pairing assumption) let us re-verify our
-core finding under corrected data and stress-test a newly available
-admissible feature that appeared, in a naive pooled analysis, to be the
-strongest predictor in the entire investigation ($r{=}-0.55$) -- only for
-a within/between-scene decomposition to reveal zero real selection-relevant
-signal, a sharper demonstration of this paper's thesis than the finding it
-was built to test. We validate the criterion externally against two recent
-published systems, report a further, independently discovered bug (a
-silent unit-scaling error in a widely used composite robot controller) as
-a case study in the same discipline, and report eleven independently
-tested and ruled-out
-mechanisms for a still-open execution-time reliability problem, each
-evaluated with a paired statistical test. We close with a hardware
-deployment architecture and safety checklist, explicitly scoped as not yet
-physically validated.
+only if every input feature is computable \emph{before} the candidate
+is executed -- a constraint we call causal validity, easy to violate
+silently since an offline accuracy evaluation looks identical whether a
+feature is valid or not. We formalize a pre-execution admissibility
+criterion and build a manual audit tool plus an automated static
+dataflow analyzer that infers feature provenance directly from source
+code. Applied to our own cross-embodiment grasp-reranking pipeline (a
+5-DoF SO-ARM101 arm to a 6-DoF Piper arm, in simulation), the criterion
+shows its practical necessity: a pooling effect that replicated five
+times at $p{<}0.0001$ collapses to an exact null ($p{=}1.0000$) once
+causally invalid features are removed, and the automated analyzer
+independently catches a contamination bug the manual audit had already
+reported as clean, with a measurable effect on a previously published
+result. We validate the criterion externally against two recent
+published systems, and report a second, independent case study in the
+same discipline: a silent unit-scaling bug in a widely used composite
+robot controller, whose fix is validated with real, measured gains
+($0\%\rightarrow45$--$65\%$ success on two previously near-zero object
+categories). For completeness rather than selective reporting, we also
+include a statistically tested ledger of eleven ruled-out mechanisms for
+a separate, still-open execution-reliability problem, and a
+hardware-deployment architecture with a pre-validation safety checklist.
+Together, these results argue that causal-validity auditing is not a
+theoretical nicety: even a team actively looking for this failure mode
+still misses real instances of it until the check is made mechanical.
 \end{abstract}
 
 % =============================================================================
@@ -211,11 +205,15 @@ we use as a boundary case our criterion correctly does not flag
 (\cref{sec:external}).
 
 \textbf{Data leakage and offline evaluation.} Look-ahead and label
-leakage are recognized general problems in machine learning and have been
-studied recently in offline reinforcement-learning policy evaluation
-\cite{offlinerl_leakage2026}, where an oracle policy may exploit
-information unavailable to the deployed agent. Closest to our formal
-criterion is concurrent work by Roth \cite{rothgrammar2026}, a grammar of
+leakage are recognized general problems in machine learning. Concurrent
+work on offline policy evaluation for manipulation
+\cite{offlinerl_leakage2026} studies a related but distinct integrity
+problem --- truncation bias from finite-horizon episodes under classical
+TD/Monte Carlo evaluation, addressed via a discounted-liveness Bellman
+operator --- rather than feature-level leakage; we cite it as adjacent
+evidence that offline manipulation-policy evaluation is an actively
+scrutinized area, not as prior art on our specific criterion. Closest to
+our formal criterion is concurrent work by Roth \cite{rothgrammar2026}, a grammar of
 eight typed primitives with a call-time-enforced admissibility gate that
 makes train/test leakage structurally unrepresentable in standard tabular
 and time-series ML pipelines. Two differences are worth stating plainly.
@@ -255,6 +253,7 @@ failure mode.
 
 % =============================================================================
 \section{System}
+\label{sec:system}
 
 Our platform is a 6-DoF AgileX Piper arm simulated in MuJoCo via
 RoboSuite, a second, independently implemented embodiment alongside this
@@ -524,6 +523,70 @@ the strongest predictor found in this entire investigation carries zero
 real selection-relevant signal once correctly decomposed -- a sharper
 demonstration of this paper's thesis than the original finding it was
 built to test.
+
+\subsection{A complementary question: causal validity vs.\ accuracy relevance}
+\label{sec:lggsnablation}
+
+\Cref{sec:selfcorrections} validated \texttt{dist\_to\_centroid} and
+\texttt{z\_rel} as \textsc{pre\_execution}-admissible; both ship in
+\texttt{full\_v2}, LGGSN's live SO-ARM101 checkpoint (14-dim: the 12
+fields of \cref{sec:system}'s baseline plus these two). Admissibility
+answers whether a feature is \emph{safe} to use, not whether using it
+\emph{helps} -- a question we tested directly, holding admissibility
+fixed, using the same paired statistical methodology as
+\cref{sec:negative}: four checkpoints trained identically except for
+this feature pair (\texttt{base}: neither; \texttt{nodist}:
+\texttt{z\_rel} only, despite the name; \texttt{nozrel}:
+\texttt{dist\_to\_centroid} only; \texttt{full\_v2}: both), evaluated
+pairwise on 582 real, provenance-pinned, identity-aligned validation
+pairs -- exact two-sided McNemar's test on discordant pairs,
+Holm--Bonferroni-corrected jointly across all five comparisons,
+cluster-bootstrapped $95\%$ CIs resampled by query since pairs sharing a
+query are not independent draws (\texttt{research\_agent\_pilots/}\allowbreak\texttt{lggsn\_analysis/}).
+
+\texttt{z\_rel} alone significantly \emph{hurt} ranking accuracy
+relative to neither feature (\texttt{base} $65.5\%$ vs.\ \texttt{nodist}
+$52.6\%$, $-12.9$pp, $p{<}0.0001$ raw and Holm-adjusted).
+\texttt{dist\_to\_centroid} alone showed no significant effect
+(\texttt{base} $65.5\%$ vs.\ \texttt{nozrel} $68.7\%$, $+3.3$pp,
+$p{=}0.099$ raw / $p{=}0.296$ Holm) -- but a follow-up power analysis,
+computed from the same discordant-pair counts with no new data, found
+this comparison had only $39\%$ post-hoc power at $\alpha{=}0.05$ and
+would need roughly $2.6\times$ more discordant pairs to resolve at
+$80\%$ power; we report it as inconclusive, not as evidence of no
+effect. Restoring \texttt{dist\_to\_centroid} alongside \texttt{z\_rel}
+(\texttt{full\_v2} vs.\ \texttt{nodist}) recovered the loss with a
+significant positive effect ($+13.2$pp, $p{<}0.0001$ raw and Holm) --
+nearly canceling \texttt{z\_rel}'s isolated harm -- while both features
+together against neither (\texttt{base} vs.\ \texttt{full\_v2}) is a
+genuine near-null ($+0.3$pp): power analysis puts the discordant pairs
+required to resolve it at $80\%$ power above $38{,}000$, well beyond a
+realistic follow-up, which is itself a more informative reading than
+``underpowered.'' The fifth comparison, isolating \texttt{z\_rel}'s
+marginal effect in the presence of \texttt{dist\_to\_centroid}
+(\texttt{full\_v2} vs.\ \texttt{nozrel}), was also inconclusive
+($-2.9$pp, $p{=}0.221$ raw / $p{=}0.442$ Holm, $25\%$ post-hoc power).
+
+We do not read this as evidence of a genuine feature interaction --
+each configuration is one trained checkpoint, not a replicated
+ablation, so we cannot separate a real interaction effect from ordinary
+training-run variance. What the data do support, without that further
+claim: (1) \texttt{z\_rel} measured in isolation is not
+accuracy-neutral, and shipping it without \texttt{dist\_to\_centroid}
+would have been the worse configuration of the four tested; (2) the
+currently deployed configuration (\texttt{full\_v2}, both features) is
+statistically indistinguishable from the simplest one (\texttt{base},
+neither) on this validation split, and -- unlike the other two null
+comparisons here -- this is not merely an underpowered study: the
+effect size itself is too small for any realistic amount of additional
+paired data to resolve. This complements, rather than substitutes for,
+\cref{sec:selfcorrections}'s admissibility finding: both features are
+safe to use; whether either is worth the added model complexity is a
+separate, now directly measured question, and, for the specific pair
+tested together, the answer on this split is ``not detectably.''
+Pairwise ranking accuracy on a fixed validation split is not a grasp
+success rate, and this ablation does not license a claim about physical
+grasp performance.
 
 % =============================================================================
 \section{Case Study: A Silent Gripper-Controller Scaling Bug}

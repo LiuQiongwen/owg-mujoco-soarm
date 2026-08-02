@@ -35,26 +35,24 @@ given the arm isn't connected).
      independently tested mechanisms across candidate generation, candidate selection,
      execution-control, active human-in-the-loop calibration, and world-model sim-to-real
      transfer, each ruled out with a paired-trial significance test. See `RULED_OUT_METHODS.md`.
-  6. **A third, prospective application of the causal-validity criterion** (§4.5, added
-     2026-07-30, merged in from the standalone `paper_risk_gated_vla_draft.md` line rather than
-     submitted separately — see that file's header note): an object-relative counterfactual
-     grasp-candidate critic, built causally-admissible from the start rather than audited after
-     the fact, that significantly outperforms a geometric baseline on two disjoint, fully
-     held-out MuJoCo test batches (dev-test +15.6pp, McNemar p=0.00258, n=90; frozen confirmatory
-     +14.0pp, p=3.24e-4, n=150) — while a chance-level stale checkpoint (AUROC=0.4996) evaluated
-     under the SAME corrected harness demonstrates why the discipline matters even when nothing
-     about the *criterion* itself is violated (that checkpoint's failure traces to two separate,
-     non-causal-validity bugs: a seed-coupling defect that broke the paired evaluation design, and
-     a success criterion that counted transient contact as success). Complements §4.2-4.3's
-     retrospective mistake-catching with a case where applying the discipline prospectively
-     produces a working, validated result, not just a caught mistake. Full negative/incomplete
-     results (uncertainty risk gate: no benefit; small-data ACT pilot: fails online) reported
-     alongside it, not omitted. See `results/risk_gated_vla/final_report.md` and `audit.md`.
-     A complementary, explicitly offline mechanistic analysis (§4.6, added 2026-07-30) decomposes
-     the same critic into contact/lift/success/failure-type heads to explain *where* it works
-     (drill is measurably harder than cracker/mustard) and *why* (a specific, actionable
-     success/no_contact confusion pattern) — kept clearly separate from the live-executed primary
-     result, not merged with it.
+  6. ~~A third, prospective application of the causal-validity criterion (§4.5/§4.6)~~ —
+     **reversed 2026-08-02.** The 2026-07-30 merge-into-T-RO decision is superseded:
+     `paper_risk_gated_vla_draft.md` is back to being drafted as its own standalone paper (title:
+     *Object-Centric Counterfactual Critics for Robust Grasp Candidate Selection*), not folded in
+     here. Rationale: (a) this T-RO paper is already at the 8-page free limit after the LGGSN
+     ablation subsection (§IV-G) was added — no room left to do the risk-gated-VLA material
+     justice without gutting it back to a stub; (b) that material's own narrative (a critic
+     initially looked chance-level under audit, AUROC=0.4996, then was rebuilt and validated with
+     a real, twice-replicated effect on disjoint held-out batches) is a complete, self-contained
+     empirical arc that reads as filler when compressed into one subsection among several; (c) two
+     freshly-verified 2026 papers (arXiv:2606.04233, arXiv:2605.18045) put this exact
+     evaluation-rigor narrative inside a live, currently-active discussion — worth aiming a
+     dedicated submission at rather than losing inside a T-RO subsection. The
+     PRE_EXECUTION-admissibility criterion itself stays T-RO's own contribution (§4.2-4.3); the
+     standalone paper cites T-RO's criterion as prior in-project work and contributes a second,
+     deeper case study plus a new critic architecture on top of it — see that draft's own Related
+     Work section for how the two are positioned to avoid overlap. `results/risk_gated_vla/`
+     source data is unaffected; nothing about the underlying numbers changed, only the target venue.
 
 ## 2. Related Work
 - Composite/hybrid grasp controllers; robosuite/MuJoCo-based manipulation benchmarks.
@@ -104,8 +102,14 @@ given the arm isn't connected).
 - **4.4 — Automated tagging** (`AUTO_TAGGER_ALGORITHM.md`): the algorithm itself, its validation
   against real code, and the re-verified empirical result after removing `grasp_yaw`
   (§4.3-corrected: accuracy 0.8236 → 0.1327, qualitative null finding unchanged).
-- **4.5 — Prospective application: an object-relative counterfactual grasp critic** (merged
-  2026-07-30 from the standalone `paper_risk_gated_vla_draft.md` draft — see that file's header
+- ~~**4.5/4.6**~~ **— redirected to the standalone paper, 2026-08-02 (see the note under
+  Contributions item 6 above). Kept below only as source material for that draft** — most of
+  4.5 is already ported into `paper_risk_gated_vla_draft.md`; 4.6's mechanistic-analysis content
+  (multi-head decomposition) is NOT yet ported there and still needs to be before the standalone
+  draft is considered complete.
+- **4.5 (historical, not part of this T-RO paper) — Prospective application: an object-relative
+  counterfactual grasp critic** (merged 2026-07-30 from the standalone
+  `paper_risk_gated_vla_draft.md` draft — see that file's header
   note; source data/results in `results/risk_gated_vla/`, not re-derived here). Where §4.2-4.3
   show the criterion catching mistakes *after* they were made, this subsection shows applying it
   *from the start*:
