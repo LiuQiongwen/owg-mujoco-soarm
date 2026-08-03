@@ -23,9 +23,13 @@
 %% a number here and one in those source files ever disagree, the source files win).
 %%
 %% Still open before this is submission-ready:
-%%   1. Methodology's architecture subsections (Translation-Invariant Conditioning, RHC, Sub-Segment
-%%      Augmentation) remain brief comment-only descriptions of the system under diagnosis, not full
-%%      prose -- lower priority now that CR-CFM is not the contribution, but should still be written.
+%%   1. DONE 2026-08-03: Methodology's four architecture subsections (Baseline Pipeline,
+%%      Translation-Invariant Conditioning, RHC, Sub-Segment Augmentation) written as full prose,
+%%      sourced directly from cr_cfm/model.py, cr_cfm/inference.py, cr_cfm/data.py, and
+%%      piper_pick_and_place.py's move_to_cr_cfm_descend() docstring -- not paraphrased from memory.
+%%      Added \label{sec:architectural} to the matching Discussion subsection so the RHC subsection's
+%%      forward \cref resolves. Manually re-verified: brace balance, no bare unescaped %, every \cref
+%%      target has a matching \label -- still not run through an actual `interact` compile (see above).
 %%   2. Repeat-based (not single-run) evaluation is mandatory throughout -- single-run-per-trial was
 %%      found to have a real ~12.5% instability rate (Discussion, "Evaluation Protocol Reliability").
 %%   3. The "1005-vs-1006 micro-trajectory" investigation is CANCELLED (verified 2026-07-19: a
@@ -125,8 +129,12 @@ the fix, and the fix itself, are.
 % Framed as the system under diagnosis, not the paper's proposed contribution -- \S4 shows why.
 
 \subsection{Baseline Pipeline (Interpolation / \texttt{descend\_refresh})}
-% Plain, non-learned interpolation between the current pose and the IK-solved descend target;
-% zero training investment, the reference point every other condition is compared against.
+The reference condition every other condition in this study is compared against: a plain,
+non-learned linear interpolation in joint space from the arm's current pose to the IK-solved
+descend target (\texttt{move\_to\_interpolated}), executed open-loop with zero training
+investment and no learned component. This is the pipeline the wrist-orientation-selection fix
+itself is layered onto in \cref{tab:critical_ablation}'s baseline+fix condition -- the fix applies
+identically here as to any downstream descend-execution method, CR-CFM included.
 
 \subsection{The Wrist-Orientation-Selection Fix (\texttt{wrist\_friendly\_orientation})}
 This paper's actual validated contribution. At grasp-orientation selection time, choose the
@@ -142,15 +150,44 @@ outcome level, pooled across ranges ($n=152$: fix $73.0\%$ vs.\ baseline $65.8\%
 $p=0.027$, $+7.2$ percentage points; \cref{tab:wristfix_effect}).
 
 \subsection{Translation-Invariant 6-DoF Conditioning Space}
-% CR-CFM's object-relative pose conditioning, retained as system description.
+CR-CFM's velocity field is conditioned on a 6-dimensional relative displacement, not an absolute
+pose: at training time, $x_0^{\text{start}} - x_1^{\text{start}}$ -- the perturbed start's offset
+from the clean target trajectory's own start, in joint-space radians. At inference, the true
+target is exactly what is being generated and so is unavailable as a conditioning input; a proxy
+is substituted instead, $x_0^{\text{start}}$ minus the training set's mean clean-start position --
+``how disturbed does this start look relative to a typical clean descend.'' Conditioning on a
+displacement rather than an absolute position makes the representation translation-invariant by
+construction: the same relative offset conditions the model identically regardless of where in
+the workspace it occurs. The train/inference substitution is a deliberate, disclosed distribution
+mismatch, not an oversight -- the standard way conditional generative models handle a condition
+that would otherwise require the very label being generated.
 
 \subsection{Receding-Horizon Control (RHC) Defense Against Open-Loop Instability}
-% CR-CFM's RHC loop, retained as system description; \S5.1 shows it re-reads only the arm's own
-% state each iteration, never the object's position or a re-solved target.
+CR-CFM generates a full 16-waypoint action chunk via Euler integration of the trained velocity
+field, but under receding-horizon control (RHC) only executes the first several waypoints before
+re-reading the arm's actual joint position and re-generating a fresh chunk against the same fixed
+target -- standard MPC-style RHC, not the open-loop full-chunk execution kept as an internal
+ablation baseline. RHC was found necessary because open-loop execution commits to the full
+generated motion before observing any real contact dynamics and is structurally incapable of
+reactive deceleration regardless of how the training loss is weighted (confirmed directly: zeroing
+the temporal-consistency regularizer's penalty in the final $30\%$ of the horizon did not reduce
+terminal velocity, ruling out loss-weighting as the mechanism). Under RHC, as the current-to-target
+displacement shrinks near contact, each freshly generated chunk represents proportionally smaller
+motion automatically, producing deceleration without any explicit contact sensing -- though
+\cref{sec:architectural} shows this closed loop still only ever re-reads the arm's own state, never
+the object's position or a re-solved target.
 
 \subsection{Sub-Segment Training Augmentation}
-% CR-CFM's training-distribution augmentation for descend sub-trajectories, retained as system
-% description.
+A training-distribution gap found by direct audit, not assumed: every original training example
+had $x_0$ built from a full trajectory's own perturbed start, so the conditioning signal
+(remaining distance to target) was always large (joint-space L2 norm $0.277$--$1.29$ across all
+155 real training examples, never smaller) -- but RHC's later iterations present the model with
+small-remaining-distance inputs as the arm approaches the target, values never seen in training.
+The fix resamples additional sub-segments starting at several intermediate points along each raw
+trajectory (always still ending at that trajectory's own true final waypoint), teaching the model
+what small-remaining-distance conditioning should produce rather than forcing it to extrapolate.
+This required no new data collection -- it purely resamples the same $n{=}155$ recordings
+differently.
 
 % =============================================================================
 \section{Experimental Design and Ablation Setup}
@@ -218,6 +255,7 @@ Mustard & $1/20$ ($5\%$) \\
 \section{Discussion}
 
 \subsection{Why CR-CFM Adds Nothing: An Architectural Explanation, Not Just an Empirical One}
+\label{sec:architectural}
 Building on the critical ablation's null result (\cref{tab:critical_ablation}), a perturbation test
 injecting a one-time joint-space disturbance ($\pm0.1$ rad, uniform) partway
 through descent produces identical degradation under both conditions (baseline $3/8$, $37.5\%$;
