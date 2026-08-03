@@ -267,6 +267,18 @@ evaluation protocol in this study -- including the perturbation test -- could ha
 chance to earn its added complexity: nothing here tests the one thing a re-solving, object-aware
 closed loop would need to demonstrate.
 
+This is not a hypothetical fix. Concurrent work on reactive flow-matching control [Park and
+Tulsiani, ``$\pi\mathbf{R}^2$: Reactive Real-time Flow Policies,'' arXiv:2607.26055, 2026]
+diagnoses the same class of gap independently -- open-loop action-chunk execution in flow-matching
+policies cannot react to fresh sensory input arriving mid-execution -- and demonstrates that
+re-incorporating it (an asynchronous fast-proprioceptive/slow-vision-language conditioning split,
+rather than solving the target once and never revisiting it) yields real, measured gains ($4\times$
+faster closed-loop replanning, $30\%$ higher real-world success on contact-rich tasks). We do not
+implement this or an equivalent object-aware re-solving mechanism for CR-CFM here -- doing so would
+be a genuine architecture change, not a parameter tweak, and is out of scope for this paper's
+diagnostic aims -- but its existence confirms the gap we identify is a real, fixable one, not an
+artifact of how we happened to build CR-CFM specifically.
+
 \subsection{Object-Dependence of the Wrist-Fix, and Why It Is Predictable in Advance}
 On Pear, the wrist-fix alone shows zero measurable effect ($6/8$ vs.\ $6/8$), mechanistically
 confirmed via direct joint6 instrumentation across all 16 trial-condition combinations: zero show
