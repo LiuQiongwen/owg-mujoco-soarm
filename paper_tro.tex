@@ -57,33 +57,32 @@ with a Case Study in Cross-Embodiment Grasping}
 % =============================================================================
 \begin{abstract}
 A learned scorer that reranks grasp candidates before execution is valid
-only if every input feature is computable \emph{before} the candidate
-is executed -- a constraint we call causal validity, easy to violate
-silently since an offline accuracy evaluation looks identical whether a
-feature is valid or not. We formalize a pre-execution admissibility
-criterion and build a manual audit tool plus an automated static
-dataflow analyzer that infers feature provenance directly from source
-code. Applied to our own cross-embodiment grasp-reranking pipeline (a
-5-DoF SO-ARM101 arm to a 6-DoF Piper arm, in simulation), the criterion
-shows its practical necessity: a pooling effect that replicated five
-times at $p{<}0.0001$ collapses to an exact null ($p{=}1.0000$) once
-causally invalid features are removed, and the automated analyzer
-independently catches a contamination bug the manual audit had already
-reported as clean, with a measurable effect on a previously published
-result. We validate the criterion externally against two recent
-published systems, and report a second, independent case study in the
-same discipline: a silent unit-scaling bug in a widely used composite
-robot controller, whose fix is validated with real, measured gains
-($0\%\rightarrow45$--$65\%$ success on two previously near-zero object
-categories). For completeness rather than selective reporting, we also
-include a statistically tested ledger of twelve ruled-out mechanisms
-spanning candidate generation and a separate, still-open
-execution-reliability problem, and a hardware-deployment architecture
-with a pre-validation safety checklist.
-Together, these results argue that causal-validity auditing is not a
-theoretical nicety: even a team actively looking for this failure mode
-still misses real instances of it until the check is made mechanical.
+only if every input feature is computable \emph{before} the candidate is
+executed -- a constraint we call causal validity, easy to violate
+silently since an offline evaluation looks identical whether a feature is
+valid or not. We formalize a pre-execution admissibility criterion and
+build a manual audit tool plus an automated static dataflow analyzer that
+infers feature provenance from source code. Applied to our
+cross-embodiment grasp-reranking pipeline (SO-ARM101 to Piper, in
+simulation), the criterion shows its necessity: a pooling effect
+replicated five times at $p{<}0.0001$ collapses to an exact null
+($p{=}1.0000$) once invalid features are removed, and the automated
+analyzer catches a contamination bug the manual audit missed. We
+validate the criterion against two published systems, and report a
+second case study: a silent unit-scaling bug in a robot controller,
+fixed with measured gains ($0\%\rightarrow45$--$65\%$ on two near-zero
+object categories). We also report a tested ledger of twelve ruled-out
+mechanisms spanning candidate generation and execution reliability, and
+a hardware-deployment architecture with a safety checklist.
+Causal-validity auditing is not a theoretical nicety: a team looking for
+this failure mode still misses it until the check is made mechanical.
 \end{abstract}
+
+\begin{IEEEkeywords}
+Causal validity, grasp candidate scoring, evaluation methodology,
+cross-embodiment transfer, static program analysis, robot grasping,
+learned reranking, negative results
+\end{IEEEkeywords}
 
 % =============================================================================
 \section{Introduction}
