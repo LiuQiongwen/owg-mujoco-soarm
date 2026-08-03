@@ -531,3 +531,261 @@ justify building it before running that specific, still-cheap test if the direct
 
 **Files (confirmatory)**: `scratchpad/stage0_augment_confirm.py`, `scratchpad/stage0_confirm_3100.log`,
 `scratchpad/stage0_confirm_3200.log`.
+
+---
+
+# Direction 5: Embodied AI / VLA reprise, "robot + large/multimodal model" framing (2026-08-02) — CLOSED before any pilot, saturated on arrival
+
+**Prompted by**: after separately assessing the Piper wrist-fix project's novelty as LOW-MEDIUM (a geometric
+orientation-selection heuristic, not a standalone algorithmic contribution — see
+`paper_piper_wristfix_draft.md`'s Drafting notes), user asked to abandon that topic and pivot to "大模型或者
+多模态" (large models / multimodal). Clarified via AskUserQuestion that this meant a robot+LLM intersection
+reusing existing infra (`tango/policy.py`'s GPT-based VLM object-grounding pipeline, LGGSN, Piper+camera
+infra), not a clean-slate non-robotics pivot. Ran `/idea-discovery-robot` for this framing.
+
+## Why this is a reprise, not a fresh direction
+
+Every plausible angle at this project's own robot+LLM/VLA intersection was already attempted and closed in
+Directions 1-4 above: generative candidate models (#1 predecessor/OT-CFM), autonomous real-time world-model
+correction (#1 predecessor/MPC), training-free candidate consensus across embodiments (#... /ensemble), AR +
+human-judgment calibration loops (Direction 1), cross-embodiment LGGSN reranking (Direction 2, closed as a
+data-leakage artifact after 3 rounds of correction), and world-model-as-data-amplifier sim-to-real transfer
+(Directions 3-4, closed on resource grounds and then on a reversed n=8→n=24 result). The only genuinely
+unexplored corner *within this project's own history* was the language-**grounding** step itself (is the
+GPT object-identification step correct/well-calibrated), as opposed to everything above which targeted
+candidate **scoring** downstream of grounding.
+
+## Literature check on the one unexplored corner (grounding-correctness/verification)
+
+- **VLA/language-grounded failure detection is itself a crowded, active 2025-2026 niche**: I-FailSense
+  (arXiv:2509.16072, VLM-based semantic-misalignment detection, zero-shot cross-environment transfer),
+  RoboFailRing (retrieval-augmented + language-grounding failure detection), SAFE (arXiv:2506.09937,
+  multitask VLA failure detection), FAIL-Detect (arXiv:2503.08558, conformal-prediction runtime failure
+  detection).
+- **Language-guided grasp-pose synthesis is also crowded** (2023-2025): HiFi-CS, VL-Grasp, OGRG
+  (attribute-based grounding + spatial reasoning for duplicate-object disambiguation), CLIP-based referring
+  grasp synthesis in clutter.
+- **Closest single adjacent paper**: "A Physical Agentic Loop for Language-Guided Grasping with
+  Execution-State Monitoring" (arXiv:2604.07395, April 2026) — wraps a grasp primitive with contact-
+  telemetry execution-state monitoring (a "Watchdog": empty/slip/stall/timeout classification) + bounded
+  retry/escalate policy; mentions "post-grasp semantic verification" only as an undetailed optional
+  component. Monitors *execution* outcomes, not pre-commitment grounding correctness — a real gap remains
+  narrowly, but this paper (and the failure-detection cluster above) confirms the general "monitoring/
+  verification loop around language-guided grasping" space is being actively worked by well-resourced teams
+  right now, not empty.
+
+## External verdict (Codex/GPT-5.4, xhigh, same thread as the Piper wrist-fix novelty check)
+
+Given all 7 prior closed directions plus this literature check, verdict: **no defensible new angle** — every
+natural use of the team's existing assets (grounding, candidate ranking, runtime failure detection,
+correction, calibration, transfer, augmentation) falls into an already-failed-in-this-project or
+already-crowded-externally category. A narrow idea (e.g. intervention-based fault localization separating
+grounding/pose-estimation/planning/execution failure stages) could probably be constructed, but would need a
+new benchmark and extensive real-world validation — "effectively a new project, not an economical reuse of
+existing infrastructure."
+
+**Explicit redirect**: the team already has a real, unfinished, statistically-significant result —
+the object-relative counterfactual grasp critic (SO-ARM101, [[project_risk_gated_vla_status]] /
+`results/risk_gated_vla/`, +15.6pp dev McNemar p=0.00258 / +14.0pp frozen-confirmatory p=3.24e-4, two
+disjoint held-out batches, causally-audited features, already drafted into `TRO_PAPER_OUTLINE.md` §4.5).
+Per the external reviewer: finishing/strengthening this (resolve the pairwise-loss-vs-features-alone
+ablation at adequate power — not another `n=8`-scale exploratory read, given this project's own repeated
+history of small-n signals reversing at scale — then pursue real-hardware validation on a fixed go/no-go
+deadline, or submit sim-only with honest limitations if hardware stays blocked) is a better use of a solo
+PhD student's remaining time than continued novelty-hunting in an already-saturated VLA/embodied-AI space.
+
+## Verdict: CLOSED before pilot. Do not re-open "robot + large model" idea generation without genuinely new assets (e.g., real Piper hardware data, or a specific narrow benchmark gap not covered above) — re-running this same search will very likely reproduce this same saturated result.
+
+## Recommendation
+
+1. Do not pursue a new VLA/embodied-AI direction now.
+2. Make the counterfactual-critic paper (`TRO_PAPER_OUTLINE.md` §4.5, [[project_risk_gated_vla_status]]) the
+   primary graduation-paper target.
+3. Resolve its one open ablation (pairwise loss vs. object-relative features alone) at adequate statistical
+   power before treating it as settled either way.
+4. Pursue real-hardware validation (SO-ARM101, blocked on Stage 0 camera repositioning) on a fixed deadline;
+   if it stays blocked, submit sim-only with the limitation stated honestly rather than delaying indefinitely.
+5. The Piper wrist-fix work (`paper_piper_wristfix_draft.md`) remains a viable secondary/parallel paper —
+   its own novelty check (LOW-MEDIUM as a standalone algorithm, MEDIUM as a diagnostic study) and this
+   direction's closure are independent findings and do not conflict.
+
+## Direction 5 addendum (2026-08-02): relaxed-constraint re-check — public-benchmark VLA (LIBERO/CALVIN/
+SimplerEnv/ManiSkill, standard open checkpoints, cloud A100/H100 rental available) is ALSO saturated
+
+After Direction 5 closed (above), user relaxed the constraint that any new direction had to reuse this
+project's own TANGO codebase — asked whether public-benchmark VLA research, now with cloud GPU rental
+confirmed available (small-scale LoRA fine-tuning in scope, not just prompting), opens real new territory.
+Fresh literature search: **no, this space is equally saturated**, specifically in the two ways a solo
+moderate-compute student could realistically attack it:
+
+- **VLA robustness/diagnostic benchmarking** (the natural fit for this project's own diagnostic-paper house
+  style): LIBERO-Plus (CVPR 2026, arXiv:2510.13626 — 10 SOTA VLAs, success collapses 95%→<30% under modest
+  perturbation), LIBERO-Para (arXiv:2603.28301 — paraphrase-robustness, 22-52pp degradation), LIBERO-PRO
+  (arXiv:2510.03827 — >90% LIBERO success is largely memorization, near-collapse under position
+  perturbation), LIBERO-Safety (arXiv:2606.23686), VLA-Risk (296 scenarios/3784 episodes), and — notably —
+  "Benchmarking VLA Models on SO-101: Failure and Recovery Analysis" (arXiv:2606.08881, real hardware, this
+  project's OWN embodiment, already done by someone else).
+- **Efficient/cheap VLA fine-tuning** (the natural fit for "solo student, occasional GPU rental" resources):
+  SmolVLA (arXiv:2506.01844, already THE standard cheap-VLA reference), multiple 2026 LoRA-efficiency papers
+  (arXiv:2607.10172, arXiv:2606.20246 "Finetuning VLA Models Requires Fewer Layers Than You Think",
+  VLA-GSE), token-pruning/caching efficiency papers (VLA-Cache, ActionFlow, Lite VLA).
+
+**External verdict (Codex/GPT-5.4 xhigh, same review thread)**: confirmed saturated, bluntly — "a solo paper
+adding another perturbation taxonomy, LoRA configuration, layer-freezing schedule, or token-pruning rule
+will likely be viewed as incremental." A narrower wedge (take ONE already-published documented weakness,
+e.g. LIBERO-Para's paraphrase-robustness collapse, and build the cheapest plausible FIX rather than another
+diagnosis — e.g. jointly enforcing paraphrase invariance AND referent sensitivity so the model can't cheat
+robustness by ignoring language) is "technically open, but highly competitive... a race, not an uncontested
+niche," and the obvious fixes (paraphrase augmentation, position augmentation) are likely already being
+tried by the same groups that published the diagnostics.
+
+**Final decisive verdict, unchanged from Direction 5's original close**: finish the counterfactual-critic/
+audit paper ([[project_risk_gated_vla_status]]). It already has replicated, pre-registered, statistically
+significant live-execution evidence; a public-benchmark VLA method paper would restart at hypothesis
+generation in an extremely fast-moving field. "Under graduation pressure, abandoning validated work for a
+speculative LoRA wedge is poor research portfolio management." If VLA/public-benchmark work is pursued at
+all, treat it as post-submission/parallel work, not the primary thesis bet.
+
+**How to apply**: if this topic comes up again, do not re-run literature search from scratch — cite this
+addendum. The conclusion holds across BOTH the TANGO-constrained framing and the relaxed public-benchmark
+framing; relaxing the constraint did not find new territory, it confirmed the saturation is field-wide in
+2026, not an artifact of this project's specific codebase.
+
+---
+
+# Direction 6: Broad 一区/Q1-tier idea search (papers + GitHub), 2026-08-02 — one genuinely promising
+candidate found, but it's a strengthening of the existing audit paper, not a new standalone one
+
+**Prompted by**: student asked for a broad literature+GitHub survey for other 一区 (CAS Q1: T-RO/Science
+Robotics/IJRR-tier, not just RA-L-tier) ideas, explicitly excluding everything already assessed (Directions
+1-5, Piper wrist-fix, the counterfactual critic, LGGSN).
+
+## What was searched
+
+GitHub trending/topics for robotics manipulation repos with known-limitations/reproducibility issues;
+general robot-manipulation-benchmark critique literature; tactile/contact-aware execution-precision
+literature (a candidate area this project has NOT touched, flagged in `TRO_PAPER_OUTLINE.md`'s own
+Limitations as the diagnosed-but-unsolved cause of Cracker's residual gap — noted here but not pursued
+further this round, no strong lead found); general ML data-leakage/audit-tooling literature.
+
+## The one promising lead: generalizing the causal-validity audit tool to public benchmark codebases
+
+**Found**: "What Are We Actually Benchmarking in Robot Manipulation?" (arXiv:2606.04233) audits LIBERO,
+CALVIN, SimplerEnv, RoboCasa, RoboTwin 2.0 for four failure modes (shortcut solvability, low statistical
+power, creeping overfitting, data-source dependence) — releases 4 diagnostics with reference code.
+**Confirmed via direct fetch: its methodology is entirely EMPIRICAL** (train weak probe models, perturbation
+testing, statistical-power computation), NOT static code-path/feature-provenance analysis — it does not
+check whether individual training/eval FEATURES are computable before an action vs. derived from execution
+telemetry (this project's own specific notion of PRE_EXECUTION admissibility). General ML leakage-detection
+tools checked too (LeakageDetector arXiv:2503.14723, static notebook-leakage detection arXiv:2209.03345) —
+both generic train/test-split leakage checkers, not robotics-specific, not about the *temporal*
+admissibility notion (a feature can pass a normal train/test leakage check while still being illegitimately
+execution-derived in the control/robotics sense — a different, more specific violation).
+
+**Idea**: run the team's own causal-validity audit tool (provenance registry + automated static-analysis
+tagger) against PUBLIC, widely-used robot-manipulation training/eval codebases (e.g. LIBERO's, CALVIN's, or
+a reference ACT/OpenVLA implementation's actual code) to look for the same class of bug the team already
+found and fixed in their own pipeline.
+
+## External verdict (Codex/GPT-5.4 xhigh, same review thread as every other assessment today)
+
+1. **The distinction from arXiv:2606.04233 and generic leakage tools is real but narrow** — must be
+   formalized as an explicit information-time boundary with provenance semantics, not just "causal
+   validity" relabeled. **Important technical caveat raised**: pure static analysis cannot always establish
+   the *actual* runtime path in dynamic Python; a hybrid static + runtime-taint/dataflow trace would be a
+   materially stronger design than static analysis alone (current tool is static-only).
+2. **Finding one bug in one public repo does NOT reach 一区 (T-RO/Science-Robotics/IJRR) on its own** — would
+   need a systematic finding across MULTIPLE independently-developed pipelines, a general tool with
+   *measured* detection/false-positive performance (not just "we ran it once"), and evidence that corrections
+   materially change published conclusions. Absent that, the ceiling is the same RA-L/Advanced-Robotics
+   (二区) tier as the existing counterfactual-critic paper. Science Robotics specifically needs a broader
+   scientific finding or physical-robot consequence, not just a code-audit result.
+3. **Biggest risk is NOT "no bug found" — it's failing to prove the analyzer itself is sound and general.**
+   A null scan proves almost nothing (clean code vs. a detector that missed everything are indistinguishable
+   without a ground-truth check). Needs a labeled test suite: known bugs + realistic SEEDED violations, with
+   measured detection/false-positive rates, before auditing real public code.
+
+## Verdict and recommendation
+
+**Not a new standalone paper. This is the concrete execution plan for the counterfactual-critic paper's own
+already-identified weakness** (validated only on the team's own pipelines — see this thread's earlier
+review). Recommended concrete steps, in order:
+1. Build a small labeled test suite (seed known bug patterns + realistic synthetic violations into toy
+   pipelines) and measure the tagger's detection/false-positive rate against ground truth — this is the
+   missing "is the tool actually sound and general" evidence.
+2. Only then audit 2-3 real public pipelines (candidates: LIBERO, CALVIN, or a reference
+   ACT/OpenVLA/LeRobot training implementation's actual code for feature-provenance violations).
+3. If a real, consequential bug is found: privately disclose to maintainers before publication (standard
+   practice, also the ethically correct move); if a fix meaningfully changes reported numbers, that is a
+   strong, concrete, citable finding for the audit paper's external-validation section.
+4. Do NOT bet a second paper on finding a "famous bug" — treat this as strengthening the existing
+   MEDIUM-novelty audit/critic paper's weakest point, not as a new 一区-caliber project on its own. If it
+   unexpectedly and consequentially generalizes across multiple independent systems, *that* could later be
+   split into its own paper — but that is an upside scenario to notice if it happens, not the plan to bet on
+   upfront.
+
+**How to apply**: when scoping the counterfactual-critic paper's "external pipeline validation" work
+(already flagged as its highest-leverage improvement earlier in this session), use this plan, not a vaguer
+"just go test it on GraspGen or something" version — the labeled-test-suite-first sequencing matters, per
+the external reviewer's own emphasis that a null scan without it is nearly worthless as evidence.
+
+---
+
+# Direction 7: VLA reconsidered as the paper target, narrowed to one wedge — the invariance-sensitivity
+frontier study (2026-08-02)
+
+**Prompted by**: after Direction 5/5-addendum closed VLA as saturated (internally and on public benchmarks),
+student explicitly asked to reconsider VLA as the graduation-paper direction anyway, accepting a lower tier
+than the counterfactual critic if needed, and asked for a specific wedge.
+
+## The wedge search
+
+Picked up Direction 5-addendum's one surviving lead — a training objective jointly enforcing
+paraphrase-invariance (actions stable under meaning-preserving instruction rewordings) and
+referent-sensitivity (actions change under minimal object/referent edits), motivated by LIBERO-Para's
+22-52pp paraphrase-robustness collapse and LIBERO-Plus's finding that VLA policies often ignore language
+entirely. **A deeper, more targeted search found this specific sub-niche ("fix VLA language-shortcut/
+grounding failures", not just diagnose them) is itself dense with very recent (mostly 2026) competing fixes**:
+
+| Paper | Mechanism |
+|---|---|
+| "When Vision Overrides Language" (arXiv:2602.17659) | Counterfactual Action Guidance — dual-branch INFERENCE-TIME comparison (language-conditioned vs. vision-only branch), no retraining; introduces its own benchmark **LIBERO-CF** |
+| "Contrastive Representation Regularization for VLA" (arXiv:2510.01711) | Contrastive TRAINING objective, but for proprioceptive-state grounding, not paraphrase/referent |
+| GATEFLOW (OpenReview) | Shortcut-learning mitigation for VLA |
+| "Robust Skills, Brittle Grounding" (arXiv:2602.24143) | Diagnoses multi-object referent disambiguation failure (the exact setting a referent-sensitivity fix would target) |
+| RoboSemanticBench (arXiv:2606.02277) | Diagnostic benchmark for semantic grounding in VLA action prediction |
+| "Flatness Preserves Instruction Following" (arXiv:2606.23641) | Flatness-preserving optimization fix |
+| APT (arXiv:2606.12366) | Action-expert-pretraining-stage fix |
+| "Restoring Linguistic Grounding via Train-Free Attention Recalibration" (arXiv:2603.06001) | Inference-time attention recalibration, no training |
+
+7 distinct fix mechanisms, mostly 2026, for essentially the same underlying problem.
+
+## External verdict (Codex/GPT-5.4 xhigh, same thread)
+
+1. **The joint paraphrase-invariance+referent-sensitivity contrastive loss, AS A NOVEL METHOD CLAIM, is
+   effectively closed** — training-vs-inference-time and paraphrase-vs-proprioceptive are real but
+   insufficient distinctions against this many existing shortcut-mitigation objectives.
+2. **Best remaining wedge: an invariance-sensitivity FRONTIER STUDY, not a new method.** Ask whether
+   existing fixes (pick a small representative set — e.g. CAG, train-free attention recalibration, plain
+   paraphrase augmentation, plus the joint-LoRA objective as a simple baseline, not all 7) improve paraphrase
+   robustness by becoming MORE language-insensitive (i.e. do they "fix" LIBERO-Para by getting worse at
+   LIBERO-CF-style referent sensitivity, or genuinely improve both?). Evaluate on LIBERO-Para + LIBERO-CF
+   together, report both axes plus a worst-group/harmonic-mean score, task success, and cross-benchmark
+   transfer, using ≥2 VLA families and multiple seeds. The defensible contribution is characterizing
+   whether current remedies trade one failure mode for the other — a diagnostic/systematic-comparison
+   paper, matching this project's own house style, not an architecture-novelty claim.
+3. **Honest venue-tier expectation**: RA-L-level IF executed with ≥2 models, ≥2 independent benchmarks,
+   rigorous paired design, and a clear trade-off finding. Workshop/lower-tier if scoped down to one model on
+   one benchmark with a modest LoRA gain. **NOT credible for T-RO/IJRR/Science Robotics on this idea alone**
+   — i.e. this reaches, at best, the SAME tier as the counterfactual-critic paper, not higher, and is
+   materially riskier (denser competitive field, more moving parts: 2 VLA families × 2 benchmarks × several
+   baseline methods to reproduce correctly).
+
+## Verdict
+
+Not closed outright (unlike Directions 1-6) — this is the one specific, honestly-scoped VLA angle that
+survived scrutiny today, **conditional on the student accepting it as a second, RA-L-tier PARALLEL paper**,
+not a replacement for or an upgrade over the counterfactual-critic paper. Do not pursue the joint
+contrastive loss as a headline method; pursue the frontier-characterization framing. If picked up, next step
+is a concrete minimal experiment spec (which 3-4 methods to reproduce, which 2 VLA families, compute budget
+estimate) before any training runs.
