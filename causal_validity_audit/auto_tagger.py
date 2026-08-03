@@ -142,8 +142,22 @@ def _find_execution_touching(module: ast.Module) -> set:
         for name, node in funcs.items():
             if name in touching:
                 continue
+            if _reads_env_state(node):
+                touching.add(name)
+                changed = True
+                continue
             for call in _calls_in(node):
                 if _is_env_step_call(call):
+                    touching.add(name)
+                    changed = True
+                    break
+                # A helper that reads live env state is execution-touching
+                # for provenance purposes even when it does not itself step
+                # the simulator.  Without this edge, a post-execution label
+                # hidden behind a wrapper (e.g. ``return env.success`` in a
+                # helper called by the scorer) was classified as pure and
+                # became a false PRE_EXECUTION result.
+                if _reads_env_state(call):
                     touching.add(name)
                     changed = True
                     break
@@ -226,6 +240,17 @@ class _FunctionTagger:
         for call in _calls_in(expr):
             cname = _call_name(call.func)
             if cname in self.execution_touching:
+                return True
+            # Fail closed for calls that cannot be resolved in this module.
+            # An imported wrapper may read live execution state (for example
+            # ``helper(env) -> env.success``); treating it as pure would turn
+            # cross-module leakage into a false PRE_EXECUTION result.
+            if (
+                cname is not None
+                and cname not in KNOWN_PURE_CALLS
+                and cname not in self.local_functions
+                and cname not in self.resolved_pure_functions
+            ):
                 return True
         return False
 
@@ -400,15 +425,40 @@ class _FoundCall(Exception):
         self.provenance = provenance
 
 
+def _subscript_field_name(target: ast.expr) -> Optional[str]:
+    """For a (possibly chained) subscript target like `d[obj][idx]["field"] = v`,
+    return the innermost (rightmost) key IF it is a string constant, else None.
+    Added 2026-08-02 after auditing a real public repo (Sim-Grasp,
+    github.com/junchengli1/Sim-Grasp, grasp_simulation.py::main_simulation_loop)
+    whose label-writing pattern -- `new_candidates[obj]["grasp_samples"][idx]
+    ["simulation_quality"] = 1` -- is neither `return {...}` nor `dict(k=v)`,
+    and was therefore invisible to this tool before this addition. Only the
+    LAST subscript is treated as the field name (matching that real pattern:
+    outer subscripts are container/index navigation, not field identity)."""
+    if not isinstance(target, ast.Subscript):
+        return None
+    key = target.slice
+    # Python 3.9+: ast.Subscript.slice is the index expression directly (no
+    # wrapping ast.Index node, which only existed pre-3.9).
+    if isinstance(key, ast.Constant) and isinstance(key.value, str):
+        return key.value
+    return None
+
+
 def analyze_function(func_def: ast.FunctionDef, module: ast.Module) -> TagResult:
-    """Two field-defining patterns are recognized: `return {...}` (a dict
-    literal) and `x = dict(k=v, ...)` (a constructor call with keyword args,
-    e.g. a row about to be written to a log) -- the latter added after
+    """Three field-defining patterns are recognized: `return {...}` (a dict
+    literal), `x = dict(k=v, ...)` (a constructor call with keyword args,
+    e.g. a row about to be written to a log) -- added after
     validating against a second real function (batch_s3s4.py's
-    _emit_lggsn_candidates) that uses this pattern instead of the first.
-    For the dict()-constructor pattern, provenance is read off at the point
-    the dict is BUILT, not at a return (this function-under-analysis has no
-    return value at all; it writes rows out as a side effect)."""
+    _emit_lggsn_candidates) that uses this pattern instead of the first --
+    and `container[...]["field"] = value` (subscript-assignment mutation of
+    an existing dict/record, added 2026-08-02 after auditing Sim-Grasp's
+    grasp_simulation.py, which writes simulation outcome labels this way;
+    see `_subscript_field_name`'s docstring). For the dict()-constructor and
+    subscript-assignment patterns, provenance is read off at the point the
+    field is WRITTEN, not at a return (a function using either pattern may
+    have no meaningful return value at all -- it writes fields out as a
+    side effect)."""
     execution_touching = _find_execution_touching(module)
     resolved_pure = _all_module_function_names(module) - execution_touching
     tagger = _FunctionTagger(execution_touching, resolved_pure_functions=resolved_pure)
@@ -435,6 +485,13 @@ def analyze_function(func_def: ast.FunctionDef, module: ast.Module) -> TagResult
                         "EXECUTION_DERIVED" if tagger.expr_is_tainted(kw.value) else "PRE_EXECUTION"
                     )
                     field_confidence[kw.arg] = tagger.expr_confidence(kw.value)
+        elif isinstance(stmt, ast.Assign) and len(stmt.targets) == 1:
+            field_name = _subscript_field_name(stmt.targets[0])
+            if field_name is not None:
+                field_provenance[field_name] = (
+                    "EXECUTION_DERIVED" if tagger.expr_is_tainted(stmt.value) else "PRE_EXECUTION"
+                )
+                field_confidence[field_name] = tagger.expr_confidence(stmt.value)
 
     return TagResult(
         field_provenance=field_provenance, tainted_vars=tagger.tainted,
