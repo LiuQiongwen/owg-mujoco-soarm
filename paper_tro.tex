@@ -76,9 +76,10 @@ same discipline: a silent unit-scaling bug in a widely used composite
 robot controller, whose fix is validated with real, measured gains
 ($0\%\rightarrow45$--$65\%$ success on two previously near-zero object
 categories). For completeness rather than selective reporting, we also
-include a statistically tested ledger of eleven ruled-out mechanisms for
-a separate, still-open execution-reliability problem, and a
-hardware-deployment architecture with a pre-validation safety checklist.
+include a statistically tested ledger of twelve ruled-out mechanisms
+spanning candidate generation and a separate, still-open
+execution-reliability problem, and a hardware-deployment architecture
+with a pre-validation safety checklist.
 Together, these results argue that causal-validity auditing is not a
 theoretical nicety: even a team actively looking for this failure mode
 still misses real instances of it until the check is made mechanical.
@@ -147,10 +148,10 @@ proposed algorithm for improving grasp success. Contributions:
   silent double-scaling bug in a widely used composite robot controller,
   validated on three previously near-zero-success object categories
   (\cref{sec:gripperbug}).
-\item An \textbf{honest, statistically rigorous ledger of eleven
-  ruled-out mechanisms} for the execution-time reliability problem our
-  diagnostics converged on, none presented as solved
-  (\cref{sec:negative}).
+\item An \textbf{honest, statistically rigorous ledger of twelve
+  ruled-out mechanisms} spanning candidate generation and the
+  execution-time reliability problem our diagnostics converged on, none
+  presented as solved (\cref{sec:negative}).
 \item A \textbf{hardware deployment architecture and safety checklist},
   scoped plainly as not yet physically validated (\cref{sec:hardware}).
 \end{enumerate}
@@ -646,7 +647,7 @@ items stated in the design document.
 \section{What Doesn't Work: An Honest Negative-Results Ledger}
 \label{sec:negative}
 
-\Cref{tab:ledger} summarizes eleven mechanisms tested and closed over the
+\Cref{tab:ledger} summarizes twelve mechanisms tested and closed over the
 course of this investigation, each evaluated with a paired-trial design
 and McNemar's exact test (or the noted equivalent). Full mechanistic
 explanations for each row are given in \cref{app:ledger}.
@@ -671,6 +672,7 @@ explanations for each row are given in \cref{app:ledger}.
 9 & Force-proportional admittance damping & Re-verified\textsuperscript{*}: null, 0 discordant pairs \\
 10 & Gripper pre-narrowing before descent & Re-verified\textsuperscript{*}: worse, $75\%$ vs.\ $15\%$, $\mathbf{p{=}0.0005}$ \\
 11 & World-model sim-to-real, scarce real data & Not piloted -- closed at feasibility stage \\
+12 & Energy-based candidate scoring (EBM) & Naive version catastrophic ($0$--$16\%$ across 3 objects); hard-negative-mined fix reaches baseline parity (pooled $-3.7$pp, $p{=}0.29$; significant win on one object, $p{=}0.041$) \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -717,7 +719,7 @@ careful, motivated verification still misses real instances of the
 problem it is looking for, until the process is made mechanical.
 Alongside this, we report a genuine, validated fix to a previously
 undiagnosed execution bug that unlocked most of a robot platform's latent
-grasp reliability, an honest account of eleven mechanisms that did not
+grasp reliability, an honest account of twelve mechanisms that did not
 work for the problem that remains, and an architecture for the
 real-hardware phase this project has not yet reached. We believe the
 discipline demonstrated across all of these -- verify against ground
@@ -767,6 +769,7 @@ test (or the noted equivalent).
 9 & Force-admittance damping & Progress damped by contact force magnitude & \emph{Original}: worse in 2 calibrations ($55\%/75\%$, $50\%/75\%$). \textbf{Re-verified}: $75\%$ vs.\ $75\%$, \emph{zero} discordant pairs across $n{=}20$ & Original mechanistic story (exposure-window extension) does not hold under valid pairing -- no measurable effect, not a harmful one \\
 10 & Gripper pre-narrowing & Narrow gripper before descend & \emph{Original}: worse, $20\%$ vs.\ $50\%$, $p{=}0.11$ (n.s.). \textbf{Re-verified}: worse, $15\%$ vs.\ $75\%$, $\mathbf{p{=}0.0005}$ & The only one of the four with a genuine, replicated, strengthened effect -- permanently reducing pre-descent clearance measurably hurts \\
 11 & World-model sim-to-real transfer & Train in sim, deploy with little/no real data & Not piloted -- closed at feasibility stage & Working prior art needs infrastructure (thousands of real demos, or video-diffusion-scale backbone) this project lacks \\
+12 & Energy-based candidate scoring (EBM v1$\to$v2) & Implicit scalar compatibility model, motivated by Implicit Behavioral Cloning~\cite{florence2021implicit} and its grasp-specific descendant~\cite{singh2024cgdf}; v1: static BCE + CEM sampling; v2 adds hard negatives mined via a 3-iteration CEM search using the model's own current weights & v1: catastrophic, $0\%$ on 2 of 3 objects ($p{<}0.001$ both). v2: recovers to $80\%/100\%/26\%$ (Pear/TomatoSoupCan/CrackerBox), pooled $-3.7$pp vs.\ baseline (n.s., $p{=}0.29$), significant win on TomatoSoupCan ($p{=}0.041$) & v1's static negatives left an under-constrained pose region the inference-time CEM search could exploit (found $\sim$1.7 SD from the training mean, scored $99\%$ confident despite no training support there); v2's mined negatives close that gap, reaching parity with baseline but not clearly exceeding it \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -829,6 +832,19 @@ E.~C.~Joyce, Q.~Zhao, N.~Burgdorfer, L.~Wang, and P.~Mordohai,
   Perception,''
 \emph{Proc.\ IEEE/RSJ Int.\ Conf.\ Intelligent Robots and Systems (IROS)},
 2025.
+
+\bibitem{florence2021implicit}
+P.~Florence, C.~Lynch, A.~Zeng, O.~A.~Ramirez, A.~Wahid, L.~Downs,
+A.~Wong, J.~Lee, I.~Mordatch, and J.~Tompson,
+``Implicit Behavioral Cloning,''
+\emph{Conf.\ Robot Learning (CoRL)}, 2021.
+
+\bibitem{singh2024cgdf}
+G.~Singh, S.~Kalwar, M.~F.~Karim, B.~Sen, N.~Govindan, S.~Sridhar, and
+K.~M.~Krishna,
+``Constrained 6-DoF Grasp Generation on Complex Shapes for Improved
+  Dual-Arm Manipulation,''
+\emph{Proc.\ IEEE/RSJ Int.\ Conf.\ Intell.\ Robots Syst.\ (IROS)}, 2024.
 
 \bibitem{lggsn_ral_under_review}
 %% Self-citation placeholder -- this project's own SO-ARM101/LGGSN paper,

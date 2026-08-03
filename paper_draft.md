@@ -1,5 +1,19 @@
 # When Geometry Is Not Enough: Object-Dependent Failure Modes of Learning-to-Rank Grasp Selection in Open-World Manipulation
 
+**[CLOSED, 2026-08-03 — do not resume drafting this as an ICRA submission.]** No substantive
+update since 2026-05-15; superseded in practice by the RA-L submission's full rewrite around the
+seeding-bug audit (`paper_final.tex`, commit message "full rewrite around the seeding-bug audit,"
+2026-07-10), which covers the same LGGSN/SO-ARM101 subject matter with a more complete evaluation.
+Also closed on its own separate merits, independent of that overlap: this project's "2 WoS SCI-E"
+graduation requirement is specifically journal-only (see `user_institution.md` memory and this
+session's ISSN-level verification against wos-journal.info/LetPub) — ICRA is a conference, indexed
+(if at all) in Web of Science's Conference Proceedings Citation Index (CPCI-S), a structurally
+separate index from the Science Citation Index Expanded (SCIE) the requirement actually names — so
+even a completed, accepted ICRA paper would not count toward it. If ICRA-tier venues become
+relevant again for a different reason (e.g. a non-graduation-driven publication goal), revisit this
+decision explicitly rather than silently resuming; the content below is frozen as of this closure,
+not deleted, in case it's useful source material later.
+
 **[ICRA 2026 Submission Draft — Double-blind]**
 
 ---
