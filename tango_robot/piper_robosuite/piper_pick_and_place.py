@@ -1070,6 +1070,7 @@ def run_pick_and_place(env, obj_name, use_oriented_grasp=True, verbose=False,
                         cr_cfm_stall_min_improvement_frac=0.3, cr_cfm_stall_extended_max_iterations=20,
                         cr_cfm_stall_window=4,
                         wrist_friendly_orientation=False, wrist_friendly_angle_tolerance_deg=0.0,
+                        tray_orientation_search=False, tray_orientation_angle_tolerance_deg=30.0,
                         step_hook=None):
     """Run one full pick-and-place trial on an already-reset env. Returns a
     result dict (success flag + per-phase IK diagnostics) instead of
@@ -1093,7 +1094,22 @@ def run_pick_and_place(env, obj_name, use_oriented_grasp=True, verbose=False,
 
     rng lets a caller pass a seeded generator so the SAME pool is drawn for
     "best" and "consensus" at a given trial_id (paired comparison, matching
-    this project's established statistical convention)."""
+    this project's established statistical convention).
+
+    tray_orientation_search (2026-08-03, opt-in, default False): the
+    transit-to-tray phases (transit_above_tray/lower_into_tray/retract)
+    normally hold the exact grasp_mat throughout -- see the comment at the
+    "close gripper" step for why (switching orientation mid-transit risks
+    twisting the object out of the grip). This flag instead searches the
+    SAME safe family of orientations pick_wrist_friendly_orientation already
+    uses (rotations about the grasp's own approach axis via
+    _rotate_grasp_about_approach, which preserve the actual gripping
+    geometry -- not an arbitrary reorientation like DOWN_ORIENTATION) but
+    evaluated for IK convergence at the TRAY target instead of the grasp
+    target, since those are different points in the workspace and a grasp
+    orientation chosen for reachability at one is not guaranteed reachable
+    at the other. Falls back to grasp_mat if no candidate converges better
+    (same safe-fallback contract as pick_wrist_friendly_orientation)."""
     ik = ArmIK(env)
     # Settle before reading the object's pose -- the placement sampler
     # deliberately spawns objects ~3cm above the table (z_offset=0.03, to
@@ -1203,9 +1219,11 @@ def run_pick_and_place(env, obj_name, use_oriented_grasp=True, verbose=False,
     tray_drop_pos = np.array([tray_xy[0], tray_xy[1], env.table_offset[2] + TRAY_DROP_HEIGHT])
     phase_log = {}
 
-    def solve_and_move(name, target, grip, seed_qpos, interpolated=False, compliant=False, force_compliant=False):
+    def solve_and_move(name, target, grip, seed_qpos, interpolated=False, compliant=False, force_compliant=False,
+                        target_mat=None):
         _set_phase(step_hook, name)
-        qpos, converged, err, source = ik.solve_multi_seed(target, primary_seed=seed_qpos, target_mat=grasp_mat)
+        qpos, converged, err, source = ik.solve_multi_seed(
+            target, primary_seed=seed_qpos, target_mat=grasp_mat if target_mat is None else target_mat)
         phase_log[name] = {"converged": bool(converged), "err_cm": float(err * 100), "seed_source": source}
         if verbose:
             print(f"[{name}] target={target.round(3)} converged={converged} err_cm={err*100:.2f} seed={source}")
@@ -1421,13 +1439,28 @@ def run_pick_and_place(env, obj_name, use_oriented_grasp=True, verbose=False,
     # object is now held -- see move_to_interpolated's docstring.
     qpos_seed = solve_and_move("lift", obj_pos + [0, 0, approach_height], GRIPPER_CLOSE, qpos_seed, interpolated=True)
     tray_above = tray_drop_pos + [0, 0, 0.08]
-    qpos_seed = solve_and_move("transit_above_tray", tray_above, GRIPPER_CLOSE, qpos_seed, interpolated=True)
-    qpos_seed = solve_and_move("lower_into_tray", tray_drop_pos, GRIPPER_CLOSE, qpos_seed, interpolated=True)
+    # tray_orientation_search (opt-in, see docstring): grasp_mat was chosen
+    # for reachability at the GRASP target, not the tray target -- these are
+    # different points in the workspace. Re-search the same safe family of
+    # orientations (rotations about the approach axis, which preserve the
+    # actual gripping geometry) for reachability at tray_above specifically.
+    # A fresh local variable, NOT reassigning grasp_mat itself, so the
+    # reported grasp_yaw (computed from grasp_mat further below) still
+    # describes the actual grasp, not this transit-specific adjustment.
+    tray_transit_mat = grasp_mat
+    if tray_orientation_search:
+        tray_transit_mat = pick_wrist_friendly_orientation(
+            ik, tray_above, grasp_mat, qpos_seed,
+            angle_tolerance_deg=tray_orientation_angle_tolerance_deg)
+    qpos_seed = solve_and_move("transit_above_tray", tray_above, GRIPPER_CLOSE, qpos_seed, interpolated=True,
+                                target_mat=tray_transit_mat)
+    qpos_seed = solve_and_move("lower_into_tray", tray_drop_pos, GRIPPER_CLOSE, qpos_seed, interpolated=True,
+                                target_mat=tray_transit_mat)
 
     if verbose:
         print("[open gripper]")
     move_to(env, qpos_seed, GRIPPER_OPEN, steps=40, step_hook=step_hook)
-    qpos, converged, err, source = ik.solve_multi_seed(tray_above, primary_seed=qpos_seed, target_mat=grasp_mat)
+    qpos, converged, err, source = ik.solve_multi_seed(tray_above, primary_seed=qpos_seed, target_mat=tray_transit_mat)
     phase_log["retract"] = {"converged": bool(converged), "err_cm": float(err * 100), "seed_source": source}
     move_to(env, qpos, GRIPPER_OPEN, step_hook=step_hook)
 
