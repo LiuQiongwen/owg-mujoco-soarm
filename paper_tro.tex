@@ -57,58 +57,30 @@ with a Case Study in Cross-Embodiment Grasping}
 % =============================================================================
 \begin{abstract}
 A learned scorer that reranks grasp candidates before execution is valid
-only if every input feature is computable \emph{before} the chosen
-candidate is executed -- a constraint we call causal validity. It is easy
-to violate silently, because an offline accuracy evaluation looks identical
-whether a feature is causally valid or not: historical logs already
-contain the outcome of every candidate they describe. We formalize a
+only if every input feature is computable before the chosen candidate is
+executed -- a constraint we call causal validity, easy to violate silently
+since an offline evaluation looks identical either way. We formalize a
 pre-execution admissibility criterion, build a reference audit tool, and
-show its practical necessity on our own cross-embodiment grasp-reranking
-pipeline (a 5-DoF SO-ARM101 arm to a 6-DoF Piper arm, in simulation): a
-pooling effect that replicated five times at $p{<}0.0001$ collapses to an
-exact null ($p{=}1.0000$) once causally invalid features are removed. We
-then automate the audit with a static dataflow analyzer that infers
-feature provenance from source code rather than manual registration, and
-show it independently catches a contamination bug our own hand-built audit
-had missed and had already reported as clean -- with a measurable
-downstream consequence on a previously reported result. Another,
-independently discovered infrastructure bug (an unseeded placement
-sampler, invalidating an implicit pairing assumption) let us re-verify our
-core finding under corrected data and stress-test a newly available
-admissible feature that appeared, in a naive pooled analysis, to be the
-strongest predictor in the entire investigation ($r{=}-0.55$) -- only for
-a within/between-scene decomposition to reveal zero real selection-relevant
-signal, a sharper demonstration of this paper's thesis than the finding it
-was built to test. We validate the criterion externally against two recent
-published systems, then apply it prospectively, from the start of a new
-investigation rather than after the fact: a predecessor critic pipeline's
-reported $+15.6$ point gain is shown invalid on two independent grounds
-(a seed-coupling defect and a saturating success criterion), and a
-rebuilt, causally-admissible-by-construction critic --- object-relative
-pose, point-cloud statistics, and object identity, trained with a
-within-scene pairwise term --- beats a geometric baseline live-executed on
-two disjoint held-out batches ($+15.6$ points, $p=0.00258$; $+14.0$ points
-on a frozen confirmatory batch, $p=3.24\times10^{-4}$), while an
-uncertainty-based risk gate and a small-data imitation-policy pilot are
-reported as negative and incomplete, respectively, with equal rigor.
-Extending to a fourth object added after the design was frozen replicates
-the gain (live-executed, $p{<}10^{-6}$ pooled) with an object-dependent
-magnitude, while a zero-shot probe on a held-out fifth object shows a
-clean negative: the critic loses to the geometric baseline outright,
-a boundary we report rather than obscure; a learned auxiliary robustness
-head and an uncertainty-penalized aggregator both beat the baseline but
-add no measurable benefit over the simplest neighborhood-perturbation
-heuristic already established, reported as consolidating negatives with
-the same rigor as the positive findings. We
-report a further, independently discovered bug (a
-silent unit-scaling error in a widely used composite robot controller) as
-a case study in the same discipline, and report eleven independently
-tested and ruled-out
-mechanisms for a still-open execution-time reliability problem, each
-evaluated with a paired statistical test. We close with a hardware
-deployment architecture and safety checklist, explicitly scoped as not yet
-physically validated.
+show its necessity on our own cross-embodiment grasp-reranking pipeline
+(SO-ARM101 to Piper, simulation): a pooling effect replicating five times
+at $p{<}0.0001$ collapses to an exact null ($p{=}1.0000$) once invalid
+features are removed. An automated static-dataflow tagger independently
+catches a contamination bug our own hand-built audit had missed, with a
+measurable downstream consequence. Applied prospectively, a predecessor
+critic's reported $+15.6$-point gain is shown invalid on two grounds, and
+a rebuilt, causally-admissible critic beats a geometric baseline
+live-executed on two disjoint batches ($+15.6$/$+14.0$ points,
+$p{<}0.003$), replicating on a fourth object added after the design was
+frozen while showing a clean zero-shot negative on a fifth. We report a
+further independently discovered controller bug as a case study in the
+same discipline, eleven ruled-out mechanisms for a still-open reliability
+problem, and a hardware deployment architecture not yet physically
+validated.
 \end{abstract}
+
+\begin{IEEEkeywords}
+Grasping, data leakage, reproducibility, static program analysis, robot manipulation, cross-embodiment transfer, benchmarking
+\end{IEEEkeywords}
 
 % =============================================================================
 \section{Introduction}
@@ -1075,6 +1047,21 @@ such feature remains checkable against \cref{sec:method}'s criterion,
 since it would be computed purely from the candidate pool's own poses and
 the measured noise covariance. This work has not yet started data
 collection and is not included in the results reported above.
+
+% =============================================================================
+\section*{Acknowledgment}
+% DRAFT -- author must verify/expand this against the full writing history of
+% the manuscript before submission; this reflects only what was directly
+% observed in the sessions that produced the object-relative counterfactual
+% critic, mechanistic multi-head analysis, and four-object extension content,
+% not necessarily the complete AI-assistance history of the whole paper.
+The authors used Claude (Anthropic) to assist with drafting and editing
+portions of the manuscript text -- including the object-relative
+counterfactual critic, mechanistic multi-head analysis, and four-object
+extension sections, and the abstract -- with statistical analysis scripting,
+and with literature search and citation verification. All experimental
+design, code implementation, data collection, and scientific claims were
+conducted and verified by the authors.
 
 % =============================================================================
 \appendix
