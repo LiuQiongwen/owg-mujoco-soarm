@@ -22,8 +22,8 @@ Results section before LaTeX conversion (tracked separately).
 Working alternate title (more ambitious, not earned by the evidence in this draft — decided, not
 just "not yet," as of 2026-08-02): *Causally Valid Object-Centric World Critics for Risk-Aware VLA
 Grasp Selection*. The risk gate and VLA integration are negative/incomplete results, not
-supporting claims (Section 6), and the pairwise-loss mechanism the "world critic" framing would
-lean on is quantifiably unresolvable at the current data scale (Section 5.3: ~210 discordant pairs
+supporting claims (Section 5), and the pairwise-loss mechanism the "world critic" framing would
+lean on is quantifiably unresolvable at the current data scale (Section 4.3: ~210 discordant pairs
 needed for 80% power, 5 observed). Keep the conservative title unless/until a future hardware or
 VLA extension, or a genuinely larger-scale ablation, actually earns the risk-aware/VLA claim.
 
@@ -31,59 +31,58 @@ VLA extension, or a genuinely larger-scale ablation, actually earns the risk-awa
 
 ## Abstract
 
-A learned critic that reranks grasp candidates before execution is only as good as the causal
-validity of its training labels and the fairness of the evaluation that measures it. We show both
-can silently break, and how to catch it. A pre-execution grasp critic trained on simulated MuJoCo
-outcomes initially appeared to improve top-1 grasp success by +15.6 percentage points over a
-geometric heuristic baseline — a result that collapsed under scrutiny: the evaluation harness
-encoded the compared method into its random seed, so "geometry" and "world-model" trials never
-shared a candidate pool or scene, and the underlying success label counted mere post-close gripper
-contact as success regardless of whether the object was ever lifted. We formalize a causal-validity
-audit for this class of pipeline, rebuild the evaluation as a shared-candidate-pool paired design
-with a production, bilaterally-gated physics grasp primitive, and find the original critic's
-success probability carries no real signal at all (AUROC = 0.4996 against 1,500 real per-candidate
-outcomes — chance level). We then train an **object-relative counterfactual critic** — pose
-features expressed relative to the target object, plus point-cloud statistics and object identity,
-trained with a within-scene Bradley-Terry-style pairwise loss on causally-admissible features only
-— and evaluate it on two disjoint, held-out scene batches never touched by training or model
-selection. The corrected critic significantly outperforms the geometric baseline on both: +15.6pp
-(McNemar exact p=0.00258, n=90) on an independent development-test batch, and +14.0pp (27 paired
-wins vs. 6 losses, exact McNemar p=3.24e-4, n=150) on a frozen confirmatory batch never inspected
-before the gate was evaluated. We report negative and incomplete results with the same rigor:
-an ensemble-uncertainty risk gate calibrated on held-out data adds no measurable benefit over the
-ungated critic; whether a pairwise loss term is independently responsible for the gain (versus
-object-relative features alone) is not established; and a small-data (15-demonstration) imitation
-policy pilot integrates end-to-end but fails its first closed-loop rollout. We release a
-causal-validity audit tool, the paired-evaluation harness, and a real-hardware validation protocol
-as a basis for future work.
+We propose an **object-relative counterfactual critic** for pre-execution grasp candidate
+selection: pose features expressed relative to the target object, plus point-cloud statistics and
+object identity, trained with a within-scene Bradley-Terry-style pairwise loss on
+causally-admissible features only. Evaluated on two independent, disjoint, held-out scene batches
+never touched by training or model selection, it significantly outperforms a geometric heuristic
+baseline on both: +15.6pp (McNemar exact p=0.00258, n=90) on an independent development-test
+batch, and +14.0pp (27 paired wins vs. 6 losses, exact McNemar p=3.24e-4, n=150) on a frozen
+confirmatory batch never inspected before the gate was evaluated — a real, twice-replicated
+effect. A complementary offline multi-head decomposition explains where and why the critic works.
+We validate this result under an unusual level of scrutiny: applying a formal causal-validity
+audit criterion from companion work to a predecessor pipeline in the same problem family, we found
+and corrected two evaluation defects that had made an earlier, superficially similar critic look
+far stronger than it actually was — a random-seed scheme that coupled the compared method's
+identity into candidate sampling, defeating its own paired design, and a success criterion that
+counted transient gripper contact regardless of whether the object was ever lifted. Re-evaluated
+under a from-scratch, causally-admissible, genuinely paired harness, that predecessor checkpoint's
+apparent signal collapses to chance (AUROC=0.4996 against 1,500 real per-candidate outcomes); our
+own critic's evaluation harness is built directly on top of this correction. We report negative
+and incomplete results with the same rigor: an ensemble-uncertainty risk gate calibrated on
+held-out data adds no measurable benefit over the ungated critic; whether a pairwise loss term is
+independently responsible for the gain (versus object-relative features alone) is not established
+and is quantifiably unresolvable at the current data scale; and a small-data (15-demonstration)
+imitation policy pilot integrates end-to-end but fails its first closed-loop rollout. We release
+the critic, a causal-validity audit tool, the paired-evaluation harness, and a real-hardware
+validation protocol as a basis for future work.
 
 ## Contributions
 
-1. **A causal-validity audit protocol for pre-execution grasp critics**, extending and applying an
-   existing formal PRE_EXECUTION-admissibility criterion (feature provenance registry +
-   automated static-analysis tagger) to a new pipeline, and using it to catch — before any paper
-   claim was made on top of it — a stale checkpoint whose apparent signal was chance-level
-   (AUROC=0.4996) once causal and pairing defects were corrected.
-2. **Diagnosis and correction of two compounding evaluation defects** in a predecessor pipeline:
-   (a) a random-seed scheme that silently coupled the compared method identity into scene/candidate
-   sampling, defeating the paired design its own statistics assumed; (b) a success criterion that
-   counted transient gripper contact — checked before any lift — as success, saturating measured
-   performance independent of grasp quality. Both are shown, not merely asserted, via direct
-   reproduction against the original data.
-3. **An object-relative counterfactual grasp critic** that is causally admissible by construction
+1. **An object-relative counterfactual grasp critic** that is causally admissible by construction
    (every input feature traceable to pre-execution scene/candidate state) and significantly
    outperforms a geometric heuristic on two independent, disjoint, held-out MuJoCo test batches —
-   the paper's central positive result.
-4. **A complementary, explicitly offline mechanistic analysis** (Section 5.4) decomposing the same
+   a real, twice-replicated effect and the paper's central positive result.
+2. **A complementary, explicitly offline mechanistic analysis** (Section 4.4) decomposing the same
    critic into contact/lift/success/failure-type heads to explain *where* it works (PowerDrill is
    measurably harder than CrackerBox/MustardBottle) and *why* (a specific, actionable
    success/no_contact confusion pattern) — kept clearly separate from the live-executed primary
    result, not merged with it.
-5. **A fully itemized negative/incomplete-results record**, produced by the same statistical
+3. **Validation of that result under a causal-validity audit protocol**: applying an existing
+   formal PRE_EXECUTION-admissibility criterion (feature provenance registry + automated
+   static-analysis tagger) to this pipeline, and using it to catch — before any paper claim was
+   built on top of it — that a predecessor, superficially similar critic's apparent signal was
+   chance-level (AUROC=0.4996) once two compounding evaluation defects were corrected: (a) a
+   random-seed scheme that silently coupled the compared method identity into scene/candidate
+   sampling, defeating the paired design its own statistics assumed; (b) a success criterion that
+   counted transient gripper contact as success regardless of whether the object was ever lifted.
+   Both defects are shown, not merely asserted, via direct reproduction against the original data;
+   our own critic's evaluation harness is built on the corrected design, not around it.
+4. **A fully itemized negative/incomplete-results record**, produced by the same statistical
    discipline as the positive result, not omitted or reframed: an uncertainty-based risk gate with
    no measurable benefit, an unresolved ablation (pairwise loss's independent contribution), and a
    small-data imitation-learning pilot that fails online despite offline metrics looking reasonable.
-6. **A real-hardware validation protocol**, explicitly scoped as future work (Section 7): staged
+5. **A real-hardware validation protocol**, explicitly scoped as future work (Section 6): staged
    pilot-then-scale-up design, safety checklist, and a corrected object choice (the protocol's own
    design review found the originally-proposed test object was out-of-distribution for the trained
    critic and substitutes an in-distribution pair instead) — not yet executed.
@@ -100,35 +99,43 @@ validity), and comparing two scoring methods requires evaluating them against th
 pool under the same conditions (paired evaluation). Neither violation is visible from an aggregate
 accuracy or success-rate number alone — both look like a real result until traced to source.
 
-We hit both violations in the same pipeline. A pre-execution grasp critic ("world model"), trained
-on simulated MuJoCo outcomes, was originally reported to beat a geometric heuristic baseline by
-+15.6 percentage points. Auditing this claim before building on it — applying this project's own
-PRE_EXECUTION-admissibility criterion and provenance registry (companion T-RO work) to a new
-pipeline — surfaced two compounding defects, neither itself a feature-provenance violation: the
-evaluation harness's random seed encoded which method was under test, so "geometry" and "critic"
-trials never executed against the same scene or candidate pool despite the paired statistics
-assuming they did; and the success label counted transient post-close gripper contact, checked
-before any lift, regardless of whether the grasp actually succeeded. Re-evaluated under a
-from-scratch, causally-admissible, genuinely paired harness, the original checkpoint's apparent
-signal is AUROC=0.4996 against 1,500 real per-candidate outcomes — exactly chance.
+We propose an **object-relative counterfactual critic** for this problem: pose features expressed
+relative to the target object, point-cloud statistics, and object identity, every field registered
+PRE_EXECUTION-admissible *before* training, not after, trained with a within-scene
+Bradley-Terry-style pairwise loss on causally-admissible features only. Evaluated on two
+independent, disjoint, held-out scene batches — one of them a frozen confirmatory batch never
+inspected before its pre-registered gate was evaluated — it significantly outperforms a geometric
+heuristic baseline on both (Section 4.2): a real, twice-replicated effect, not a single lucky
+sample.
 
-Rather than discard the direction, we rebuilt it. An object-relative counterfactual critic — pose
-features expressed relative to the target object, point-cloud statistics, and object identity,
-every field registered PRE_EXECUTION-admissible *before* training, not after — significantly
-outperforms the geometric baseline on two independent, disjoint, held-out scene batches, one of
-them a frozen confirmatory batch never inspected before its pre-registered gate was evaluated. We
-report this result with the same statistical discipline that caught the original claim's
-invalidity, and we report, with equal weight, what this investigation could not establish: an
-uncertainty-based risk gate with no measurable benefit, a pairwise-loss ablation quantifiably not
-resolvable at the current evaluation scale (Section 5.3), and a small-data imitation-learning
-integration that has not yet demonstrated closed-loop robustness.
+We hold this result to an unusual level of scrutiny. A pre-execution grasp critic ("world model")
+in the same problem family, trained on simulated MuJoCo outcomes, was previously reported to beat
+a geometric heuristic baseline by +15.6 percentage points. Auditing that claim before building on
+it — applying this project's own PRE_EXECUTION-admissibility criterion and provenance registry
+(companion T-RO work) to that predecessor pipeline — surfaced two compounding defects, neither
+itself a feature-provenance violation: the evaluation harness's random seed encoded which method
+was under test, so "geometry" and "critic" trials never executed against the same scene or
+candidate pool despite the paired statistics assuming they did; and the success label counted
+transient post-close gripper contact, checked before any lift, regardless of whether the grasp
+actually succeeded. Re-evaluated under a from-scratch, causally-admissible, genuinely paired
+harness, that predecessor checkpoint's apparent signal is AUROC=0.4996 against 1,500 real
+per-candidate outcomes — exactly chance (Section 3.4). Our own critic's evaluation harness
+(Section 3.3) is built directly on top of this correction, not around it — the same discipline
+that caught an invalid predecessor result is what lets us trust our own.
 
-This paper is organized around that arc — audit, diagnose, rebuild, re-verify — mirroring this
-project's companion T-RO investigation into the same class of failure in a different pipeline. We
-do not claim the specific defects found here are universal; we claim the failure mode — an
-aggregate metric that cannot distinguish a causally valid, fairly evaluated result from an invalid
-one — is a structural risk for any pipeline in this family, and that catching it requires checking
-an evaluation's construction, not only its output.
+We report our positive result with that discipline, and we report, with equal weight, what this
+investigation could not establish: an uncertainty-based risk gate with no measurable benefit, a
+pairwise-loss ablation quantifiably not resolvable at the current evaluation scale (Section 4.3),
+and a small-data imitation-learning integration that has not yet demonstrated closed-loop
+robustness.
+
+This paper's evidence chain — propose a critic, validate it under audit, honestly characterize
+what doesn't work — mirrors this project's companion T-RO investigation into the same class of
+evaluation failure in a different pipeline. We do not claim the specific defects found in the
+predecessor pipeline are universal; we claim the failure mode itself — an aggregate metric that
+cannot distinguish a causally valid, fairly evaluated result from an invalid one — is a structural
+risk worth checking before trusting any pre-execution critic's output, and that our own critic's
+validation here demonstrates one concrete way to check it.
 
 ## 2. Related Work
 
@@ -167,7 +174,7 @@ bias value estimates under classical TD/Monte Carlo evaluation (truncation bias)
 address with a liveness-based Bellman operator, evaluated on VLA and diffusion-policy manipulation
 tasks plus cloth folding. This is adjacent evidence that offline/simulated manipulation-policy
 evaluation is error-prone in more than one structurally distinct way — not directly overlapping
-prior art for the seed-coupling and success-criterion defects Section 4 diagnoses, and should not
+prior art for the seed-coupling and success-criterion defects Section 3.4 diagnoses, and should not
 be cited as a leakage paper (an earlier internal draft note mischaracterized it as one).
 Independently, and closer in spirit to our diagnosis, "What Are We Actually Benchmarking in Robot
 Manipulation?" [Jiang, Tan, Wheeler, Sun, Ayalew, and Walter, arXiv:2606.04233] audits LIBERO and
@@ -175,7 +182,7 @@ CALVIN and finds only 19.8% of LIBERO's reported advances are statistically sign
 evaluation noise is accounted for, alongside shortcut-solvable benchmark items and
 train/test-distribution proximity effects that inflate apparent generalization. Their specific
 failure modes (shortcut solvability, creeping overfitting, data-source dependence) are distinct
-from the seed-coupling and success-criterion defects Section 4 diagnoses in our own pipeline, but
+from the seed-coupling and success-criterion defects Section 3.4 diagnoses in our own pipeline, but
 the broader concern is the same and, as of mid-2026, actively converging from multiple independent
 directions: a robot-manipulation benchmark score is not self-certifying, and treating one as
 evidence of general capability without auditing how it was produced is an increasingly recognized,
@@ -191,7 +198,7 @@ constrained Markov decision process, optimizing against elicited unsafe behavior
 83.58% reduction in cumulative safety-violation cost versus prior methods. Both report a positive
 effect from their respective uncertainty/safety mechanism. Our own ensemble-disagreement risk
 gate — calibrated on held-out data and evaluated with the same statistical rigor as our positive
-result — shows no measurable benefit over the ungated critic (coverage 98.7%, Section 6). We do
+result — shows no measurable benefit over the ungated critic (coverage 98.7%, Section 5). We do
 not read this as evidence against uncertainty-gating in general: ReconVLA's per-token conformal
 calibration and SafeVLA's constrained-optimization framing are both structurally different from a
 post-hoc ensemble-disagreement filter applied to a pre-execution candidate scorer. Concurrent work
@@ -199,7 +206,7 @@ directly asking when uncertainty-gating helps, "Confidence-Gated Robot Autonomy"
 and Haeufle, ICRA 2026 workshop, arXiv:2605.18045], identifies a dataset-dependent *competence
 regime*: below it, uncertainty rankings are weak and unstable regardless of which uncertainty
 source (softmax, MC dropout, ensemble) is used; above it, simple proxies suffice and the gating
-threshold matters more than the method. Our critic's ~50% pooled success rate (Section 5.2) may
+threshold matters more than the method. Our critic's ~50% pooled success rate (Section 4.2) may
 simply not yet be in the regime their analysis identifies as necessary for a gate to add value —
 we flag this as the most likely explanation for our null result rather than leaving it
 unexplained, without claiming to have tested for the regime directly. We report our own result as
@@ -207,7 +214,7 @@ a specific negative finding for the specific gate design tested, with the same d
 positive finding, not omitted or hedged into ambiguity.
 
 **Sim-to-real transfer for grasp success prediction.** Out of scope for this paper's evidence base;
-motivates Section 7's protocol as a stated future-work step, not a claim made here.
+motivates Section 6's protocol as a stated future-work step, not a claim made here.
 
 ## 3. Method
 
@@ -249,48 +256,45 @@ Section 3.2), not the criterion itself.
 - Per-scene protocol: build one candidate pool (object placement + K sampled grasp poses) before
   any method is chosen; every compared method executes against a *fresh, identically re-placed*
   copy of the same scene, sharing the same pool. This directly fixes the predecessor pipeline's
-  seed-coupling defect (Section 4.1).
+  seed-coupling defect (Section 3.4).
 - Production execution primitive: the same bilaterally-gated, weld-based physics grasp routine
   used elsewhere in this project's simulation stack (not a bespoke, more lenient reimplementation —
-  Section 4.2 shows why that distinction matters).
+  Section 3.4 shows why that distinction matters).
 - Statistics: McNemar's exact test (paired), bootstrap CIs, per-object and pooled effects; gates
   pre-registered before any result was inspected (`preregistration.yaml`).
 
-## 4. Diagnosing the Predecessor Pipeline (methodology-as-result)
+### 3.4 Why we rebuilt the evaluation (the predecessor pipeline's defects)
 
-This section is itself a result, not just setup — structure it as such, matching this project's
-established house style of reporting a self-correction as a first-class finding rather than
-suppressing it.
+This subsection is itself a finding, not just setup, reported with the same discipline as a
+positive result rather than glossed over — matching this project's established house style of
+reporting a self-correction as a first-class finding, not suppressing it. A predecessor pipeline's
+evaluation harness had two compounding defects, neither itself a feature-provenance violation.
+First, a **seed-coupling defect**: the exact random-number-generator seed depended on which method
+was under test, provably by construction and confirmed directly — 0/250 paired trials shared even
+the same executed candidate position between the "geometry" and "critic" arms, despite the paired
+statistics assuming they did. Second, a **success-criterion defect**: the legacy
+`contact or grasped or lifted` criterion saturated (150/150 sampled candidates "succeeded"
+regardless of pose, across 2 objects/15 scenes), replaced here by bilateral contact plus a
+verified post-settle lift via the production grasp primitive (Section 3.3). Together, these mean
+the predecessor pipeline's originally-reported effect (+15.6pp, "world model" vs. geometry) is
+unsupported by either the pairing or the underlying success labels — not a subtle statistical
+concern, a fully saturated label and a broken pairing. This is why our own critic's positive
+result (Section 4.2) is built on this from-scratch corrected pipeline rather than a patch to the
+original one, and why Section 4.1 reports the predecessor checkpoint's own corrected,
+chance-level performance before presenting our own critic's result.
 
-### 4.1 The seed-coupling defect
+## 4. Results
 
-Show the exact seeding formula, the analytic proof it depends on method identity, and the direct
-empirical confirmation (0/250 paired trials shared even the same executed candidate position).
-
-### 4.2 The success-criterion defect
-
-Show the legacy `contact or grasped or lifted` criterion, its saturation (150/150 sampled
-candidates "succeeded" regardless of pose, across 2 objects/15 scenes), and the corrected
-criterion (bilateral contact + verified post-settle lift, via the production primitive).
-
-### 4.3 Consequence
-
-The originally-reported effect (+15.6pp, "world model" vs. geometry) is unsupported by either the
-pairing or the underlying success labels. Reframe explicitly: this is why the paper's positive
-result (Section 5) is built on a from-scratch corrected pipeline, not a patch to the original one.
-
-## 5. Results
-
-### 5.1 Stale-checkpoint gate (negative, reported first — matches this project's own
+### 4.1 Stale-checkpoint gate (negative, reported first — matches this project's own
 pre-registered-gate discipline)
 
 The original critic checkpoint, re-evaluated under the corrected pipeline, fails the pre-registered
 gate: pooled effect −14.0pp (wrong sign vs. the required ≥+8pp), AUROC=0.4996 on 1,500 real
 per-candidate labels (chance level). Full numbers: `results/risk_gated_vla/phase1/RESULT.md`.
-Explain *why* (Section 4.2's success-criterion defect contaminated its training labels too) —
+Explain *why* (Section 3.4's success-criterion defect contaminated its training labels too) —
 this is not a mysterious failure.
 
-### 5.2 Object-relative counterfactual critic — the positive result
+### 4.2 Object-relative counterfactual critic — the positive result
 
 | Batch | Base seed | n | Geometry | Critic | Δ | Exact McNemar |
 |---|---:|---:|---|---|---:|---:|
@@ -310,7 +314,7 @@ for this object, at either scale, not a near-miss that a larger sample might res
 **Live-executed vs. offline-re-scored reporting convention.** `geometry` and
 `object_counterfactual` were the two methods actually live-selected during data collection, so
 their reported numbers are live-executed paired outcomes — the real online trial, not a re-run.
-`global_bce` and object-relative BCE (Section 5.3) were never live-selected in this collection run;
+`global_bce` and object-relative BCE (Section 4.3) were never live-selected in this collection run;
 their numbers are offline re-scores against the same scene's fully-swept candidate ground truth.
 This distinction matters for a subtler reason than convenience: MuJoCo's contact solver is not
 perfectly reproducible on marginal grasps. Independently verified across the confirmatory batch's
@@ -321,7 +325,7 @@ script bug, and the same class of finding independently documented in a companio
 (~12.5% single-run instability, `paper_advanced_robotics.tex`). We report it as a stated
 limitation rather than treating any single execution as ground truth.
 
-### 5.3 Ablation: is the pairwise loss load-bearing?
+### 4.3 Ablation: is the pairwise loss load-bearing?
 
 Object-relative BCE alone (no pairwise term) is statistically indistinguishable from the full
 `object_counterfactual` variant on the frozen confirmatory batch (2 wins/3 losses, p=1.0). This is
@@ -332,19 +336,19 @@ observed 2-vs-3 discordant split gives essentially zero post-hoc power and a req
 discordant pairs** for 80% power at this effect size — against only 5 observed here out of 150
 evaluated pools, resolving this would need on the order of several thousand additional evaluated
 candidate pools, not a modest top-up. **Do not attempt to close this ablation by collecting more
-data at the current scale; scope the paper's central claim to avoid depending on it** (Section 8):
+data at the current scale; scope the paper's central claim to avoid depending on it** (Section 7):
 the defensible claim is "object-centric, causally-admissible scoring beats geometry," not "the
 within-scene pairwise loss term is what makes it work." This conclusion, and the reasoning behind
 it, is already stated in `results/risk_gated_vla/final_report.md`'s "Recommended paper scope" —
 restated here with the exact power numbers rather than the original's qualitative "n is small."
 
-### 5.4 Mechanistic analysis: multi-head decomposition (offline, complementary)
+### 4.4 Mechanistic analysis: multi-head decomposition (offline, complementary)
 
-Section 5.2 establishes *that* the corrected critic beats geometry, live-executed — the paper's
+Section 4.2 establishes *that* the corrected critic beats geometry, live-executed — the paper's
 primary quantitative claim. This subsection asks *why and where* it works, via a second,
 explicitly **offline re-scoring** experiment on the same causally-admissible features. It is
 complementary evidence, not a replication, and must never be pooled with or presented as confirming
-Section 5.2's live-executed numbers.
+Section 4.2's live-executed numbers.
 
 **Setup.** The same object-relative feature set, decomposed into four prediction heads instead of
 one: `bilateral_contact`, `lifted`, `success` (binary), and a 3-class `failure_type`
@@ -353,12 +357,12 @@ one: `bilateral_contact`, `lifted`, `success` (binary), and a 3-class `failure_t
 collected batch — the weld gate is currently identical to bilateral contact by construction, and the
 `fell_off` threshold never triggers within the post-grasp settle window — so the 3-class scheme is
 what was actually trained; the 6-class taxonomy is documented future schema, not a current claim.
-Trained on the same base-100/dev-200/confirmatory-300 split chain as Section 5.2, with checkpoint
+Trained on the same base-100/dev-200/confirmatory-300 split chain as Section 4.2, with checkpoint
 and loss-weighting choice frozen on dev-200 only and confirmatory-300 read exactly once.
 
 **Result (offline, confirmatory-300).** The success head alone, used for top-1 selection, beats
 geometry pooled +10.7pp (46.0% vs. 35.3%, McNemar p=0.0052) — directionally and in rough magnitude
-consistent with Section 5.2's live-executed +14.0pp, reported as separate, complementary evidence
+consistent with Section 4.2's live-executed +14.0pp, reported as separate, complementary evidence
 for the same claim, not pooled or averaged with it. All three heads reach AUROC 0.90-0.93 with
 ECE≈0.04 (reasonably calibrated).
 
@@ -380,11 +384,11 @@ AUROC distinguished them. Coarse top-1 metrics can be an insufficiently sensitiv
 criterion for this kind of ablation at small validation-set scale; this was caught by
 cross-checking, not silently reported as "no difference."
 
-Neither this subsection nor Section 5.2 licenses a risk-gate or VLA-policy improvement claim
-(Section 6's negative results on both stand unchanged) — the AUROC/interpretability gains here are
+Neither this subsection nor Section 4.2 licenses a risk-gate or VLA-policy improvement claim
+(Section 5's negative results on both stand unchanged) — the AUROC/interpretability gains here are
 about the critic's own outputs, not about downstream gating or imitation-policy performance.
 
-## 6. Limitations
+## 5. Limitations
 
 Per this study's own rule — do not report only positive results; distinguish evidence from
 hypothesis from refuted conclusion — every negative or unresolved finding this investigation
@@ -398,9 +402,9 @@ that bears directly on this paper's central claim:
    competence regime that analysis identifies as necessary — stated as the most likely
    explanation, not a claim we separately tested for it.
 2. Pairwise-loss contribution unresolved, and not cheaply resolvable at this evaluation scale
-   (Section 5.3 — quantified: ~210 discordant pairs needed for 80% power, against 5 observed).
+   (Section 4.3 — quantified: ~210 discordant pairs needed for 80% power, against 5 observed).
    The paper's central claim does not depend on resolving this.
-3. Simulation-only: no real-hardware validation in this draft (Section 7 states the plan).
+3. Simulation-only: no real-hardware validation in this draft (Section 6 states the plan).
 4. Small object set (3 YCB objects); generalization to a broader object distribution untested.
 5. Physics-level non-determinism on marginal grasps (~0.6-1% outcome-flip rate on repeated
    identical execution) — a measurement-noise floor on any single-run success-rate estimate in
@@ -409,14 +413,14 @@ that bears directly on this paper's central claim:
    online rollout failed; 5 demonstrations/object is not enough data to expect closed-loop
    robustness. Report as integration status, not as a result bearing on the paper's central claim.
 
-## 7. Hardware Extension (future work, explicitly not executed in this draft)
+## 6. Hardware Extension (future work, explicitly not executed in this draft)
 
-We designed, but did not execute, a protocol to test whether Section 5.2's simulated advantage
-transfers to physical SO-ARM101 hardware — a sim-to-real gap check, not a re-run of Section 5.2's
+We designed, but did not execute, a protocol to test whether Section 4.2's simulated advantage
+transfers to physical SO-ARM101 hardware — a sim-to-real gap check, not a re-run of Section 4.2's
 statistical claims; a physical pilot that fails to replicate the simulated effect would not
-invalidate Section 5.2, and is the same class of outcome this project's own prior real-hardware
-work has already hit and reported honestly (Section 4's companion investigation; this project's
-independent SO-ARM101 execution-fidelity pilots).
+invalidate Section 4.2, and is the same class of outcome this project's own prior real-hardware
+work has already hit and reported honestly (the companion T-RO paper's own Section 4 investigation;
+this project's independent SO-ARM101 execution-fidelity pilots).
 
 **Object choice, corrected before any data collection.** The critic's object one-hot only covers
 {CrackerBox, MustardBottle, PowerDrill} (Section 3.2); an earlier proposal to pilot on Pear was
@@ -447,7 +451,7 @@ must be re-confirmed live at execution time, not assumed from this document.
 **What this would, and would not, settle.** A completed pilot/scale-up would establish whether the
 simulated +14-16pp advantage survives the sim-to-real gap on CrackerBox and MustardBottle
 specifically, at the tested sample size. It would not establish generalization to PowerDrill or
-Pear, and does not test the risk gate at all (Section 6) — only top-1 critic selection, to keep
+Pear, and does not test the risk gate at all (Section 5) — only top-1 critic selection, to keep
 the physical pilot's scope minimal and interpretable.
 
 **Status, stated plainly.** Camera repositioning (Stage 0 of the protocol) is an unresolved
@@ -456,22 +460,24 @@ a precondition for every later stage. No result from this section exists in this
 future revision adds one, only then would the more ambitious title (this file's header note) be
 earned.
 
-## 8. Conclusion
+## 7. Conclusion
 
-We set out to validate a pre-execution grasp critic and instead found that our own strongest
-reported result for it was invalid — not through a single bug, but two independent evaluation
-defects that each, alone, would have been enough to invalidate the comparison. Rather than treat
-that as a dead end, we applied and extended this project's causal-validity criterion to catch it,
-rebuilt the evaluation as a genuinely paired, causally-admissible design, and found a real,
-replicated, live-executed effect: an object-relative counterfactual critic beats a geometric
-baseline by +15.6pp on an independent development batch (p=0.00258, n=90) and +14.0pp on a frozen,
-pre-registered confirmatory batch never inspected before evaluation (p=3.24e-4, n=150). We report
-this as the paper's central claim, and only this claim — not a claim about the specific pairwise
-loss term, which exact power analysis shows is not resolvable at the current data scale without
-roughly two orders of magnitude more evaluated candidate pools (Section 5.3), and not a claim
-about risk-aware gating, which measurably added nothing here (Section 6). A real-hardware
-validation protocol is designed and the platform is connected and verified, but no hardware result
-exists in this paper; Section 7 states the plan, not a result.
+We proposed an object-relative counterfactual critic for pre-execution grasp candidate selection
+and found a real, replicated, live-executed effect: it beats a geometric baseline by +15.6pp on an
+independent development batch (p=0.00258, n=90) and +14.0pp on a frozen, pre-registered
+confirmatory batch never inspected before evaluation (p=3.24e-4, n=150) — two independent
+confirmations, not one lucky sample. We validated this result to an unusual standard: applying and
+extending this project's causal-validity criterion to a predecessor pipeline in the same problem
+family, we found that its own strongest reported result was invalid — not through a single bug,
+but two independent evaluation defects that each, alone, would have been enough to invalidate the
+comparison. Rather than treat that as a dead end, we rebuilt the evaluation as a genuinely paired,
+causally-admissible design and built our own critic's validation directly on top of the correction.
+We report our positive result as the paper's central claim, and only this claim — not a claim
+about the specific pairwise loss term, which exact power analysis shows is not resolvable at the
+current data scale without roughly two orders of magnitude more evaluated candidate pools
+(Section 4.3), and not a claim about risk-aware gating, which measurably added nothing here
+(Section 5). A real-hardware validation protocol is designed and the platform is connected and
+verified, but no hardware result exists in this paper; Section 6 states the plan, not a result.
 
 The discipline we believe generalizes beyond this specific pipeline is not the critic architecture
 or the loss function — it is the practice of auditing an evaluation's construction before trusting
@@ -485,12 +491,15 @@ plainly, at every step, what the evidence does and does not support.
 - Source of truth for every number in this draft: `results/risk_gated_vla/final_report.md` and
   `audit.md`. If a number here and a number there ever disagree, `final_report.md` wins — it was
   independently re-verified from raw `scenes.jsonl`, this draft was not (yet).
-- Do not add real-hardware numbers to Section 5 or the Abstract until Section 7 actually produces
-  them — this is the exact discipline this paper's own Section 4 is about.
+- Do not add real-hardware numbers to Section 4 or the Abstract until Section 6 actually produces
+  them — this is the exact discipline this paper's own Section 3.4 is about.
 - Venue/template: decided 2026-08-02 — reuse this project's IEEEtran-based LaTeX infrastructure (as
   `paper_tro.tex`/`paper_final.tex` already do — corrected 2026-08-02: `interact` is
   `paper_advanced_robotics.tex`'s class, not theirs) rather than RA-L's exact `paper_final.tex`
-  content, targeting a workshop or a modest-tier evaluation-rigor-focused venue rather than
-  T-RO/RA-L tier (per the standalone-vs-merged analysis this decision followed from). No hard page
-  limit assumed for the first LaTeX pass; trim Section 2/4/6 to fit once an actual venue and its
-  page limit are chosen.
+  content. Target venue narrowed further, also 2026-08-02: Robotica (Cambridge University Press),
+  non-open-access route — a real SCIE-indexed journal, not a workshop, chosen after confirming
+  workshop papers do not count toward this project's specific "WoS SCI-E" requirement; see
+  `paper_risk_gated_vla.tex`'s header comment for Robotica's own submission requirements (abstract
+  word limit, required declarations, LaTeX class only needed at provisional acceptance). No hard
+  page limit was found in Robotica's public author instructions; trim Section 2/3.4/5 first if one
+  turns out to apply.
