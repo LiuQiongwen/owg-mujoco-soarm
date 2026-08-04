@@ -53,9 +53,11 @@ and incomplete results with the same rigor: an ensemble-uncertainty risk gate ca
 held-out data adds no measurable benefit over the ungated critic; whether a pairwise loss term is
 independently responsible for the gain (versus object-relative features alone) is not established
 and is quantifiably unresolvable at the current data scale; and a small-data (15-demonstration)
-imitation policy pilot integrates end-to-end but fails its first closed-loop rollout. We release
-the critic, a causal-validity audit tool, the paired-evaluation harness, and a real-hardware
-validation protocol as a basis for future work.
+imitation policy pilot integrates end-to-end but fails its first closed-loop rollout. The critic,
+a causal-validity audit tool, the paired-evaluation harness, and a real-hardware validation
+protocol are available to support future work (see Data Availability Statement — per user
+decision 2026-08-03, available from the corresponding author upon reasonable request, not a
+public repository).
 
 ## Contributions
 
