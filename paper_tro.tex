@@ -610,6 +610,13 @@ Confirmatory (frozen) & 150 & $54/150$ (36.0\%) & $75/150$ (50.0\%) & $3.24{\tim
 {\footnotesize Stale checkpoint (pre-audit), same corrected harness: AUROC $=0.4996$ on 1{,}500 real per-candidate labels --- chance level.}
 \end{table}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\linewidth]{figures/fig_critic_results.pdf}
+\caption{\Cref{tab:critic_results} as a bar chart. The stale checkpoint's success rate is not shown here since it comes from a disjoint scene population (\texttt{phase1/} base-42, not paired with either batch above) --- see \cref{tab:critic_results}'s caption for its AUROC under the same corrected harness.}
+\label{fig:critic_results}
+\end{figure}
+
 Consistent with this paper's discipline of reporting negative and
 incomplete findings with the same rigor as positive ones, three results
 from the same investigation do not support further claims
@@ -717,6 +724,13 @@ Drill ($n{=}50$) & 30.0\% & 40.0\% & $+10.0$pp & $0.302$ (n.s.) \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.85\linewidth]{figures/fig_offline_vs_live_consistency.pdf}
+\caption{Live-executed (\cref{sec:critic}) and offline re-scored (\cref{sec:multihead}) results on the same confirmatory scene population, shown side by side. These are two different, complementary measurements and are never pooled or averaged into a single number --- the figure exists to show they agree in direction and rough magnitude, not to combine them.}
+\label{fig:offline_vs_live}
+\end{figure}
 
 \begin{table}[t]
 \centering
