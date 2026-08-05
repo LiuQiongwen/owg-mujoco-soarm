@@ -4,10 +4,29 @@
 %% NOT verified: this journal's specific fee/OA policy and review-turnaround claims -- check the
 %% actual "Instructions for Authors" page on tandfonline.com directly before submitting (automated
 %% fetch attempts here returned 403 -- their site blocks non-browser access, so this could not be
-%% confirmed from this environment). Also NOT compilable in this environment (verified 2026-08-02:
-%% `interact.cls` is not installed here) -- compile in an environment with the class available
-%% before submitting; this pass was checked manually for balanced braces/escaping only.
+%% confirmed from this environment; retried 2026-08-05, same 403, consistent not transient). Also
+%% NOT compilable in this environment (verified 2026-08-02, re-verified 2026-08-05 via `tlmgr search
+%% --global` and a full `texlive-full` install: `interact.cls` is genuinely not on CTAN, it is a
+%% T&F-proprietary template) -- compile in an environment with the class available before
+%% submitting; this pass was checked manually for balanced braces/escaping only.
 %%
+%% 2026-08-05 (WebSearch, NOT WebFetch-confirmed from tandfonline.com itself -- both attempts 403'd
+%% again): (a) `interact.cls` IS legitimately obtainable, just not from CTAN -- Taylor & Francis
+%% publishes it as an official Overleaf template gallery entry ("Taylor & Francis LaTeX template for
+%% authors (Interact layout + ...)", e.g. overleaf.com/latex/templates/tagged/tandf), confirmed via
+%% WebFetch to contain `interact.cls` + `interacttfpsample.tex` + `tfp.bst`; open one of those in an
+%% Overleaf account to get a real compile, or download the .cls from there. (b) Two independent
+%% search-engine summaries (not a primary-source fetch, since tandfonline.com itself keeps 403'ing)
+%% state Advanced Robotics uses SINGLE-anonymized review (reviewers know author identity; authors
+%% do not know reviewers) via ScholarOne Manuscripts, not double-anonymous -- consistent with, not
+%% contradicted by, this file's own `\author{\name{Author A}\affil{...}}` block already being
+%% present (unlike the double-blind T-RO/Robotica papers in this same project, which omit it). Still
+%% worth a direct primary-source check before submitting, since this is corroborated-by-search, not
+%% fetched from tandfonline.com itself. Abstract word limit remains genuinely unconfirmed -- search
+%% results for it kept surfacing a different, similarly-named Wiley journal ("Advanced Robotics
+%% Research", advanced.onlinelibrary.wiley.com) rather than this one (T&F, tandfonline.com/tadr20,
+%% ISSN 0169-1864) -- do not trust a word-limit number from search without checking which journal it
+%% actually describes.
 %% STATUS (2026-08-02): REFRAMED, per explicit instruction, around this project's own critical
 %% ablation finding (`tango_robot/piper_robosuite/README.md`, "DECISIVE FINDING" 2026-07-21 and its
 %% n=152 rescale 2026-07-22): CR-CFM (the learned flow-matching policy) adds no measurable value
