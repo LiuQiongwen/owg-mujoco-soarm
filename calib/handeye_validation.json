@@ -1,0 +1,34 @@
+{
+  "schema": "handeye_holdout_validation_v1",
+  "generated_by": "scripts/validate_handeye_holdout.py",
+  "generated_at": "2026-08-05T04:43:47.276890+00:00",
+  "method": "Held-out split of calib/handeye_samples.json: T_cam2base refit on the same first 12 samples used by scripts/solve_handeye.py (cv2.calibrateHandEye, TSAI, eye-to-hand inversion trick, identical math), then applied to the remaining 14 samples that were never used in any fit. NOT a vision-style reprojection RMSE against independently-known ground truth -- no such ground-truth correspondence data currently exists in this project (see docstring: calib/charuco_robot_points.jsonl's point_id/charuco_id does not denote a verified touch-point correspondence). This is a held-out generalization check using the same target-in-base spread diagnostic scripts/solve_handeye.py already reports in-sample.",
+  "sanity_check": {
+    "refit_reproduces_existing_cam_to_base_json": true,
+    "max_abs_element_diff": 0.0,
+    "note": "Confirms this script's fit math matches scripts/solve_handeye.py before trusting the held-out extension below."
+  },
+  "n_fit_samples": 12,
+  "n_holdout_samples_raw": 14,
+  "n_holdout_distinct_novel_poses": 9,
+  "n_holdout_samples_repeating_a_fit_pose": 1,
+  "pseudoreplication_note": "Of the 14 held-out samples, 1 duplicates the exact joint pose of a training sample (no new information) and 5 are repeated captures of a single other pose. Only 9 held-out samples correspond to genuinely distinct, never-fit physical configurations. reprojection_rmse_m below is computed over per-pose cluster means (n=9) to avoid repeated captures at one pose silently deflating the spread estimate.",
+  "reprojection_rmse_m": 0.08316169573472253,
+  "reprojection_rmse_m_caveat": "Held-out target-in-base RMS radial spread across 9 distinct novel poses, NOT an externally-referenced ground-truth reprojection error. Treat as a generalization consistency proxy, not a calibrated accuracy bound.",
+  "reprojection_rmse_m_std_per_axis": [
+    0.04233735176724526,
+    0.05273958174003045,
+    0.0483937268734053
+  ],
+  "reprojection_rmse_m_naive_all_14_raw_samples": 0.0768295512942875,
+  "reprojection_rmse_m_naive_std_per_axis": [
+    0.03518278729138295,
+    0.045078200493285196,
+    0.05131186286598877
+  ],
+  "existing_in_sample_target_in_base_std_m": [
+    0.05229701656083757,
+    0.08258633926793851,
+    0.06207965373809466
+  ]
+}

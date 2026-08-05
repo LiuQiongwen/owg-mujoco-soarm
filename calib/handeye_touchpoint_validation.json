@@ -1,0 +1,11 @@
+{
+  "schema": "handeye_touchpoint_validation_v1",
+  "generated_by": "scripts/validate_handeye_touchpoints.py",
+  "generated_at": "2026-08-05T04:57:16.224608+00:00",
+  "kabsch_self_test_passed": true,
+  "n_total_records_in_file": 7,
+  "n_confirmed_touch_points": 0,
+  "min_schema_version_trusted": "1.1",
+  "status": "no_confirmed_touch_points_yet",
+  "note": "No records with touch_confirmed_by_operator=true found. All 7 existing record(s) predate the --confirm-touch fix to scripts/collect_charuco_robot_point.py and are not usable as ground truth. Run that script with --confirm-touch after physically touching the gripper to a known charuco corner to start building real ground-truth data. reprojection_rmse_m is intentionally omitted -- computing one from zero points would be meaningless."
+}
