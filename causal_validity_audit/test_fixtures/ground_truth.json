@@ -1,0 +1,46 @@
+{
+  "_comment": "Ground truth labels for the auto_tagger.py validation suite (AUDIT_TOOL_VALIDATION_PLAN.md Stage 1). Each entry: [fixture_file, function_name, field_name] -> {expected: PRE_EXECUTION|EXECUTION_DERIVED, category, expected_tool_outcome}. expected_tool_outcome documents whether we predict the tool gets this right (\"pass\"), or whether this is a KNOWN, documented limitation we expect it to miss (\"expected_miss\" for false negatives, \"expected_false_positive\" for false positives) -- do not silently patch the tool to force these two to pass; report them honestly.",
+  "entries": [
+    {"file": "fixture_01_clean.py", "function": "select_candidate", "field": "x", "expected": "PRE_EXECUTION", "category": 1, "expected_tool_outcome": "pass"},
+    {"file": "fixture_01_clean.py", "function": "select_candidate", "field": "y", "expected": "PRE_EXECUTION", "category": 1, "expected_tool_outcome": "pass"},
+    {"file": "fixture_01_clean.py", "function": "select_candidate", "field": "z", "expected": "PRE_EXECUTION", "category": 1, "expected_tool_outcome": "pass"},
+    {"file": "fixture_01_clean.py", "function": "select_candidate", "field": "yaw", "expected": "PRE_EXECUTION", "category": 1, "expected_tool_outcome": "pass"},
+
+    {"file": "fixture_02_derived.py", "function": "grasp_and_log", "field": "target_x", "expected": "PRE_EXECUTION", "category": 2, "expected_tool_outcome": "pass"},
+    {"file": "fixture_02_derived.py", "function": "grasp_and_log", "field": "post_close_drift", "expected": "EXECUTION_DERIVED", "category": 2, "expected_tool_outcome": "pass"},
+
+    {"file": "fixture_03_multihop.py", "function": "grasp_and_score", "field": "approach_yaw", "expected": "PRE_EXECUTION", "category": 3, "expected_tool_outcome": "pass"},
+    {"file": "fixture_03_multihop.py", "function": "grasp_and_score", "field": "quality_score", "expected": "EXECUTION_DERIVED", "category": 3, "expected_tool_outcome": "pass"},
+
+    {"file": "fixture_04_reassignment.py", "function": "grasp_with_refresh", "field": "grasp_yaw", "expected": "EXECUTION_DERIVED", "category": 4, "expected_tool_outcome": "pass"},
+
+    {"file": "fixture_05_misleading_comment.py", "function": "grasp_and_log_legacy_fields", "field": "x", "expected": "PRE_EXECUTION", "category": 5, "expected_tool_outcome": "pass"},
+    {"file": "fixture_05_misleading_comment.py", "function": "grasp_and_log_legacy_fields", "field": "dz", "expected": "PRE_EXECUTION", "category": 5, "expected_tool_outcome": "pass"},
+
+    {"file": "fixture_06_settle_step.py", "function": "observe_scene_then_grasp", "field": "object_height", "expected": "PRE_EXECUTION", "category": 6, "expected_tool_outcome": "pass"},
+
+    {"file": "fixture_07_name_collision.py", "function": "grasp_with_two_yaw_fields", "field": "yaw", "expected": "PRE_EXECUTION", "category": 7, "expected_tool_outcome": "pass"},
+    {"file": "fixture_07_name_collision.py", "function": "grasp_with_two_yaw_fields", "field": "grasp_yaw", "expected": "EXECUTION_DERIVED", "category": 7, "expected_tool_outcome": "pass"},
+
+    {"file": "fixture_08_unknown_entry_method.py", "function": "grasp_with_aliased_handle", "field": "approach_x", "expected": "PRE_EXECUTION", "category": 8, "expected_tool_outcome": "pass"},
+    {"file": "fixture_08_unknown_entry_method.py", "function": "grasp_with_aliased_handle", "field": "sim_x", "expected": "EXECUTION_DERIVED", "category": 8, "expected_tool_outcome": "expected_miss"},
+
+    {"file": "fixture_09_static_config.py", "function": "grasp_with_static_config_read", "field": "approach_z", "expected": "PRE_EXECUTION", "category": 9, "expected_tool_outcome": "pass"},
+    {"file": "fixture_09_static_config.py", "function": "grasp_with_static_config_read", "field": "gripper_width", "expected": "PRE_EXECUTION", "category": 9, "expected_tool_outcome": "expected_false_positive"},
+
+    {"file": "fixture_10_interprocedural.py", "function": "grasp_via_helper", "field": "approach_yaw", "expected": "PRE_EXECUTION", "category": 10, "expected_tool_outcome": "pass"},
+    {"file": "fixture_10_interprocedural.py", "function": "grasp_via_helper", "field": "measured_force", "expected": "EXECUTION_DERIVED", "category": 10, "expected_tool_outcome": "pass"},
+
+    {"file": "fixture_11_baseline_padding.py", "function": "grasp_object_id_and_width", "field": "width", "expected": "PRE_EXECUTION", "category": 11, "expected_tool_outcome": "pass"},
+    {"file": "fixture_11_baseline_padding.py", "function": "grasp_object_id_and_width", "field": "object_id", "expected": "PRE_EXECUTION", "category": 11, "expected_tool_outcome": "pass"},
+    {"file": "fixture_11_baseline_padding.py", "function": "grasp_and_measure_lift", "field": "roll", "expected": "PRE_EXECUTION", "category": 11, "expected_tool_outcome": "pass"},
+    {"file": "fixture_11_baseline_padding.py", "function": "grasp_and_measure_lift", "field": "pitch", "expected": "PRE_EXECUTION", "category": 11, "expected_tool_outcome": "pass"},
+    {"file": "fixture_11_baseline_padding.py", "function": "grasp_and_measure_lift", "field": "lift_height", "expected": "EXECUTION_DERIVED", "category": 11, "expected_tool_outcome": "pass"},
+    {"file": "fixture_11_baseline_padding.py", "function": "grasp_and_measure_lift", "field": "settled_ok", "expected": "EXECUTION_DERIVED", "category": 11, "expected_tool_outcome": "pass"},
+    {"file": "fixture_11_baseline_padding.py", "function": "grasp_with_static_geometry", "field": "dist_to_centroid", "expected": "PRE_EXECUTION", "category": 11, "expected_tool_outcome": "pass"},
+    {"file": "fixture_11_baseline_padding.py", "function": "grasp_with_static_geometry", "field": "bbox_extent", "expected": "PRE_EXECUTION", "category": 11, "expected_tool_outcome": "pass"},
+
+    {"file": "fixture_12_subscript_assignment.py", "function": "label_candidate_pool", "field": "approach_yaw", "expected": "PRE_EXECUTION", "category": 12, "expected_tool_outcome": "pass"},
+    {"file": "fixture_12_subscript_assignment.py", "function": "label_candidate_pool", "field": "simulation_quality", "expected": "EXECUTION_DERIVED", "category": 12, "expected_tool_outcome": "pass"}
+  ]
+}
