@@ -27,6 +27,30 @@ Public API
   transform_points(points, T)                         → (N, 3) transformed
   mujoco_depth_to_world_points(depth, seg, ...)       → (N, 3) world frame
   pybullet_depth_to_world_points(zbuffer, seg, ...)   → (N, 3) world frame
+
+Preprocessing (added 2026-08-05)
+─────────────────────────────────
+Before this, voxel downsampling / outlier removal / plane segmentation /
+workspace cropping were each reimplemented ad hoc in individual scripts
+(grasp_6dof/grasp_sampler.py, grasp_6dof/generate_grasps_open3d.py,
+cameras/noise_characterization.py), untested as shared units. This is exactly
+the failure class documented in paperA_data/README.md's GeoEBM postmortem:
+one such ad hoc script's uniform downsample-to-3000-points left only ~9
+points within 3cm of the target object, silently saturating downstream
+geometric features to a degenerate fallback rather than erroring -- already
+fixed at that specific call site, but nothing stopped the same pattern from
+recurring elsewhere, since there was no shared, tested implementation to use
+instead. crop_to_workspace / remove_statistical_outliers /
+segment_and_remove_plane / voxel_downsample are that shared implementation;
+preprocess_pointcloud chains them in the standard order (crop first, for
+efficiency and to keep outlier-removal/plane-fit statistics workspace-local
+rather than skewed by irrelevant background geometry).
+
+  crop_to_workspace(points, bounds)                        → (N', 3)
+  remove_statistical_outliers(points, nb_neighbors, std_ratio) → (N', 3), inlier_mask
+  segment_and_remove_plane(points, distance_threshold, ...) → (N', 3), plane_model
+  voxel_downsample(points, voxel_size)                     → (N', 3)
+  preprocess_pointcloud(points, ...)                       → (N', 3), stats dict
 """
 
 from __future__ import annotations
@@ -259,3 +283,141 @@ def obs_to_object_points(obs: dict,
             target_ids=obj_ids)
     else:
         raise ValueError(f"Unknown backend: {backend!r}.  Use 'mujoco' or 'pybullet'.")
+
+
+# ── preprocessing (shared, tested -- see module docstring for why) ───────────
+
+def crop_to_workspace(points: np.ndarray, bounds) -> np.ndarray:
+    """Keep only points inside an axis-aligned world-frame box.
+
+    Args:
+        points : (N, 3) float32/float64.
+        bounds : ((xmin, xmax), (ymin, ymax), (zmin, zmax)).
+
+    Returns:
+        (N', 3) points inside the box. Empty input returns empty output
+        (not an error) -- an empty cloud is a valid, meaningful state for a
+        caller to check, not a failure this function should mask or raise on.
+    """
+    if len(points) == 0:
+        return points
+    (xmin, xmax), (ymin, ymax), (zmin, zmax) = bounds
+    keep = (
+        (points[:, 0] >= xmin) & (points[:, 0] <= xmax) &
+        (points[:, 1] >= ymin) & (points[:, 1] <= ymax) &
+        (points[:, 2] >= zmin) & (points[:, 2] <= zmax)
+    )
+    return points[keep]
+
+
+def voxel_downsample(points: np.ndarray, voxel_size: float) -> np.ndarray:
+    """Voxel-grid downsample via Open3D (lazy-imported, matching the existing
+    lazy-import convention in cameras/noise_characterization.py -- this
+    module stays importable without Open3D installed unless a caller
+    actually uses a preprocessing function)."""
+    if len(points) == 0 or voxel_size is None or voxel_size <= 0:
+        return points
+    import open3d as o3d
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(np.asarray(points, dtype=np.float64))
+    down = pcd.voxel_down_sample(voxel_size=voxel_size)
+    return np.asarray(down.points, dtype=points.dtype if hasattr(points, "dtype") else np.float64)
+
+
+def remove_statistical_outliers(points: np.ndarray, nb_neighbors: int = 20,
+                                 std_ratio: float = 2.0):
+    """Statistical outlier removal via Open3D: for each point, compute the
+    mean distance to its nb_neighbors nearest neighbours, then drop points
+    whose mean distance exceeds (global_mean + std_ratio * global_std).
+
+    Returns:
+        (points_inliers (N', 3), inlier_mask (N,) bool) -- the mask is
+        returned alongside the filtered points so a caller can apply the same
+        filter to a parallel array (e.g. per-point RGB or segmentation ids)
+        without recomputing anything.
+    """
+    n = len(points)
+    if n == 0:
+        return points, np.zeros(0, dtype=bool)
+    if n <= nb_neighbors:
+        # Too few points for the neighbour statistic to be meaningful --
+        # explicit no-op rather than a misleading/degenerate Open3D call.
+        return points, np.ones(n, dtype=bool)
+    import open3d as o3d
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(np.asarray(points, dtype=np.float64))
+    _, inlier_idx = pcd.remove_statistical_outlier(
+        nb_neighbors=nb_neighbors, std_ratio=std_ratio)
+    mask = np.zeros(n, dtype=bool)
+    mask[np.asarray(inlier_idx, dtype=int)] = True
+    return points[mask], mask
+
+
+def segment_and_remove_plane(points: np.ndarray, distance_threshold: float = 0.01,
+                              ransac_n: int = 3, num_iterations: int = 1000):
+    """RANSAC-fit the dominant plane (the table, in this project's tabletop
+    setting) and return the points NOT on it, plus the fitted plane model.
+
+    Returns:
+        (points_above_plane (N', 3), plane_model (a, b, c, d) for
+        ax+by+cz+d=0, or None if there were too few points to fit a plane).
+    """
+    n = len(points)
+    if n < ransac_n:
+        return points, None
+    import open3d as o3d
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(np.asarray(points, dtype=np.float64))
+    plane_model, inlier_idx = pcd.segment_plane(
+        distance_threshold=distance_threshold, ransac_n=ransac_n,
+        num_iterations=num_iterations)
+    mask = np.ones(n, dtype=bool)
+    mask[np.asarray(inlier_idx, dtype=int)] = False  # drop plane inliers, keep the rest
+    return points[mask], plane_model
+
+
+def preprocess_pointcloud(points: np.ndarray,
+                           workspace_bounds=None,
+                           voxel_size: Optional[float] = None,
+                           outlier_nb_neighbors: Optional[int] = None,
+                           outlier_std_ratio: float = 2.0,
+                           plane_distance_threshold: Optional[float] = None):
+    """Chain the standard preprocessing steps in the standard order: crop →
+    voxel downsample → statistical outlier removal → RANSAC plane removal.
+    Crop goes first (cheap, and keeps every later step's statistics
+    workspace-local instead of skewed by irrelevant background geometry);
+    each later step is skipped entirely when its parameter is left None, so
+    a caller only pays for what it asks for.
+
+    This is a convenience default, not a mandate -- a caller with different
+    ordering needs can call the individual functions above directly instead.
+
+    Returns:
+        (points (N', 3), stats dict) -- stats records the point count after
+        each step under keys "n_raw", "n_after_crop", "n_after_voxel",
+        "n_after_outlier_removal", "n_after_plane_removal" (only the keys for
+        steps actually run are present), so a caller can detect and log the
+        exact "3000 points -> 9 near object" failure class this module's
+        docstring describes, instead of it happening silently.
+    """
+    stats = {"n_raw": len(points)}
+
+    if workspace_bounds is not None:
+        points = crop_to_workspace(points, workspace_bounds)
+        stats["n_after_crop"] = len(points)
+
+    if voxel_size is not None:
+        points = voxel_downsample(points, voxel_size)
+        stats["n_after_voxel"] = len(points)
+
+    if outlier_nb_neighbors is not None:
+        points, _ = remove_statistical_outliers(
+            points, nb_neighbors=outlier_nb_neighbors, std_ratio=outlier_std_ratio)
+        stats["n_after_outlier_removal"] = len(points)
+
+    if plane_distance_threshold is not None:
+        points, _ = segment_and_remove_plane(
+            points, distance_threshold=plane_distance_threshold)
+        stats["n_after_plane_removal"] = len(points)
+
+    return points, stats
