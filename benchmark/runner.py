@@ -74,6 +74,20 @@ class SamplingConfig:
     yaw_hi:       float =  math.pi / 2
     opening_lo:   float = 0.04
     opening_hi:   float = 0.09
+    # Opt-in hard pre-execution validity filter (added 2026-08-05, default
+    # False = byte-identical behaviour to before this existed). _sample_candidates
+    # is pure uniform random around the object centroid with NO collision/
+    # reachability check of any kind -- confirmed by reading the full
+    # candidate->rank->execute path, nothing anywhere in this pipeline rejects
+    # a geometrically invalid candidate before physically attempting it. This
+    # is a real gap relative to standard grasp-generation practice (Dex-Net,
+    # Contact-GraspNet, GraspGen all hard-filter on collision-free +
+    # IK-reachable before ever scoring/executing a candidate). Uses the
+    # existing, already-validated EnvironmentSoArm.compute_ik_reachability_per_candidate
+    # (runs on a scratch MjData, cannot leak simulation state into the real
+    # episode) -- no new IK/collision logic invented here.
+    ik_reachability_filter:       bool  = False
+    ik_reachability_residual_max: float = 0.03  # metres
 
 
 @dataclass
@@ -309,6 +323,14 @@ class BenchmarkRunner:
         # ── sample grasp candidates ───────────────────────────────────────────
         grasp_rng  = np.random.default_rng(seed + 9999)
         candidates = _sample_candidates(obj_pos, grasp_rng, self.cfg)
+
+        # ── opt-in hard pre-execution validity filter (default off) ───────────
+        if self.cfg.sampling.ik_reachability_filter:
+            candidates, ik_filter_stats = _filter_ik_reachable(candidates, env, self.cfg.sampling)
+            if self.cfg.verbose and ik_filter_stats["n_ik_rejected"] > 0:
+                print(f"  [ik_filter] rejected {ik_filter_stats['n_ik_rejected']}/"
+                      f"{ik_filter_stats['n_input']} candidates (unreachable/non-converged)")
+
         n_cands    = len(candidates)
 
         # ── rank ──────────────────────────────────────────────────────────────
@@ -472,3 +494,30 @@ def _sample_candidates(
     Hs   = np.full(N, H_val)
 
     return np.column_stack([xs, ys, zs, yaws, ops, Hs]).astype(np.float32)
+
+
+def _filter_ik_reachable(candidates: np.ndarray, env, sc: SamplingConfig) -> np.ndarray:
+    """Opt-in hard pre-execution filter: drop candidates whose (x,y,z,yaw)
+    doesn't IK-converge from HOME_QPOS, or whose residual exceeds
+    sc.ik_reachability_residual_max. See SamplingConfig.ik_reachability_filter's
+    docstring for why this exists. Uses env.compute_ik_reachability_per_candidate
+    unchanged -- no new IK logic here, just gating on its existing output.
+
+    Returns candidates unchanged if filtering would remove everything (an
+    empty candidate pool would just make every attempt fail with a confusing
+    "all_attempts_failed" reason instead of a clear one) -- but this is
+    reported via the returned dict's n_ik_rejected count for the caller to log.
+    """
+    if len(candidates) == 0:
+        return candidates, {"n_input": 0, "n_ik_rejected": 0, "n_output": 0}
+    poses = [(c[0], c[1], c[2], c[3]) for c in candidates]
+    ik_results = env.compute_ik_reachability_per_candidate(poses)
+    keep_mask = np.array([
+        r["ik_converged"] and r["ik_residual"] <= sc.ik_reachability_residual_max
+        for r in ik_results
+    ])
+    stats = {"n_input": len(candidates), "n_ik_rejected": int((~keep_mask).sum()),
+              "n_output": int(keep_mask.sum())}
+    if not keep_mask.any():
+        return candidates, stats
+    return candidates[keep_mask], stats
