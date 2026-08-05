@@ -337,8 +337,13 @@ property of code, not of a field's name.
 We checked the criterion against two recent published systems chosen to
 stress-test both directions of the boundary. GraspGen \cite{graspgen2025}
 is confirmed to satisfy it: its discriminator's inference-time inputs are
-a point-cloud encoding and candidate pose only; training labels are
-simulated shaking-motion outcomes. Freeform Preference Learning
+a point-cloud encoding and candidate pose only (verified directly against
+the released code, commit \texttt{2dd8852}:
+\texttt{grasp\_gen/models/discriminator.py}'s \texttt{forward} and its
+call site \texttt{grasp\_gen/grasp\_server.py::score\_grasps\_with\_%
+discriminator}, whose only inputs are a centered point cloud and centered
+candidate poses); training labels are simulated shaking-motion outcomes.
+Freeform Preference Learning
 \cite{fpl2026} is confirmed as a correct \emph{non-flagged} boundary case:
 its reward model legitimately takes trajectory-level, execution-derived
 input, because its role in the pipeline -- post-hoc reward shaping for
@@ -472,6 +477,135 @@ including confirming that a success-derived label field is
 execution-derived (correct, since it is the training label, exempt under
 the Corollary) while the pose-derived features are genuinely
 pre-execution and safe for live selection.
+
+\subsection{Controlled fixture validation}
+\label{sec:fixtures}
+
+The internal case studies above show the tagger catching real bugs, but do
+not by themselves bound its detection rate: a clean scan of unfamiliar
+code is uninterpretable without knowing how often the tool misses a true
+violation or flags a false one. We built a labeled benchmark of 14 fixture
+functions spanning 12 categories and 30 individually labeled fields
+(clean pre-execution assignment, direct execution-derivation, multi-hop
+taint propagation, post-commit reassignment, dead-constant fields behind a
+misleading comment, a pre-marker settle step reusing a live method name,
+field-name collision, aliased/renamed environment handles, static
+configuration reads, interprocedural taint through a helper, mixed-label
+baseline padding, and subscript-assignment field writes -- the last
+category added after auditing real external code, \cref{sec:extboundary}).
+Each fixture's expected label was fixed before running the tagger, and
+several categories were deliberately designed to characterize a known
+heuristic boundary rather than to be trivially passable.
+
+\begin{table}[t]
+\centering
+\caption{Controlled fixture validation, $n=30$ labeled fields.}
+\label{tab:fixturevalidation}
+\begin{tabular}{@{}lr@{}}
+\toprule
+Metric & Value \\
+\midrule
+Accuracy & $0.933$ \\
+Precision (EXECUTION\_DERIVED positive) & $0.889$ \\
+Recall & $0.889$ \\
+F1 & $0.889$ \\
+False positive rate & $0.048$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Of 30 labeled fields, 28 were classified correctly; the two disagreements
+are both pre-registered, expected characterizations of the tool's static
+heuristics, not surprises found after the fact. \textbf{Aliasing false
+negative}: the tagger's execution-touching checks match a hardcoded
+variable name (\texttt{env}); a physical-actuation handle passed under any
+other name (a renamed parameter, \texttt{self.env}, \texttt{sim}) is
+invisible to it. \textbf{Static-configuration false positive}: the same
+heuristic that lets the tagger recognize live-state reads
+(``any attribute chain rooted at a variable named \texttt{env}'') cannot
+distinguish a static, construction-time configuration read from a genuine
+live-state read -- both are syntactically identical \texttt{env.*} access.
+Both are stated here as known limitations of the current static
+implementation, not smoothed into the headline numbers.
+
+One methodological note is worth keeping rather than hiding: two of our
+own hypotheses about the aliasing case were wrong before the fixture
+suite was actually run. The original design intent assumed the tagger
+would miss an execution call under an \emph{unrecognized method name}
+(e.g.\ \texttt{env.advance\_physics(...)} against a fixed list of known
+entry-point names); two fixture attempts built around that mechanism both
+passed, because the actual check walks any attribute chain rooted at
+\texttt{env} regardless of the specific method name, making the assumed
+method-name list irrelevant to this code path. Only reading the exact AST
+condition -- not the docstring describing it -- revealed the real,
+narrower mechanism (the hardcoded variable name), and the fixture was
+rewritten a third time around that. The same discipline this tool exists
+to enforce on other people's code -- read the code, not a comment
+describing it -- turned out to be necessary to characterize the tool
+itself correctly.
+
+\subsection{External boundary checks}
+\label{sec:extboundary}
+
+\Cref{sec:external} checked the criterion conceptually against two
+published systems. Here we report what happened when the automated
+tagger (\cref{sec:autotag}) was pointed at code we did not write, with
+no prior familiarity, and no marker placed until after independent
+verification. These are boundary/specificity checks against two systems,
+not a benchmark: we make no claim that either codebase is exhaustively
+verified clean, only what is reported for the specific paths inspected.
+
+Auditing Sim-Grasp \cite{simgrasp2024}
+(\texttt{grasp\_simulation.py::main\_simulation\_loop}) exposed a
+field-writing pattern the tagger could not see at all: a result written
+via subscript assignment to an existing container
+(\texttt{new\_candidates[obj]["grasp\_samples"][idx]["simulation\_quality"]
+= 1}), rather than the \texttt{return \{\ldots\}} or
+\texttt{dict(k=v)} patterns the tool previously recognized. We extended
+the tagger to recognize this pattern (Category 12,
+\cref{sec:fixtures}) and re-validated the full fixture suite afterward --
+identical accuracy, no regression on any previously-passing category.
+This is the value of external boundary checks distinct from a fixture
+benchmark: a fixture suite can only characterize failure modes someone
+already thought to construct, while unfamiliar real code surfaces
+coverage gaps a benchmark's author would not have anticipated.
+
+Applying the extended tagger to the same function without a commit marker
+flags every field as PRE\_EXECUTION by design (\cref{sec:autotag}'s
+fail-closed convention: no marker means no execution boundary has been
+asserted, so nothing can be shown tainted) -- correctly reported as not
+yet meaningful evidence on its own. Manually tracing the call graph before
+placing a marker showed why a marker would have been the wrong next step:
+\texttt{main\_simulation\_loop} runs a post-placement stress test (lowers
+a supporting surface under the object, checks whether it stayed in place)
+and writes \texttt{simulation\_quality} as the resulting label -- it is
+not a candidate-scoring function at all. The candidate pose is committed
+earlier, by \texttt{RobotSpawner.spawn} placing the gripper directly at
+the candidate's translation and rotation, before
+\texttt{main\_simulation\_loop} is ever called. Labels are explicitly
+exempt from the PRE\_EXECUTION requirement under our own Corollary, so
+\texttt{simulation\_quality} being execution-derived is correct and
+expected -- treating this as a discovered violation would have been an
+unsupportable claim, caught by the same manual-verification discipline
+this method argues for, applied to itself, before any marker was placed
+or any claim written down. We report this not as a violation found in
+Sim-Grasp, but as the audit \emph{process} correctly declining to make an
+unsupported claim -- a legitimate, if less dramatic, external-validation
+outcome in its own right.
+
+Taken together, \cref{sec:fixtures,sec:extboundary} bound what this tool
+can be trusted to do: it is a static analyzer, and pure static analysis
+cannot always establish the actual runtime path taken by dynamic Python
+(dynamic dispatch, monkey-patching, config-driven branching are all
+outside its reach). Every finding reported anywhere in this paper that
+came from the tagger was manually verified against the underlying code
+before being trusted, not accepted on the tool's output alone -- the
+detection-rate numbers in \cref{tab:fixturevalidation} describe how often
+that manual step would be needed to catch a miss, not a guarantee that it
+would always succeed at doing so on unfamiliar code. A hybrid
+static-plus-runtime-taint design would be more defensible than a
+static-only one; this is a stated scope limitation of the current tool,
+independent of how clean any particular scan turns out to be.
 
 \subsection{An independently discovered infrastructure bug, and a stronger re-verification}
 \label{sec:rngbug}
@@ -789,6 +923,12 @@ M.~Carlson, F.~Ramos, S.~Birchfield, D.~Fox, and C.~Eppner,
 ``GraspGen: A Diffusion-based Framework for 6-DOF Grasping with
   On-Generator Training,''
 \emph{arXiv:2507.13097}, 2025.
+
+\bibitem{simgrasp2024}
+J.~Li and D.~J.~Cappelleri,
+``Sim-Grasp: Learning 6-DOF Grasp Policies for Cluttered Environments
+  Using a Synthetic Benchmark,''
+\emph{arXiv:2405.00841}, 2024.
 
 \bibitem{graspgenx2026}
 B.~Han, Y.-W.~Chao, E.~Coumans, C.~Eppner, B.~Sundaralingam,
