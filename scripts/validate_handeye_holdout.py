@@ -103,6 +103,63 @@ def pose_key(sample):
     return tuple(round(a, POSE_ROUND_DECIMALS) for a in sample["joint_angles_rad"])
 
 
+def root_cause_diagnostics(samples):
+    """Summarize the two per-sample quality signals scripts/capture_handeye_sample.py
+    started recording 2026-08-05 (reprojection_rms_px, joint_to_camera_gap_s),
+    added specifically to distinguish two leading hypotheses for the ~8cm
+    held-out calibration error this script otherwise measures: checkerboard
+    corner-detection noise vs. timing/settling skew between the joint-angle
+    read and the camera capture. Rotational diversity among the fit samples
+    and the eye-to-hand inversion math were already checked and ruled out as
+    explanations (see this script's own sanity_check, and the manual
+    pairwise-rotation-spread check run alongside this addition -- mean 36.8
+    degrees, only 3/66 pairs below 10 degrees, well-conditioned).
+
+    Returns None (with an explanatory status) if no sample in the given list
+    has these fields yet -- true for all 26 samples collected before this
+    diagnostic existed, so this always returns "not_available" until a new
+    real capture session is run.
+    """
+    with_diag = [s for s in samples if "reprojection_rms_px" in s and "joint_to_camera_gap_s" in s]
+    if not with_diag:
+        return {
+            "status": "not_available",
+            "note": (
+                "None of the current samples have reprojection_rms_px / "
+                "joint_to_camera_gap_s -- they all predate this diagnostic "
+                "(added 2026-08-05 to scripts/capture_handeye_sample.py). "
+                "Run a new real calibration session with the updated script "
+                "to populate this."
+            ),
+        }
+    rms_px = np.array([s["reprojection_rms_px"] for s in with_diag])
+    gap_s = np.array([s["joint_to_camera_gap_s"] for s in with_diag])
+    return {
+        "status": "available",
+        "n_samples_with_diagnostics": len(with_diag),
+        "reprojection_rms_px": {
+            "mean": float(rms_px.mean()), "max": float(rms_px.max()),
+            "min": float(rms_px.min()),
+        },
+        "joint_to_camera_gap_s": {
+            "mean": float(gap_s.mean()), "max": float(gap_s.max()),
+            "min": float(gap_s.min()),
+        },
+        "interpretation_guide": (
+            "High reprojection_rms_px (roughly >1-2px is suspicious for a "
+            "15mm-square checkerboard at typical working distance) points at "
+            "corner-detection noise as a contributor. A large "
+            "joint_to_camera_gap_s (multi-second) combined with LOW "
+            "reprojection error instead points at timing/settling skew "
+            "between reading the arm's joint angles and capturing the camera "
+            "frame -- e.g. cheap servo backlash/settling not having finished. "
+            "Neither is a final diagnosis by itself; correlate against "
+            "per-sample residuals in a future analysis pass once enough "
+            "diagnosed samples exist."
+        ),
+    }
+
+
 def rms_radial_spread(points):
     points = np.asarray(points)
     std = points.std(axis=0)
@@ -202,6 +259,7 @@ def main():
         "reprojection_rmse_m_naive_all_14_raw_samples": rmse_naive,
         "reprojection_rmse_m_naive_std_per_axis": std_naive,
         "existing_in_sample_target_in_base_std_m": existing.get("target_in_base_std"),
+        "root_cause_diagnostics": root_cause_diagnostics(samples),
     }
 
     out_path = Path(args.out)

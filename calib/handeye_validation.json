@@ -1,7 +1,7 @@
 {
   "schema": "handeye_holdout_validation_v1",
   "generated_by": "scripts/validate_handeye_holdout.py",
-  "generated_at": "2026-08-05T04:43:47.276890+00:00",
+  "generated_at": "2026-08-05T07:14:53.025874+00:00",
   "method": "Held-out split of calib/handeye_samples.json: T_cam2base refit on the same first 12 samples used by scripts/solve_handeye.py (cv2.calibrateHandEye, TSAI, eye-to-hand inversion trick, identical math), then applied to the remaining 14 samples that were never used in any fit. NOT a vision-style reprojection RMSE against independently-known ground truth -- no such ground-truth correspondence data currently exists in this project (see docstring: calib/charuco_robot_points.jsonl's point_id/charuco_id does not denote a verified touch-point correspondence). This is a held-out generalization check using the same target-in-base spread diagnostic scripts/solve_handeye.py already reports in-sample.",
   "sanity_check": {
     "refit_reproduces_existing_cam_to_base_json": true,
@@ -30,5 +30,9 @@
     0.05229701656083757,
     0.08258633926793851,
     0.06207965373809466
-  ]
+  ],
+  "root_cause_diagnostics": {
+    "status": "not_available",
+    "note": "None of the current samples have reprojection_rms_px / joint_to_camera_gap_s -- they all predate this diagnostic (added 2026-08-05 to scripts/capture_handeye_sample.py). Run a new real calibration session with the updated script to populate this."
+  }
 }

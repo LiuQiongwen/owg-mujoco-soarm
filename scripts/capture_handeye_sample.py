@@ -25,6 +25,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -37,12 +38,44 @@ os.environ.setdefault("MUJOCO_GL", "egl")
 CHECKERBOARD = (8, 6)   # internal corners (cols, rows)
 SQUARE_SIZE_M = 0.015
 SAMPLES_PATH = Path("calib/handeye_samples.json")
+CALIBRATION_PATH = Path.home() / ".cache/huggingface/lerobot/calibration/robots/so101_follower/my_follower.json"
 
 
 def get_real_joint_angles() -> np.ndarray:
     """Read current 5-DoF arm joint angles (radians) from the real follower."""
+    # Load LeRobot before the project root's ``datasets`` package to avoid
+    # shadowing HuggingFace datasets (same compatibility fix as real_hw_connect).
+    project_root = str(Path(__file__).resolve().parent.parent)
+    sys.path[:] = [item for item in sys.path if item != project_root and item != ""]
+    from lerobot.motors.feetech import FeetechMotorsBus  # noqa: F401
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "datasets.episode", Path(__file__).resolve().parent.parent / "datasets" / "episode.py"
+    )
+    episode_mod = importlib.util.module_from_spec(spec)
+    sys.modules["datasets.episode"] = episode_mod
+    spec.loader.exec_module(episode_mod)
+    sys.path.insert(0, project_root)
+
     from robots.soarm_real_backend import SOARMRealBackend
-    backend = SOARMRealBackend(port="/dev/ttyACM0", robot_id="my_follower")
+    from cameras.base import CameraBase
+
+    class _NullCamera(CameraBase):
+        def camera_id(self): return "null"
+        @property
+        def width(self): return 0
+        @property
+        def height(self): return 0
+        def fov_deg(self): return 0.0
+        def intrinsics(self): return np.eye(3)
+        def capture(self): raise NotImplementedError
+
+    backend = SOARMRealBackend(
+        port="/dev/ttyACM0",
+        camera=_NullCamera(),
+        calibration=CALIBRATION_PATH,
+        max_relative_target=30.0,
+    )
     backend.connect()
     try:
         q = backend.get_joint_positions()
@@ -79,7 +112,8 @@ def fk_eef_pose(q: np.ndarray):
 
 def capture_checkerboard_pose():
     """Capture one RealSense color frame, detect the checkerboard, return
-    (R_target2cam (3,3), t_target2cam (3,)) or None if not detected."""
+    (R_target2cam (3,3), t_target2cam (3,), reprojection_rms_px (float)) or
+    None if not detected."""
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
@@ -119,8 +153,23 @@ def capture_checkerboard_pose():
         print("[FAIL] solvePnP failed")
         return None
     R, _ = cv2.Rodrigues(rvec)
-    print(f"[OK] Checkerboard detected. Debug image -> {debug_path}")
-    return R, tvec.flatten()
+
+    # Reprojection RMS error, in pixels: how well the fitted (R, t) actually
+    # explains the detected corner pixels. No such diagnostic existed before
+    # -- added 2026-08-05 while root-causing why the calibration's held-out
+    # validation (scripts/validate_handeye_holdout.py) found an ~8cm error,
+    # far outside ChArUco/checkerboard calibration's normal sub-mm-to-few-mm
+    # range in the literature. A high value here on a real sample directly
+    # implicates corner-detection noise; a low value across all samples rules
+    # it out and points elsewhere (e.g. the joint-read/camera-capture timing
+    # gap, also now logged below).
+    reprojected, _ = cv2.projectPoints(objp, rvec, tvec, K, dist)
+    reprojection_rms_px = float(np.sqrt(np.mean(
+        np.sum((reprojected.reshape(-1, 2) - corners.reshape(-1, 2)) ** 2, axis=1))))
+
+    print(f"[OK] Checkerboard detected. Reprojection RMS = {reprojection_rms_px:.3f}px. "
+          f"Debug image -> {debug_path}")
+    return R, tvec.flatten(), reprojection_rms_px
 
 
 def main():
@@ -135,14 +184,27 @@ def main():
     if args.reset:
         print("Resetting sample list.")
 
+    joint_read_time = time.time()
     q = get_real_joint_angles()
     pos, R_gripper2base = fk_eef_pose(q)
 
+    camera_capture_time = time.time()
     result = capture_checkerboard_pose()
     if result is None:
         print("No sample added (checkerboard not detected). Adjust the board/camera and retry.")
         return
-    R_target2cam, t_target2cam = result
+    R_target2cam, t_target2cam, reprojection_rms_px = result
+
+    # Elapsed time between reading the robot's joint angles (the
+    # "gripper2base" leg) and actually capturing the camera frame (the
+    # "target2cam" leg) of this same sample. Added 2026-08-05 alongside
+    # reprojection_rms_px, while root-causing the ~8cm held-out calibration
+    # error found by scripts/validate_handeye_holdout.py: if this gap is
+    # large and reprojection_rms_px stays low across samples, that points at
+    # timing/settling skew rather than corner-detection noise as the likely
+    # cause -- neither hypothesis was previously distinguishable because
+    # nothing recorded either signal.
+    joint_to_camera_gap_s = camera_capture_time - joint_read_time
 
     samples.append({
         "joint_angles_rad": q.tolist(),
@@ -150,10 +212,14 @@ def main():
         "R_gripper2base": R_gripper2base.tolist(),
         "R_target2cam": R_target2cam.tolist(),
         "t_target2cam": t_target2cam.tolist(),
+        "reprojection_rms_px": reprojection_rms_px,
+        "joint_to_camera_gap_s": joint_to_camera_gap_s,
     })
     SAMPLES_PATH.write_text(json.dumps(samples, indent=2))
     print(f"Sample {len(samples)} added -> {SAMPLES_PATH}")
     print(f"  gripper pos (robot-base frame): {pos.round(4)}")
+    print(f"  reprojection RMS: {reprojection_rms_px:.3f}px, "
+          f"joint-read-to-camera-capture gap: {joint_to_camera_gap_s:.2f}s")
     if len(samples) < 12:
         print(f"  Need >= 12 samples with varied position AND orientation for a good solve "
               f"({len(samples)}/12 so far).")
