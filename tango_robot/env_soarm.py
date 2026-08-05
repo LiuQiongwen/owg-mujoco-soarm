@@ -155,6 +155,34 @@ GRASP_MODE_PHYSICS      = "physics"                        # legacy alias
 GRASP_MODE_DEMO_ATTACH  = "demo_attach"
 
 
+# ── Opt-in synthetic D435i depth noise (default disabled) ────────────────────
+# Added 2026-08-05: every Stage 1-4 success rate ever reported by this project
+# was computed against MuJoCo's ideal noiseless depth -- no sensor noise model
+# was wired into the live render path, only into a one-off offline diagnostic
+# (scripts/depth_noise_feature_degradation_check.py, which found sensor noise
+# a comparatively minor factor next to a since-fixed cached-point-cloud bug in
+# that specific GeoEBM context -- that finding does NOT establish sensor noise
+# is unimportant for the live Stage 1-4 pipeline in general, it was never
+# tested there). This reuses that script's own d435i_rms_error formula (only
+# the depth-dependent-Gaussian-jitter component -- edge-void/small-object
+# sparsification need a per-object reference point not available at the raw
+# whole-scene depth-image stage, so are not ported here) so results obtained
+# with noise enabled are comparable to that established model, not a new one.
+# Off by default: every existing caller's rendered depth is byte-identical to
+# before this was added unless it explicitly passes depth_noise_severity.
+_DEPTH_NOISE_GAUSS_SCALE = {"mild": 0.5, "medium": 1.0, "severe": 2.0}
+
+
+def _d435i_rms_error_m(dist_m: np.ndarray) -> np.ndarray:
+    """RMS depth error per Intel's published D435i guidance: ~2.5-5mm at 1m,
+    scaling with distance^2 (mid-point 3.5mm@1m used here, matching
+    scripts/depth_noise_feature_degradation_check.py's d435i_rms_error).
+    Duplicated rather than imported: that script pulls in sklearn/grasp_6dof
+    at module load, too heavy for this file's hot path -- keep the two
+    formulas in sync if this constant is ever revised."""
+    return 0.0035 * np.square(np.clip(dist_m, 0.0, None))
+
+
 # ── Phase 1: MPC-style real-time correction model (optional) ─────────────────
 # Set env var MPC_CORRECTION to a checkpoint path (see train_mpc_correction.py)
 # to enable a pre-close correction search in _execute_grasp_physics_topdown:
@@ -553,12 +581,40 @@ class EnvironmentSoArm:
                  finger_length: float = 0.04,
                  n_grasp_attempts: int = 3,
                  grasp_mode: str = GRASP_MODE_PHYSICS,
+                 contact_servo_shift_m: float = 0.0,
+                 depth_noise_severity: Optional[str] = None,
+                 depth_noise_seed: Optional[int] = None,
+                 enable_close_window_diagnostics: bool = False,
                  **kwargs):
         self.vis        = vis
         self.debug      = debug
         self.finger_length    = finger_length
         self.N_GRASP_ATTEMPTS = n_grasp_attempts
         self.grasp_mode = grasp_mode
+        self.contact_servo_shift_m = float(contact_servo_shift_m)
+        # Opt-in close-window physics diagnostics (default False = zero
+        # overhead, zero behaviour change). Added 2026-08-05 during the
+        # jaw-collision-geometry investigation: measuring raw object velocity
+        # across a WHOLE grasp attempt is contaminated by legitimate internal
+        # teleport/park/restore cycles _execute_grasp_physics_topdown performs
+        # while positioning the arm (parking objects at z=-100 during IK
+        # teleport settle) -- an external ad hoc probe caught this only after
+        # producing two false "explosion" readings. This flag scopes
+        # measurement to exactly the real close+settle window
+        # (_close_with_contact_servo + the following _steps(120)), writing
+        # close_window_max_speed_mps / close_window_min_contact_dist_m into
+        # the existing self.last_grasp_metrics dict -- no new external
+        # plumbing needed, no monkey-patching required from callers.
+        self.enable_close_window_diagnostics = bool(enable_close_window_diagnostics)
+        # Opt-in synthetic D435i depth noise (default None = disabled, so
+        # every existing caller's rendered depth is byte-identical to before
+        # this was added). See _inject_depth_noise's docstring for the model.
+        if depth_noise_severity not in (None, "clean", "mild", "medium", "severe"):
+            raise ValueError(
+                f"depth_noise_severity must be one of None/clean/mild/medium/"
+                f"severe, got {depth_noise_severity!r}")
+        self.depth_noise_severity = depth_noise_severity
+        self._depth_noise_rng = np.random.default_rng(depth_noise_seed)
 
         # mock camera so ui.py can do env.camera.width
         self.camera = _MockCamera(IMG_SIZE)
@@ -773,6 +829,11 @@ class EnvironmentSoArm:
     # ── simulation step ───────────────────────────────────────────────────────
 
     def step_simulation(self):
+        # Optional data-collection hook that must affect the physics step.
+        # Keep this separate from `_step_hook`, whose established semantics are
+        # post-step observation/logging.
+        if getattr(self, '_pre_step_hook', None) is not None:
+            self._pre_step_hook()
         mujoco.mj_step(self.model, self.data)
         if self._welded_obj_id is not None:
             self._sync_kinematic_grasp()
@@ -837,6 +898,51 @@ class EnvironmentSoArm:
             if check_contact and self.gripper_contact():
                 return True
         return False
+
+    @staticmethod
+    def _contact_servo_direction(fixed_xy, moving_xy, fixed_contact, moving_contact):
+        """World-XY correction toward the jaw with unilateral object contact."""
+        if bool(fixed_contact) == bool(moving_contact):
+            return None
+        fixed_xy = np.asarray(fixed_xy, dtype=float)
+        moving_xy = np.asarray(moving_xy, dtype=float)
+        direction = fixed_xy - moving_xy if fixed_contact else moving_xy - fixed_xy
+        norm = float(np.linalg.norm(direction))
+        return direction / norm if norm > 1e-9 else None
+
+    def _close_with_contact_servo(self, opening: float, step: int = 100):
+        """Close once, applying at most one lateral correction on unilateral contact."""
+        audit = {"enabled": self.contact_servo_shift_m > 0,
+                 "corrections": 0, "trigger_side": None}
+        if self.contact_servo_shift_m <= 0:
+            self.auto_close_gripper(check_contact=False)
+            return audit
+        obj_bodies = {self.model.body(f"obj_{slot}").id for slot in self._pool_slots}
+        for i in range(step):
+            t = 1.0 - i / step
+            self.data.ctrl[self._grip_act_id] = GRIP_CLOSED + t * (GRIP_OPEN - GRIP_CLOSED)
+            self.step_simulation()
+            fixed_contact = bool(self._contacts_on_bodies(
+                [self._jaw_body_id], obj_bodies))
+            moving_contact = bool(self._contacts_on_bodies(
+                [self._jaw_mv_body_id], obj_bodies))
+            direction = self._contact_servo_direction(
+                self.data.xpos[self._jaw_body_id][:2],
+                self.data.xpos[self._jaw_mv_body_id][:2],
+                fixed_contact, moving_contact)
+            if direction is not None:
+                audit["trigger_side"] = "fixed" if fixed_contact else "moving"
+                self.move_gripper(opening, step=30)
+                eef = self._get_eef_pos()
+                target = eef.copy()
+                target[:2] += self.contact_servo_shift_m * direction
+                ik_ok, _ = self.move_ee([*target, None], max_step=100)
+                audit.update({"corrections": 1, "ik_converged": bool(ik_ok),
+                              "direction_xy": direction.tolist(),
+                              "target_xy": target[:2].tolist()})
+                self.auto_close_gripper(check_contact=False)
+                return audit
+        return audit
 
     def calc_z_offset(self, gripper_opening_length: float) -> float:
         return 0.0
@@ -1673,6 +1779,8 @@ class EnvironmentSoArm:
         self._renderer.update_scene(self.data, camera="overhead")
         depth = self._renderer.render().copy()
         self._renderer.disable_depth_rendering()
+        if self.depth_noise_severity not in (None, "clean"):
+            depth = self._inject_depth_noise(depth)
 
         # Segmentation — re-update scene after enabling segmentation mode so that
         # geom IDs are encoded into the scene; without this, all pixels return -1
@@ -1693,6 +1801,22 @@ class EnvironmentSoArm:
                     pass
 
         return rgb, depth, seg
+
+    def _inject_depth_noise(self, depth: np.ndarray) -> np.ndarray:
+        """Opt-in synthetic D435i depth noise, gated by self.depth_noise_severity
+        (constructor arg; None/"clean" = disabled, this method is never called
+        in that case -- see the guard in _render_rgb_depth_seg). Per-pixel
+        Gaussian jitter in z, scaled by that pixel's own depth via
+        _d435i_rms_error_m. Only valid-return pixels (depth > 0) are jittered;
+        background/no-return pixels are left untouched. Uses self._depth_noise_rng
+        (seeded at construction via depth_noise_seed) so noisy runs stay
+        reproducible given a seed, rather than differing every render call."""
+        gauss_scale = _DEPTH_NOISE_GAUSS_SCALE[self.depth_noise_severity]
+        std = _d435i_rms_error_m(depth) * gauss_scale
+        valid = depth > 0
+        noisy = depth.copy()
+        noisy[valid] = depth[valid] + self._depth_noise_rng.normal(0.0, std[valid])
+        return noisy
 
     def _depth_to_pointcloud(self, depth: np.ndarray) -> np.ndarray:
         """Project metric depth image to 3D pointcloud in robot-base frame.
@@ -1754,7 +1878,10 @@ class EnvironmentSoArm:
 
     def _execute_grasp(self, pos: tuple, roll: float,
                        gripper_opening_length: float,
-                       obj_height: float) -> Tuple[bool, Optional[int]]:
+                       obj_height: float,
+                       stop_after_contact: bool = False,
+                       hold_steps: int = 100,
+                       release_after_lift: bool = False) -> Tuple[bool, Optional[int]]:
         """Dispatch to the active grasp execution mode (self.grasp_mode).
 
         Returns (success, grasped_obj_id_or_None).
@@ -1767,7 +1894,10 @@ class EnvironmentSoArm:
         # jaw-midpoint IK + bilateral-contact-conditioned kinematic weld.
         return self._execute_grasp_physics_topdown(pos, roll,
                                                    gripper_opening_length,
-                                                   obj_height)
+                                                   obj_height,
+                                                   stop_after_contact=stop_after_contact,
+                                                   hold_steps=hold_steps,
+                                                   release_after_lift=release_after_lift)
 
     def _execute_grasp_physics(self, pos: tuple, roll: float,
                                gripper_opening_length: float,
@@ -2013,7 +2143,10 @@ class EnvironmentSoArm:
 
     def _execute_grasp_physics_topdown(self, pos: tuple, yaw: float,
                                        gripper_opening_length: float,
-                                       obj_height: float) -> Tuple[bool, Optional[int]]:
+                                       obj_height: float,
+                                       stop_after_contact: bool = False,
+                                       hold_steps: int = 100,
+                                       release_after_lift: bool = False) -> Tuple[bool, Optional[int]]:
         """Physics grasp with jaw-midpoint–targeted approach.
 
         Uses IK_MODE_JAW_POS so the JAW MIDPOINT (not the site) is driven to
@@ -2086,8 +2219,39 @@ class EnvironmentSoArm:
                           f"({baseline_val} -> {corrected_val}), reverting to original")
                     metrics_pre, mg0 = self._settle_at_pose(x, y, z, yaw, opening)
 
-        self.auto_close_gripper(check_contact=False)
+        close_window_diag = None
+        _orig_step_for_diag = None
+        if self.enable_close_window_diagnostics:
+            close_window_diag = {"max_speed_mps": 0.0, "min_contact_dist_m": 0.0}
+            _diag_obj_body_ids = {self.model.body(f"obj_{slot}").id for slot in self._pool_slots}
+            _diag_obj_geom_ids = set()
+            for _slot in self._pool_slots:
+                for _gname in (f"ycb_vis_geom_{_slot}", f"ycb_col_geom_{_slot}"):
+                    try:
+                        _diag_obj_geom_ids.add(self.model.geom(_gname).id)
+                    except Exception:
+                        pass
+            _orig_step_for_diag = self.step_simulation
+
+            def _diag_step():
+                _orig_step_for_diag()
+                for _bid in _diag_obj_body_ids:
+                    _v = float(np.linalg.norm(self.data.cvel[_bid][3:6]))
+                    if _v > close_window_diag["max_speed_mps"]:
+                        close_window_diag["max_speed_mps"] = _v
+                for _ci in range(self.data.ncon):
+                    _c = self.data.contact[_ci]
+                    if _c.geom1 in _diag_obj_geom_ids or _c.geom2 in _diag_obj_geom_ids:
+                        if _c.dist < close_window_diag["min_contact_dist_m"]:
+                            close_window_diag["min_contact_dist_m"] = float(_c.dist)
+
+            self.step_simulation = _diag_step
+
+        contact_servo_audit = self._close_with_contact_servo(opening)
         self._steps(120)   # let gripper settle and contacts stabilize
+
+        if self.enable_close_window_diagnostics:
+            self.step_simulation = _orig_step_for_diag
 
         if self._jaw_fixed_geom_id >= 0:
             fg1 = self.data.geom_xpos[self._jaw_fixed_geom_id].copy()
@@ -2138,10 +2302,27 @@ class EnvironmentSoArm:
         else:
             print(f"  [grasp/physics_weld] no bilateral contacts → skip weld")
 
+        if stop_after_contact:
+            self._phase_weld_obj = weld_obj
+            self._phase_target_xy = (float(x), float(y))
+            metrics_post.update({"exec_mode": GRASP_MODE_PHYSICS_WELD,
+                                 "bilateral_contact": contact,
+                                 "weld_triggered": weld_triggered,
+                                 "lifted": False, "success": False,
+                                 "phase_exit": "CONTACT",
+                                 "close_window_max_speed_mps":
+                                     (close_window_diag["max_speed_mps"]
+                                      if close_window_diag else None),
+                                 "close_window_min_contact_dist_m":
+                                     (close_window_diag["min_contact_dist_m"]
+                                      if close_window_diag else None)})
+            self.last_grasp_metrics = metrics_post
+            return False, None
+
         # Lift: xyz-only to avoid arm reconfiguration pushing cube into table.
         self.move_ee([x, y, self.GRIPPER_MOVING_HEIGHT, None],
                      ik_mode=IK_MODE_XYZ_ONLY, max_step=300)
-        self._steps(100)
+        self._steps(int(hold_steps))
 
         if weld_obj is not None:
             obj_z  = self.get_obj_pos(weld_obj)[2]
@@ -2154,6 +2335,9 @@ class EnvironmentSoArm:
             obj_z       = self.Z_TABLE_TOP
             lifted      = False
 
+        if release_after_lift and weld_obj is not None:
+            self._detach_obj(weld_obj)
+            grasped_ids = []
         success = bool(grasped_ids) and lifted
         print(f"  [grasp/physics_weld] result → bilateral={contact}"
               f"  weld={weld_triggered}  table_contact={table_contact}"
@@ -2169,6 +2353,11 @@ class EnvironmentSoArm:
             "final_z":           float(obj_z),
             "lifted":            lifted,
             "success":           success,
+            "contact_servo":     contact_servo_audit,
+            "close_window_max_speed_mps":      (close_window_diag["max_speed_mps"]
+                                                 if close_window_diag else None),
+            "close_window_min_contact_dist_m": (close_window_diag["min_contact_dist_m"]
+                                                 if close_window_diag else None),
         })
         self.last_grasp_metrics = metrics_post
 
@@ -2335,8 +2524,36 @@ class EnvironmentSoArm:
 
     # kept as public alias for backward compat
     def grasp(self, pos, roll, gripper_opening_length, obj_height,
-              debug=False, vis=False):
-        return self._execute_grasp(pos, roll, gripper_opening_length, obj_height)
+              debug=False, vis=False, stop_after_contact=False,
+              hold_steps=100, release_after_lift=False):
+        return self._execute_grasp(pos, roll, gripper_opening_length, obj_height,
+                                   stop_after_contact=stop_after_contact,
+                                   hold_steps=hold_steps,
+                                   release_after_lift=release_after_lift)
+
+    def continue_phase_lift(self, hold_steps: int = 100,
+                            release: bool = False) -> Tuple[bool, Optional[int]]:
+        """Continue a contact-stopped grasp without resetting the episode."""
+        weld_obj = getattr(self, "_phase_weld_obj", None)
+        target_xy = getattr(self, "_phase_target_xy", None)
+        if weld_obj is None or target_xy is None:
+            raise RuntimeError("no contact-phase grasp is pending")
+        self.move_ee([target_xy[0], target_xy[1], self.GRIPPER_MOVING_HEIGHT, None],
+                     ik_mode=IK_MODE_XYZ_ONLY, max_step=300)
+        self._steps(int(hold_steps))
+        obj_z = float(self.get_obj_pos(weld_obj)[2])
+        lifted = obj_z > self.Z_TABLE_TOP + 0.07
+        if release:
+            self._detach_obj(weld_obj)
+        metrics = dict(self.last_grasp_metrics or {})
+        metrics.update({"lifted": lifted, "final_z": obj_z,
+                        "phase_exit": "RELEASED" if release else "HOLDING",
+                        "success": bool(lifted and not release)})
+        self.last_grasp_metrics = metrics
+        if release:
+            self._phase_weld_obj = None
+            self._phase_target_xy = None
+        return bool(lifted and not release), weld_obj if lifted and not release else None
 
     # ── pick_obj_by_id — full PyBullet-compatible logic ───────────────────────
 
