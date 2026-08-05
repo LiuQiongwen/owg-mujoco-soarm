@@ -28,7 +28,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 
 from lggsn_model import LGGSN
-from causal_validity_audit.provenance import audit_feature_set
+from causal_validity_audit.provenance import audit_feature_set, SOARM_FIELDS
 
 # ── config ────────────────────────────────────────────────────────────────────
 JSONL_PATH  = os.environ.get("LGGSN_JSONL",  "logs/lggsn_live_candidates.jsonl")
@@ -50,7 +50,14 @@ FEATURE_COLS = [
 # actually used live by grasp_ranker_lggsn.py, so every column here must be
 # admissible for pre-execution candidate selection, not just for offline
 # evaluation of historical logs.
-audit_feature_set(FEATURE_COLS, context="train_lggsn_pairwise.py FEATURE_COLS")
+#
+# registry=SOARM_FIELDS explicitly (not the ALL_FIELDS default): "dz" means
+# different things in different pipelines' registries (SOARM_FIELDS: a
+# verified-constant PRE_EXECUTION placeholder; WORLD_MODEL_FIELDS: a genuine
+# EXECUTION_DERIVED post-grasp delta), so ALL_FIELDS deliberately excludes it
+# rather than guessing -- see docs/CAUSAL_VALIDITY_REGISTRY_BUG.md. This is
+# the SO-ARM101/LGGSN pipeline, so SOARM_FIELDS is the correct registry.
+audit_feature_set(FEATURE_COLS, context="train_lggsn_pairwise.py FEATURE_COLS", registry=SOARM_FIELDS)
 # ─────────────────────────────────────────────────────────────────────────────
 
 

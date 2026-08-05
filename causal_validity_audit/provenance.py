@@ -246,7 +246,46 @@ WORLD_MODEL_FIELDS = {
     "fell_off": FieldSpec(Provenance.EXECUTION_DERIVED, "thresholded on obj_pos_after -- post-execution only"),
 }
 
-ALL_FIELDS = {**SOARM_FIELDS, **PIPER_FIELDS, **WORLD_MODEL_FIELDS}
+def _union_with_collision_guard(*named_registries):
+    """Union per-pipeline registries into ALL_FIELDS, but drop (not silently
+    pick a winner for) any field name that two registries define with
+    DIFFERENT Provenance -- e.g. SOARM_FIELDS["dz"] (PRE_EXECUTION, a
+    verified-constant placeholder) vs WORLD_MODEL_FIELDS["dz"]
+    (EXECUTION_DERIVED, a genuine post-execution delta): both are correct
+    for their own pipeline, and a plain dict-merge previously picked
+    whichever was merged in last, unconditionally, for every caller relying
+    on the ALL_FIELDS default -- see docs/CAUSAL_VALIDITY_REGISTRY_BUG.md.
+
+    Dropping the colliding name makes audit_feature_set()'s existing
+    fail-closed behavior ("unregistered field -> violation, not silently
+    admissible") do the right thing here too: a caller that hits a dropped
+    name via the ALL_FIELDS default gets a loud, correct "UNREGISTERED"
+    error telling it to pass its own pipeline-specific registry (SOARM_FIELDS
+    / PIPER_FIELDS / WORLD_MODEL_FIELDS) explicitly, instead of a quiet,
+    possibly-wrong answer. Two registries defining the same name with the
+    SAME provenance is fine and still merges normally.
+    """
+    provenance_by_name: dict[str, Provenance] = {}
+    colliding_names: set[str] = set()
+    for _reg_name, registry in named_registries:
+        for field_name, spec in registry.items():
+            if field_name in provenance_by_name and provenance_by_name[field_name] is not spec.provenance:
+                colliding_names.add(field_name)
+            else:
+                provenance_by_name[field_name] = spec.provenance
+    merged: dict[str, FieldSpec] = {}
+    for _reg_name, registry in named_registries:
+        for field_name, spec in registry.items():
+            if field_name not in colliding_names:
+                merged[field_name] = spec
+    return merged, colliding_names
+
+
+ALL_FIELDS, _COLLIDING_FIELD_NAMES = _union_with_collision_guard(
+    ("SOARM_FIELDS", SOARM_FIELDS),
+    ("PIPER_FIELDS", PIPER_FIELDS),
+    ("WORLD_MODEL_FIELDS", WORLD_MODEL_FIELDS),
+)
 
 
 class CausalValidityViolation(Exception):
@@ -267,7 +306,16 @@ def audit_feature_set(feature_names, *, context: str = "live candidate selection
     for name in feature_names:
         spec = registry.get(name)
         if spec is None:
-            violations.append((name, "UNREGISTERED -- provenance not declared, cannot certify admissibility"))
+            if registry is ALL_FIELDS and name in _COLLIDING_FIELD_NAMES:
+                violations.append((
+                    name,
+                    "UNREGISTERED IN ALL_FIELDS -- this name means different, conflicting "
+                    "things in different pipelines' registries (SOARM_FIELDS/PIPER_FIELDS/"
+                    "WORLD_MODEL_FIELDS); pass the correct one explicitly via registry=, "
+                    "see docs/CAUSAL_VALIDITY_REGISTRY_BUG.md",
+                ))
+            else:
+                violations.append((name, "UNREGISTERED -- provenance not declared, cannot certify admissibility"))
         elif spec.provenance is Provenance.EXECUTION_DERIVED:
             violations.append((name, spec.reason))
     if violations:
