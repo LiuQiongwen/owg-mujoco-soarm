@@ -213,7 +213,18 @@ itself: our pairwise signal is derived from physical execution outcomes
 within a scene, not human preference judgments, and every input feature is
 checked against the PRE\_EXECUTION-admissibility criterion before training
 -- a formal, checkable distinction absent from this and the other prior
-systems surveyed here.
+systems surveyed here. Concurrent with this work, ``Robot Critics that
+Sweat the Small Stuff'' \cite{sweatsmallstuff2026} fine-tunes a
+vision-language critic on pairwise progress supervision from success/
+failure rollouts and pairs it with an action-conditioned video model to
+predict each candidate action's visual effect before selecting among them
+-- the same pairwise-supervised candidate-selection pattern as our critic,
+in a different modality (VLM/video prediction over raw visual rollouts
+rather than a small MLP over point-cloud/pose features) and without a
+stated input-admissibility criterion; their video-model-predicted
+``visual effect of a candidate action'' is exactly the kind of quantity
+our PRE\_EXECUTION criterion would need to audit case-by-case; we do not
+audit it here since we did not evaluate their system.
 
 \textbf{Evaluation-protocol failures in offline policy/critic assessment.}
 Data leakage and unfair offline comparison are recognized general risks in
@@ -757,6 +768,11 @@ G.~D'urso, K.~Roy, N.~Lawrance, and B.~Tidd,
 ``It's Not Just More Demos: Counterfactual Action Sensitivity Coverage
   for Data-Efficient Robust Robot Imitation,''
 \emph{arXiv:2607.27261}, 2026.
+
+\bibitem{sweatsmallstuff2026}
+S.~Sudhakar, J.~Liang, S.~Rammohan, P.~Tokmakov, R.~Zemel, and C.~Vondrick,
+``Robot Critics that Sweat the Small Stuff,''
+\emph{arXiv:2606.21572}, 2026.
 
 \end{thebibliography}
 
