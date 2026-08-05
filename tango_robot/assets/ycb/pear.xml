@@ -30,7 +30,7 @@
       <!-- Visual geometry: rendered, excluded from collision pipeline -->
       <geom name="pear_visual" type="mesh" mesh="pear_vis"
             material="pear_mat" contype="0" conaffinity="0" group="2"/>
-      <!-- Collision geometry: mass=0.049 kg (YCB), lower friction (smooth skin) -->
+      <!-- Collision geometry: mass=0.049 kg (YCB), friction: hand-picked estimate (plausible for smooth skin, not measured) -->
       <geom name="pear_collision" type="mesh" mesh="pear_col"
             mass="0.049" friction="1.5 0.05 0.01"
             contype="1" conaffinity="1"/>

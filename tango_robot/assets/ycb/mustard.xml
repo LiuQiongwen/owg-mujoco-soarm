@@ -30,7 +30,7 @@
       <!-- Visual geometry: rendered, excluded from collision pipeline -->
       <geom name="mustard_visual" type="mesh" mesh="mustard_vis"
             material="mustard_mat" contype="0" conaffinity="0" group="2"/>
-      <!-- Collision geometry: mass=0.603 kg (YCB), standard friction for plastic -->
+      <!-- Collision geometry: mass=0.603 kg (YCB), friction: hand-picked estimate (plausible for plastic, not measured) -->
       <geom name="mustard_collision" type="mesh" mesh="mustard_col"
             mass="0.603" friction="2.0 0.05 0.01"
             contype="1" conaffinity="1"/>

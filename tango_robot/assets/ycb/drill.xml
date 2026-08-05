@@ -30,7 +30,7 @@
       <!-- Visual geometry: rendered, excluded from collision pipeline -->
       <geom name="drill_visual" type="mesh" mesh="drill_vis"
             material="drill_mat" contype="0" conaffinity="0" group="2"/>
-      <!-- Collision geometry: mass=0.895 kg (YCB), higher friction for rubber grip -->
+      <!-- Collision geometry: mass=0.895 kg (YCB), friction: hand-picked estimate (plausible for rubber grip, not measured) -->
       <geom name="drill_collision" type="mesh" mesh="drill_col"
             mass="0.895" friction="2.5 0.05 0.01"
             contype="1" conaffinity="1"/>

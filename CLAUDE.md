@@ -59,12 +59,15 @@ conda run -n tango python demo.py \
   grep -E 'LGGSN grasp scores|Final action|Done pick'
 ```
 
-### Quick eval (20 trials)
+### Quick eval (35 trials)
 ```bash
-bash scripts/quick_eval.sh           # fast: 4 objects × 5 seeds
-bash scripts/quick_eval.sh full      # paper: 4 objects × 25 seeds
+bash scripts/quick_eval.sh           # fast: 7 objects × 5 seeds (corrected 2026-08-05; was documented as 4)
+bash scripts/quick_eval.sh full      # paper: 7 objects × 25 seeds
 bash scripts/quick_eval.sh fast 3    # stage 3 baseline
 ```
+Objects iterated (`scripts/quick_eval.sh:9`): Banana, TomatoSoupCan, Pear, MustardBottle,
+Scissors, CrackerBox, PowerDrill — all 7 of `OBJECT_REGISTRY`'s effective members, not a
+4-object subset.
 
 ### Benchmark runner
 ```bash
@@ -153,14 +156,26 @@ OBJECT_REGISTRY = {
 
 ## LGGSN model checkpoints (grasp_6dof/models/)
 
+**⚠️ Corrected 2026-08-05 — this table was stale**: `demo.py`'s actual Stage-4 default
+(`demo.py:64`) is `lggsn_pairwise_live_v5d.pt`, **not** `v2` as previously stated here.
+`grasp_6dof/models/` also contains 10+ further versions (v3 through v11_ik) never listed
+in this table — all `.pt` files are gitignored, so none of them are reproducible from a
+clean checkout; treat any checkpoint not in the table below as unaudited.
+
 | File | Status | Val pair_acc | Features |
 |------|--------|-------------|---------|
-| `lggsn_pairwise_live.pt` | v1 (inflated accuracy, noisy negatives) | 0.766 | 12-dim |
-| `lggsn_pairwise_live_v2.pt` | **active — use this** | 0.664 | 14-dim |
+| `lggsn_pairwise_live.pt` | v1, deprecated (inflated accuracy, noisy negatives) | 0.710 (independently re-verified 2026-08-01; provenance incomplete — see below) | 12-dim |
+| `lggsn_pairwise_live_v2.pt` | independently verified, sha256-checked | **0.658** (`research_agent_pilots/lggsn_suite/`, commit `ceb2029`) | 14-dim |
+| `lggsn_pairwise_live_v5d.pt` | **`demo.py`'s actual current Stage-4 default** — accuracy **unverified** | ~0.750 *(cited from training logs/commit messages only — this project's own standalone eval suite cannot score it: needs `local_point_density`/`normal_consistency`/`contact_width_ratio` per-candidate point-cloud features plus a query-embedding architecture the evaluator doesn't implement; see `research_agent_pilots/lggsn_suite/eval_outputs/matrix_summary.json`'s `ext_v5d` entry, `status: BLOCKED`)* | 17+dim, point-cloud + query-embedding |
 | `lggsn_geom_only_live.pt` | legacy single-label | — | 12-dim |
 
 v2 uses 14 features: base 12 + `dist_to_centroid` + `z_rel` (min-max height within episode).
-BPR pairwise + margin_0.00 is the current best-performing training configuration.
+BPR pairwise + margin_0.00 is the current best-performing training configuration among the
+**independently verified** checkpoints. v5d is architecturally newer and cited as more
+accurate, but that number has never been reproduced outside its own training run — if a
+result depends on which checkpoint was active, check `LGGSN_CKPT`/`demo.py`'s actual default
+explicitly rather than assuming v2, and flag v5d-based results as resting on an unverified
+accuracy claim until someone extends the standalone evaluator to support point-cloud features.
 
 ## robots/ abstraction layer
 

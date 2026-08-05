@@ -11,7 +11,16 @@
 #   visual_mesh     High-poly textured mesh for rendering (no collision)
 #   collision_mesh  VHACD convex-decomposition mesh for contact physics
 #   mass            Object mass in kg (YCB dataset ground truth)
-#   friction        MuJoCo friction triplet: [sliding, torsional, rolling]
+#   friction        MuJoCo friction triplet: [sliding, torsional, rolling].
+#                   Hand-picked per object for stable MuJoCo contact, NOT
+#                   measured or sourced from YCB -- YCB publishes no official
+#                   friction coefficients for any object (confirmed 2026-08-05,
+#                   see YCB's own IEEE paper, ieeexplore.ieee.org/document/7251504;
+#                   this is a known gap in the field generally, not unique to
+#                   this project). Per-object XML comments describing these as
+#                   e.g. "cardboard box friction" or "rubber grip" are
+#                   plausible-sounding rationale for a chosen constant, not a
+#                   measured physical property -- read them that way.
 #   scale           Uniform scale applied to both visual and collision meshes.
 #                   Most YCB objects are at 1:1 scale; MediumClamp uses 1.75×.
 #   spawn_z_offset  Additional height above TABLE_TOP_Z (0.785 m) to drop the

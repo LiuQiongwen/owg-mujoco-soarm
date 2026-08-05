@@ -30,7 +30,7 @@
       <!-- Visual geometry: rendered, excluded from collision pipeline -->
       <geom name="banana_visual" type="mesh" mesh="banana_vis"
             material="banana_mat" contype="0" conaffinity="0" group="2"/>
-      <!-- Collision geometry: mass=0.166 kg (YCB), friction tuned for MuJoCo -->
+      <!-- Collision geometry: mass=0.166 kg (YCB), friction: hand-picked estimate, not measured -->
       <geom name="banana_collision" type="mesh" mesh="banana_col"
             mass="0.166" friction="2.0 0.05 0.01"
             contype="1" conaffinity="1"/>
