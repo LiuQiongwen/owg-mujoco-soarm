@@ -1,12 +1,23 @@
 # Bug report: `ALL_FIELDS` registry collision silently mis-classifies `dz`
 
-**Status:** documented only, not fixed in this task (per instruction —
-`causal_validity_audit/` is untouched).
-**Severity:** the audit gate currently fails closed (rejects) for a field it
-should accept — a false positive, not a false negative. No causally-invalid
-feature is being silently admitted anywhere as a result of this bug; the
-practical effect is that `train_lggsn_pairwise.py` cannot currently be
-imported/run at all (its own module-level `audit_feature_set` call raises).
+**Status:** FIXED (2026-08-05, commit `8fc227e`) — the combination of options
+(2) and (3) below was implemented: `ALL_FIELDS` now drops any field name two
+per-pipeline registries define with conflicting `Provenance` instead of
+silently letting a dict-merge pick a winner (see
+`causal_validity_audit/provenance.py::_union_with_collision_guard`), and
+`train_lggsn_pairwise.py` now passes `registry=SOARM_FIELDS` explicitly.
+Verified: `import train_lggsn_pairwise` succeeds; `tests/test_risk_gated_vla_phase1.py`
+and `tests/test_candidate_pc_local_features.py` still pass; the other call
+sites listed below (none of which reference `dz`) are unaffected. The
+"Root cause" / "Affected call sites" / "Suggested scope" sections below are
+kept as-written for historical record of the diagnosis that led to the fix.
+
+**Severity (at time of discovery):** the audit gate failed closed (rejected)
+for a field it should have accepted — a false positive, not a false
+negative. No causally-invalid feature was ever silently admitted anywhere as
+a result of this bug; the practical effect was that `train_lggsn_pairwise.py`
+could not be imported/run at all (its own module-level `audit_feature_set`
+call raised).
 
 ## Root cause
 
