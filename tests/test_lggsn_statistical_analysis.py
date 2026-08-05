@@ -802,3 +802,325 @@ def test_phase3_manifest_records_all_required_provenance_fields(real_run):
     assert set(manifest["checkpoint_sha256"].keys()) == set(loader.CORE_CHECKPOINT_NAMES)
     assert len(manifest["dataset_sha256"]) == 64  # sha256 hex digest
     assert len(manifest["pair_identity_digest"]) == 64
+
+
+# ── Phase 4: cluster-level (query-as-unit) sensitivity analysis ─────────────
+#
+# statistics.cluster_sign_flip_test: an exact cluster-level sign-flip
+# permutation test, added alongside -- never replacing -- the existing
+# pair-level exact McNemar test and query-cluster bootstrap CI. Explicitly
+# NOT McNemar's test (see its own docstring for the exchangeability
+# assumption it actually relies on).
+
+
+def _make_query_pairs(query_diffs: dict[str, int]) -> tuple:
+    """Build AlignedPairs from a {query: direction} map, 2 pairs per query.
+    direction > 0 -> that query's pairs go a=wrong/wrong, b=correct/correct
+    (accuracy_diff_b_minus_a = +1.0); direction < 0 -> the reverse
+    (diff = -1.0); direction == 0 -> a=correct/wrong, b=correct/wrong
+    (diff = 0.0). Used only to build fixtures with an exactly
+    hand-computable per-query accuracy_diff_b_minus_a -- never used to
+    represent real data."""
+    a_by_q: dict[str, tuple] = {}
+    b_by_q: dict[str, tuple] = {}
+    for q, d in query_diffs.items():
+        if d > 0:
+            a_by_q[q], b_by_q[q] = (False, False), (True, True)
+        elif d < 0:
+            a_by_q[q], b_by_q[q] = (True, True), (False, False)
+        else:
+            a_by_q[q], b_by_q[q] = (True, False), (True, False)
+    a_records = []
+    b_records = []
+    for q in query_diffs:
+        for i, (av, bv) in enumerate(zip(a_by_q[q], b_by_q[q])):
+            a_records.append(loader.PairRecord(q, f"{q}p{i}", f"{q}n{i}", av))
+            b_records.append(loader.PairRecord(q, f"{q}p{i}", f"{q}n{i}", bv))
+    return alignment.align_pairs({"a": tuple(a_records), "b": tuple(b_records)})
+
+
+# 1. Hand-checkable 3-cluster fixture: all three query-level diffs are
+# +1.0 (unanimous). Only the "all +1" and "all -1" sign assignments (2 of
+# the 2**3=8 total) can reach |mean| == 1.0 -- every mixed assignment gives
+# a strictly smaller magnitude -- so the exact two-sided p-value is
+# provably 2/8 = 0.25, independent of the permutation-enumeration code
+# under test (verified by direct hand enumeration in this docstring, not
+# just by re-running the implementation on itself):
+#   +++: (1+1+1)/3=+1.00  ++-: +1/3  +-+: +1/3  -++: +1/3
+#   +--: -1/3  -+-: -1/3  --+: -1/3  ---: (-1-1-1)/3=-1.00
+# -> exactly 2 of 8 reach |stat| >= 1.00.
+def test_phase4_cluster_sign_flip_hand_checked_3_cluster_fixture():
+    aligned = _make_query_pairs({"q1": 1, "q2": 1, "q3": 1})
+    result = lggsn_statistics.cluster_sign_flip_test(
+        aligned, checkpoint_a="a", checkpoint_b="b", cluster_key_fn=lambda p: p.query, resampling_unit="query",
+    )
+    assert result.n_clusters == 3
+    assert result.n_permutations == 8
+    assert result.n_favor_b == 3 and result.n_favor_a == 0 and result.n_tied == 0
+    assert result.mean_cluster_diff == pytest.approx(1.0)
+    assert result.median_cluster_diff == pytest.approx(1.0)
+    assert result.observed_statistic == pytest.approx(1.0)
+    assert result.p_value == pytest.approx(0.25, abs=1e-12)
+
+
+# 2. Hand-checkable 3-cluster fixture with a mixed, non-extremal result
+# (2 favor B, 1 favors A, all magnitude 1.0). Observed mean = (1+1-1)/3 =
+# 1/3. Hand enumeration of all 8 signed means (same 8 listed above, but
+# now the "base" pattern is [+1, +1, -1] with the third cluster's sign
+# itself part of what gets flipped) gives |stat| in {1/3, 1/3, 1/3, 1/3,
+# 1/3, 1/3, 1.0, 1.0} -- every one of the 8 assignments has |stat| >= 1/3,
+# so p = 8/8 = 1.0 (a case worth covering precisely because it is *not*
+# the maximally-extreme fixture, unlike test 1 above).
+def test_phase4_cluster_sign_flip_hand_checked_3_cluster_mixed_fixture():
+    aligned = _make_query_pairs({"q1": 1, "q2": 1, "q3": -1})
+    result = lggsn_statistics.cluster_sign_flip_test(
+        aligned, checkpoint_a="a", checkpoint_b="b", cluster_key_fn=lambda p: p.query, resampling_unit="query",
+    )
+    assert result.n_favor_b == 2 and result.n_favor_a == 1 and result.n_tied == 0
+    assert result.mean_cluster_diff == pytest.approx(1.0 / 3.0)
+    assert result.median_cluster_diff == pytest.approx(1.0)
+    assert result.p_value == pytest.approx(1.0, abs=1e-12)
+
+
+# 3. Hand-checkable 6-cluster fixture: all six query-level diffs are +1.0
+# (unanimous). Same reasoning as test 1, generalized: for n equal-magnitude
+# same-sign diffs, only the 2 unanimous assignments (all+, all-) reach the
+# maximal |mean|; every assignment with k in [1, n-1] signs flipped gives
+# |mean| = |n-2k|/n * magnitude, strictly less than the unanimous case.
+# Exact p = 2/2**6 = 2/64 = 0.03125 -- also the coarsest possible p-value
+# this test can ever report for 6 clusters, referenced in the power
+# caveat text.
+def test_phase4_cluster_sign_flip_hand_checked_6_cluster_fixture():
+    aligned = _make_query_pairs({f"q{i}": 1 for i in range(6)})
+    result = lggsn_statistics.cluster_sign_flip_test(
+        aligned, checkpoint_a="a", checkpoint_b="b", cluster_key_fn=lambda p: p.query, resampling_unit="query",
+    )
+    assert result.n_clusters == 6
+    assert result.n_permutations == 64
+    assert result.n_favor_b == 6 and result.n_favor_a == 0
+    assert result.p_value == pytest.approx(2 / 64, abs=1e-12)
+
+
+# 4. Hand-checkable 6-cluster mixed fixture (4 favor B, 2 favor A, equal
+# magnitude), cross-checked against an independent brute-force
+# itertools.product reference implementation written directly in this
+# test -- not just against the module under test re-running itself.
+def test_phase4_cluster_sign_flip_6_cluster_mixed_matches_independent_brute_force():
+    import itertools
+
+    aligned = _make_query_pairs({"q1": 1, "q2": 1, "q3": 1, "q4": 1, "q5": -1, "q6": -1})
+    result = lggsn_statistics.cluster_sign_flip_test(
+        aligned, checkpoint_a="a", checkpoint_b="b", cluster_key_fn=lambda p: p.query, resampling_unit="query",
+    )
+
+    diffs = [1.0, 1.0, 1.0, 1.0, -1.0, -1.0]
+    observed = sum(diffs) / len(diffs)
+    count = 0
+    for signs in itertools.product((1, -1), repeat=len(diffs)):
+        stat = sum(s * d for s, d in zip(signs, diffs)) / len(diffs)
+        if abs(stat) >= abs(observed) - 1e-9:
+            count += 1
+    expected_p = count / (2 ** len(diffs))
+
+    assert result.n_favor_b == 4 and result.n_favor_a == 2
+    assert result.mean_cluster_diff == pytest.approx(observed)
+    assert result.median_cluster_diff == pytest.approx(1.0)
+    assert result.p_value == pytest.approx(expected_p, abs=1e-12)
+
+
+def test_phase4_cluster_sign_flip_is_not_named_mcnemar():
+    # Explicit requirement: this test must never be described/labeled as
+    # McNemar's test anywhere in its own result type or docstring.
+    assert "mcnemar" not in lggsn_statistics.ClusterSignFlipResult.__doc__.lower() if \
+        lggsn_statistics.ClusterSignFlipResult.__doc__ else True
+    assert "McNemar" not in lggsn_statistics.cluster_sign_flip_test.__name__
+
+
+def test_phase4_cluster_sign_flip_requires_at_least_two_clusters():
+    aligned = _make_query_pairs({"only_query": 1})
+    with pytest.raises(lggsn_statistics.StatisticsError):
+        lggsn_statistics.cluster_sign_flip_test(
+            aligned, checkpoint_a="a", checkpoint_b="b", cluster_key_fn=lambda p: p.query, resampling_unit="query",
+        )
+
+
+def test_phase4_cluster_sign_flip_is_deterministic_no_seed_needed():
+    # Exact enumeration: repeated calls with identical input must be
+    # byte-identical without ever passing a seed (there is nothing random
+    # to seed).
+    aligned = _make_query_pairs({"q1": 1, "q2": -1, "q3": 1, "q4": 0})
+    kwargs = dict(checkpoint_a="a", checkpoint_b="b", cluster_key_fn=lambda p: p.query, resampling_unit="query")
+    first = lggsn_statistics.cluster_sign_flip_test(aligned, **kwargs)
+    second = lggsn_statistics.cluster_sign_flip_test(aligned, **kwargs)
+    assert first == second
+
+
+def test_phase4_cluster_sign_flip_rejects_unknown_checkpoint():
+    aligned = _make_query_pairs({"q1": 1, "q2": -1})
+    with pytest.raises(lggsn_statistics.StatisticsError):
+        lggsn_statistics.cluster_sign_flip_test(
+            aligned, checkpoint_a="a", checkpoint_b="nonexistent",
+            cluster_key_fn=lambda p: p.query, resampling_unit="query",
+        )
+
+
+# ── Phase 4: conclusion_category logic (real_analysis.py) ───────────────────
+
+def test_phase4_conclusion_category_consistent_when_both_significant_and_agree():
+    category = real_analysis._conclusion_category(
+        pair_interpretation_raw="SIGNIFICANT_FAVORS_B", cluster_p_value=0.01,
+        accuracy_diff_b_minus_a=0.2, mean_cluster_diff=0.15, alpha=0.05,
+    )
+    assert category == "CONSISTENT_ACROSS_CLUSTER_AND_PAIR_INFERENCE"
+
+
+def test_phase4_conclusion_category_pair_level_only_when_cluster_not_significant():
+    category = real_analysis._conclusion_category(
+        pair_interpretation_raw="SIGNIFICANT_FAVORS_A", cluster_p_value=0.41,
+        accuracy_diff_b_minus_a=-0.13, mean_cluster_diff=-0.11, alpha=0.05,
+    )
+    assert category == "PAIR_LEVEL_ONLY"
+
+
+def test_phase4_conclusion_category_no_clear_difference_when_pair_not_significant():
+    category = real_analysis._conclusion_category(
+        pair_interpretation_raw="NOT_SIGNIFICANT", cluster_p_value=0.03,
+        accuracy_diff_b_minus_a=0.01, mean_cluster_diff=0.2, alpha=0.05,
+    )
+    assert category == "NO_CLEAR_DIFFERENCE"
+
+
+def test_phase4_conclusion_category_no_clear_difference_when_both_significant_but_disagree_direction():
+    category = real_analysis._conclusion_category(
+        pair_interpretation_raw="SIGNIFICANT_FAVORS_B", cluster_p_value=0.01,
+        accuracy_diff_b_minus_a=0.2, mean_cluster_diff=-0.15, alpha=0.05,
+    )
+    assert category == "NO_CLEAR_DIFFERENCE"
+
+
+# ── Phase 4: regression -- existing pair-level McNemar/bootstrap results ────
+# are unaltered by this addition ─────────────────────────────────────────────
+
+def test_phase4_does_not_alter_existing_mcnemar_hand_checked_fixture():
+    # Byte-for-byte the same fixture and assertions as
+    # test_phase3_mcnemar_hand_checked_fixture above, re-run after the
+    # Phase 4 addition to confirm exact_mcnemar's own behavior/values are
+    # untouched by anything added in this section.
+    aligned = alignment.align_pairs({
+        "a": (
+            loader.PairRecord("q", "p1", "n1", True), loader.PairRecord("q", "p2", "n2", True),
+            loader.PairRecord("q", "p3", "n3", False), loader.PairRecord("q", "p4", "n4", False),
+            loader.PairRecord("q", "p5", "n5", False),
+        ),
+        "b": (
+            loader.PairRecord("q", "p1", "n1", True), loader.PairRecord("q", "p2", "n2", False),
+            loader.PairRecord("q", "p3", "n3", True), loader.PairRecord("q", "p4", "n4", True),
+            loader.PairRecord("q", "p5", "n5", False),
+        ),
+    })
+    result = lggsn_statistics.exact_mcnemar(aligned, checkpoint_a="a", checkpoint_b="b")
+    assert result.n01 == 2
+    assert result.n10 == 1
+    assert result.p_value == pytest.approx(1.0, abs=1e-12)
+
+
+def test_phase4_real_run_mcnemar_and_bootstrap_fields_match_standalone_calls(real_run):
+    # For every real planned comparison, the mcnemar_p_value_raw and
+    # bootstrap fields embedded in _build_comparison's output must equal
+    # a fresh, independent standalone call to exact_mcnemar /
+    # paired_bootstrap_ci_clustered on the same aligned_pairs -- proving
+    # the Phase 4 addition did not change what those existing calls
+    # compute or how their results are threaded into the comparison dict.
+    for comparison in real_run.comparisons:
+        a, b = comparison["checkpoint_a"], comparison["checkpoint_b"]
+        direct_mcnemar = lggsn_statistics.exact_mcnemar(real_run.aligned_pairs, checkpoint_a=a, checkpoint_b=b)
+        assert comparison["mcnemar_p_value_raw"] == direct_mcnemar.p_value
+        assert comparison["discordant_a_correct_b_wrong"] == direct_mcnemar.n10
+        assert comparison["discordant_a_wrong_b_correct"] == direct_mcnemar.n01
+
+        direct_bootstrap = lggsn_statistics.paired_bootstrap_ci_clustered(
+            real_run.aligned_pairs, checkpoint_a=a, checkpoint_b=b, cluster_key_fn=lambda p: p.query,
+            resampling_unit=real_analysis.BOOTSTRAP_RESAMPLING_UNIT, seed=real_analysis.BOOTSTRAP_SEED,
+            n_resamples=real_analysis.BOOTSTRAP_N_RESAMPLES, confidence=real_analysis.BOOTSTRAP_CONFIDENCE,
+        )
+        assert comparison["bootstrap"]["ci_lower"] == direct_bootstrap.ci_lower
+        assert comparison["bootstrap"]["ci_upper"] == direct_bootstrap.ci_upper
+        assert comparison["bootstrap"]["observed_diff_b_minus_a"] == direct_bootstrap.observed_diff_b_minus_a
+
+
+# ── Phase 4: real-data integration ───────────────────────────────────────────
+
+def test_phase4_real_run_cluster_sign_flip_has_six_query_clusters(real_run):
+    for comparison in real_run.comparisons:
+        cluster_sign_flip = comparison["cluster_sign_flip"]
+        assert cluster_sign_flip["n_clusters"] == 6
+        assert cluster_sign_flip["n_permutations"] == 64
+        assert len(cluster_sign_flip["cluster_diffs"]) == 6
+        assert cluster_sign_flip["n_favor_a"] + cluster_sign_flip["n_favor_b"] + cluster_sign_flip["n_tied"] == 6
+        assert 0.0 <= cluster_sign_flip["p_value"] <= 1.0
+
+
+def test_phase4_real_run_conclusion_category_is_one_of_three_known_values(real_run):
+    known = {
+        "CONSISTENT_ACROSS_CLUSTER_AND_PAIR_INFERENCE", "PAIR_LEVEL_ONLY", "NO_CLEAR_DIFFERENCE",
+    }
+    for comparison in real_run.comparisons:
+        assert comparison["conclusion_category"] in known
+
+
+def test_phase4_real_run_primary_goal_comparisons_present_with_both_evidence_lines(real_run):
+    # Primary goal (per the task spec): base-vs-nodist and nodist-vs-full_v2
+    # must both be assessable through cluster-level inference, not just
+    # pair-level.
+    by_pair = {(c["checkpoint_a"], c["checkpoint_b"]): c for c in real_run.comparisons}
+    for key in [("base", "nodist"), ("nodist", "full_v2")]:
+        assert key in by_pair
+        comparison = by_pair[key]
+        assert comparison["cluster_sign_flip"]["n_clusters"] == 6
+        assert comparison["conclusion_category"] in {
+            "CONSISTENT_ACROSS_CLUSTER_AND_PAIR_INFERENCE", "PAIR_LEVEL_ONLY", "NO_CLEAR_DIFFERENCE",
+        }
+
+
+def test_phase4_evidence_columns_field_lists_exactly_three_names(real_run):
+    for comparison in real_run.comparisons:
+        assert comparison["evidence_columns"] == [
+            "pair_level_mcnemar", "query_cluster_permutation", "query_cluster_bootstrap_ci",
+        ]
+
+
+# ── Phase 4: JSON/CSV agreement for the new fields ───────────────────────────
+
+def test_phase4_json_and_csv_outputs_agree_for_cluster_permutation_fields(tmp_path, real_run):
+    reporting.write_pairwise_comparisons_json(real_run.comparisons, tmp_path / "pairwise_comparisons.json")
+    reporting.write_pairwise_comparisons_csv(real_run.comparisons, tmp_path / "pairwise_comparisons.csv")
+
+    json_payload = json.loads((tmp_path / "pairwise_comparisons.json").read_text())["comparisons"]
+    with (tmp_path / "pairwise_comparisons.csv").open(newline="") as f:
+        csv_rows = list(csv.DictReader(f))
+
+    for json_row, csv_row in zip(json_payload, csv_rows):
+        cluster_sign_flip = json_row["cluster_sign_flip"]
+        assert cluster_sign_flip["resampling_unit"] == csv_row["cluster_permutation_resampling_unit"]
+        assert cluster_sign_flip["n_clusters"] == int(csv_row["cluster_permutation_n_clusters"])
+        assert cluster_sign_flip["n_favor_a"] == int(csv_row["cluster_permutation_n_favor_a"])
+        assert cluster_sign_flip["n_favor_b"] == int(csv_row["cluster_permutation_n_favor_b"])
+        assert cluster_sign_flip["n_tied"] == int(csv_row["cluster_permutation_n_tied"])
+        assert cluster_sign_flip["mean_cluster_diff"] == pytest.approx(float(csv_row["cluster_permutation_mean_diff"]))
+        assert cluster_sign_flip["median_cluster_diff"] == pytest.approx(float(csv_row["cluster_permutation_median_diff"]))
+        assert cluster_sign_flip["n_permutations"] == int(csv_row["cluster_permutation_n_permutations"])
+        assert cluster_sign_flip["p_value"] == pytest.approx(float(csv_row["cluster_permutation_p_value"]))
+        assert json_row["conclusion_category"] == csv_row["conclusion_category"]
+
+
+def test_phase4_markdown_summary_mentions_three_evidence_columns_and_not_mcnemar_for_cluster_test(real_run):
+    manifest = real_analysis.build_manifest(
+        repo_root=REPO_ROOT, run=real_run, started_at="2026-01-01T00:00:00+00:00",
+        runtime_seconds=0.0, command=["python", "-m", "research_agent_pilots.lggsn_analysis.real_analysis"],
+    )
+    md = reporting.render_statistical_summary_markdown(real_run.comparisons, manifest)
+    assert "pair_level_mcnemar" in md
+    assert "query_cluster_permutation" in md
+    assert "query_cluster_bootstrap_ci" in md
+    assert "NOT McNemar" in md
+    assert "CONSISTENT_ACROSS_CLUSTER_AND_PAIR_INFERENCE" in md or "PAIR_LEVEL_ONLY" in md or "NO_CLEAR_DIFFERENCE" in md

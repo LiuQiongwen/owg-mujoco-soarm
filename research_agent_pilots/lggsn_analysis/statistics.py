@@ -322,6 +322,138 @@ def paired_bootstrap_ci_clustered(
     )
 
 
+def _mean(values: Sequence[float]) -> float:
+    return sum(values) / len(values)
+
+
+def _median(values: Sequence[float]) -> float:
+    ordered = sorted(values)
+    n = len(ordered)
+    mid = n // 2
+    if n % 2 == 1:
+        return ordered[mid]
+    return (ordered[mid - 1] + ordered[mid]) / 2.0
+
+
+@dataclass(frozen=True)
+class ClusterSignFlipResult:
+    checkpoint_a: str
+    checkpoint_b: str
+    resampling_unit: str
+    n_clusters: int
+    cluster_diffs: tuple[tuple[str, float], ...]  # (cluster_key, accuracy_diff_b_minus_a), sorted by key
+    n_favor_a: int  # cluster diff < 0
+    n_favor_b: int  # cluster diff > 0
+    n_tied: int     # cluster diff == 0
+    mean_cluster_diff: float
+    median_cluster_diff: float
+    observed_statistic: float  # == mean_cluster_diff; named separately for clarity in the test itself
+    n_permutations: int
+    p_value: float
+
+
+_SIGN_FLIP_MAX_CLUSTERS = 20  # 2**20 == 1,048,576 enumerations -- beyond this, exact
+# enumeration stops being cheap; fail closed rather than silently degrade to slow or
+# approximate behavior.
+
+_SIGN_FLIP_TOLERANCE = 1e-9  # float-comparison slack for the "at least as extreme as
+# observed" tail count -- guards against the observed assignment being excluded from
+# its own tail due to summation-order floating-point noise (accuracy diffs are ratios
+# of small integers, not always exactly binary-representable).
+
+
+def cluster_sign_flip_test(
+    aligned_pairs: Sequence[AlignedPair],
+    *,
+    checkpoint_a: str,
+    checkpoint_b: str,
+    cluster_key_fn: Callable[[AlignedPair], str],
+    resampling_unit: str,
+) -> ClusterSignFlipResult:
+    """Exact cluster-level sign-flip (Fisher-randomization) permutation test
+    for the accuracy difference (checkpoint_b minus checkpoint_a), treating
+    each cluster (as identified by `cluster_key_fn`) as ONE independent
+    experimental unit. This is NOT McNemar's test and must not be reported
+    or labeled as one: exact_mcnemar above treats each PAIR as an
+    independent Bernoulli trial; this function makes no such claim about
+    individual pairs at all.
+
+    Exchangeability assumption (the only assumption this test makes): under
+    the null hypothesis of no true difference between checkpoint_a and
+    checkpoint_b, the SIGN of each cluster's own accuracy_diff_b_minus_a is
+    exchangeable -- equally likely to have been positive or negative,
+    independently of every other cluster's sign. This does not require
+    pairs within a cluster to be independent of each other, does not
+    require clusters to be equal-sized, and does not require the
+    *magnitude* of each cluster's difference to follow any particular
+    distribution -- a substantially weaker and more defensible assumption
+    than pair-level independence when clusters are internally correlated
+    (see paired_bootstrap_ci_clustered's docstring above for why LGGSN
+    pairs are correlated within a query).
+
+    With `n_clusters` clusters there are exactly 2**n_clusters possible
+    sign assignments; every one is enumerated exactly here (no Monte Carlo
+    approximation, no seed -- there is nothing random to seed). The
+    two-sided exact p-value is the fraction of assignments whose
+    |mean signed cluster diff| is >= the observed |mean cluster diff|.
+
+    Statistical power caveat, worth restating at every call site that
+    reports this result: with only `n_clusters` clusters, the coarsest
+    possible two-sided exact p-value is 2/2**n_clusters (e.g. 2/64 =
+    0.03125 for 6 clusters) -- p-values from this test are discrete and
+    power is low. Failing to reject the null here is not evidence of
+    equivalence between checkpoint_a and checkpoint_b; it may simply
+    reflect that too few clusters exist to resolve a real but modest
+    effect."""
+    _checkpoint_values(aligned_pairs, checkpoint_a=checkpoint_a, checkpoint_b=checkpoint_b)
+
+    clusters: dict[str, list[AlignedPair]] = {}
+    for pair in aligned_pairs:
+        clusters.setdefault(cluster_key_fn(pair), []).append(pair)
+    cluster_keys = sorted(clusters.keys())
+    n_clusters = len(cluster_keys)
+    if n_clusters < 2:
+        raise StatisticsError(f"cluster sign-flip test requires at least two clusters, got {n_clusters}")
+    if n_clusters > _SIGN_FLIP_MAX_CLUSTERS:
+        raise StatisticsError(
+            "cluster sign-flip test's exact enumeration is only supported up to "
+            f"{_SIGN_FLIP_MAX_CLUSTERS} clusters, got {n_clusters}"
+        )
+
+    cluster_diffs: list[tuple[str, float]] = [
+        (key, _accuracy_diff_b_minus_a(clusters[key], checkpoint_a=checkpoint_a, checkpoint_b=checkpoint_b))
+        for key in cluster_keys
+    ]
+    diff_values = [d for _, d in cluster_diffs]
+
+    n_favor_b = sum(1 for d in diff_values if d > 0)
+    n_favor_a = sum(1 for d in diff_values if d < 0)
+    n_tied = n_clusters - n_favor_a - n_favor_b
+    mean_diff = _mean(diff_values)
+    median_diff = _median(diff_values)
+    observed_statistic = mean_diff
+
+    n_permutations = 2 ** n_clusters
+    abs_observed = abs(observed_statistic)
+    count_at_least_as_extreme = 0
+    for bits in range(n_permutations):
+        total = 0.0
+        for i, d in enumerate(diff_values):
+            total += d if (bits >> i) & 1 else -d
+        stat = total / n_clusters
+        if abs(stat) >= abs_observed - _SIGN_FLIP_TOLERANCE:
+            count_at_least_as_extreme += 1
+    p_value = count_at_least_as_extreme / n_permutations
+
+    return ClusterSignFlipResult(
+        checkpoint_a=checkpoint_a, checkpoint_b=checkpoint_b, resampling_unit=resampling_unit,
+        n_clusters=n_clusters, cluster_diffs=tuple(cluster_diffs),
+        n_favor_a=n_favor_a, n_favor_b=n_favor_b, n_tied=n_tied,
+        mean_cluster_diff=mean_diff, median_cluster_diff=median_diff,
+        observed_statistic=observed_statistic, n_permutations=n_permutations, p_value=p_value,
+    )
+
+
 def holm_bonferroni_adjust(p_values: Sequence[float]) -> list[float]:
     """Holm step-down adjusted p-values (matches R's
     p.adjust(method="holm")), returned in the SAME order as the input --

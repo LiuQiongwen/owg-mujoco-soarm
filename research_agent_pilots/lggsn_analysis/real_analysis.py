@@ -41,6 +41,22 @@ Nothing here converts pair_accuracy into a grasp success rate, and nothing
 here claims causal feature importance from a single checkpoint per ablation
 -- see reporting.py's generated "What these results do and do not prove"
 section for the explicit, non-silent caveats.
+
+Phase 4 addition: a cluster-as-independent-unit sensitivity analysis
+(statistics.cluster_sign_flip_test), added alongside -- never replacing --
+the existing pair-level exact McNemar test and query-cluster bootstrap CI.
+Motivation: the pair-level McNemar test treats each of the 582 aligned
+pairs as an independent Bernoulli trial, which understates uncertainty
+given LGGSN pairs are correlated within a query (see the bootstrap
+resampling-unit note above); this addition asks the same base-vs-nodist
+and nodist-vs-full_v2 question again with `query` (6 clusters) as the unit
+of analysis instead, using an exact sign-flip permutation test rather than
+a bootstrap. All three lines of evidence -- pair_level_mcnemar,
+query_cluster_permutation, query_cluster_bootstrap_ci -- are reported
+separately for every comparison and are never collapsed into one
+significance label; `_conclusion_category` below is a conservative,
+explicitly-labeled combined read that still keeps all three visible
+alongside it.
 """
 from __future__ import annotations
 
@@ -83,6 +99,13 @@ BOOTSTRAP_SEED = 20260803
 BOOTSTRAP_N_RESAMPLES = 10000
 BOOTSTRAP_CONFIDENCE = 0.95
 BOOTSTRAP_RESAMPLING_UNIT = "query"
+
+# Phase 4: cluster-level (query-as-unit) sensitivity analysis, added
+# alongside the existing pair-level McNemar and query-cluster bootstrap CI
+# -- never replacing either. See statistics.cluster_sign_flip_test's
+# docstring for the exact method and its exchangeability assumption; it is
+# an exact enumeration (2**n_clusters), so there is no seed to declare.
+CLUSTER_PERMUTATION_RESAMPLING_UNIT = "query"
 
 PAIR_RESULTS_RELATIVE_DIR = Path("research_agent_pilots") / "lggsn_analysis" / "pair_results"
 
@@ -220,6 +243,45 @@ def _interpretation(p_value: float, accuracy_diff_b_minus_a: float, *, alpha: fl
     return "NOT_SIGNIFICANT"  # p < alpha with a zero observed difference cannot occur under exact McNemar
 
 
+def _conclusion_category(
+    *, pair_interpretation_raw: str, cluster_p_value: float,
+    accuracy_diff_b_minus_a: float, mean_cluster_diff: float, alpha: float,
+) -> str:
+    """Conservative combined read across the two independent significance
+    tests (pair-level exact McNemar, raw/unadjusted; cluster-level exact
+    sign-flip permutation, see statistics.cluster_sign_flip_test) -- never
+    a replacement for either, always reported alongside both in full (see
+    the three separate evidence columns in reporting.py). Uses the RAW,
+    not Holm-adjusted, pair-level p-value: Holm-Bonferroni is a family-wise
+    correction across the five planned comparisons, a separate concern
+    from this per-comparison cluster-vs-pair agreement check.
+
+    CONSISTENT_ACROSS_CLUSTER_AND_PAIR_INFERENCE: both tests reject the
+      null at `alpha`, AND they agree on direction (the pooled pair-level
+      accuracy_diff_b_minus_a and the unweighted mean_cluster_diff have
+      the same sign) -- the strongest defensible read.
+    PAIR_LEVEL_ONLY: the pair-level test rejects but the cluster-level
+      test does not -- exactly the pattern real within-cluster correlation
+      would produce (the pair-level test overstates confidence because it
+      assumes independence the data does not have; see
+      statistics.paired_bootstrap_ci_clustered's docstring for why LGGSN
+      pairs are correlated within a query).
+    NO_CLEAR_DIFFERENCE: everything else -- including the pair-level test
+      failing to reject (regardless of the cluster-level result), and the
+      edge case where both tests reject but disagree on direction (never
+      labeled "consistent" even though both are individually
+      significant)."""
+    pair_significant = pair_interpretation_raw != "NOT_SIGNIFICANT"
+    cluster_significant = cluster_p_value < alpha
+    same_direction = (accuracy_diff_b_minus_a > 0) == (mean_cluster_diff > 0)
+
+    if pair_significant and cluster_significant and same_direction:
+        return "CONSISTENT_ACROSS_CLUSTER_AND_PAIR_INFERENCE"
+    if pair_significant and not cluster_significant:
+        return "PAIR_LEVEL_ONLY"
+    return "NO_CLEAR_DIFFERENCE"
+
+
 def _build_comparison(
     aligned_pairs: Sequence[alignment.AlignedPair],
     *,
@@ -239,8 +301,21 @@ def _build_comparison(
         cluster_key_fn=lambda p: p.query, resampling_unit=BOOTSTRAP_RESAMPLING_UNIT,
         seed=BOOTSTRAP_SEED, n_resamples=BOOTSTRAP_N_RESAMPLES, confidence=BOOTSTRAP_CONFIDENCE,
     )
+    cluster_sign_flip = lggsn_statistics.cluster_sign_flip_test(
+        aligned_pairs, checkpoint_a=checkpoint_a, checkpoint_b=checkpoint_b,
+        cluster_key_fn=lambda p: p.query, resampling_unit=CLUSTER_PERMUTATION_RESAMPLING_UNIT,
+    )
     score_margin = _score_margin_summary(aligned_pairs, margins[checkpoint_a], margins[checkpoint_b])
     per_query = _per_query_breakdown(aligned_pairs, checkpoint_a=checkpoint_a, checkpoint_b=checkpoint_b)
+
+    interpretation_raw = _interpretation(mcnemar.p_value, accuracy_diff, alpha=alpha)
+    conclusion_category = _conclusion_category(
+        pair_interpretation_raw=interpretation_raw,
+        cluster_p_value=cluster_sign_flip.p_value,
+        accuracy_diff_b_minus_a=accuracy_diff,
+        mean_cluster_diff=cluster_sign_flip.mean_cluster_diff,
+        alpha=alpha,
+    )
 
     return {
         "checkpoint_a": checkpoint_a,
@@ -256,7 +331,7 @@ def _build_comparison(
         # Filled in by run_analysis once all planned comparisons' raw
         # p-values are available (Holm-Bonferroni needs the whole family).
         "mcnemar_p_value_holm_adjusted": None,
-        "interpretation_raw": _interpretation(mcnemar.p_value, accuracy_diff, alpha=alpha),
+        "interpretation_raw": interpretation_raw,
         "interpretation_holm": None,
         "bootstrap": {
             "seed": bootstrap.seed,
@@ -270,6 +345,39 @@ def _build_comparison(
         },
         "score_margin": score_margin,
         "per_query_breakdown": per_query,
+        # Phase 4: cluster-as-unit sensitivity analysis (see
+        # statistics.cluster_sign_flip_test) -- explicitly NOT McNemar, and
+        # never combined with pair_level_mcnemar/query_cluster_bootstrap_ci
+        # into a single number. All three evidence columns are reported in
+        # full; `evidence_columns` below is only a display-order pointer,
+        # never a computed/derived value.
+        "cluster_sign_flip": {
+            "resampling_unit": cluster_sign_flip.resampling_unit,
+            "n_clusters": cluster_sign_flip.n_clusters,
+            "cluster_diffs": [list(item) for item in cluster_sign_flip.cluster_diffs],
+            "n_favor_a": cluster_sign_flip.n_favor_a,
+            "n_favor_b": cluster_sign_flip.n_favor_b,
+            "n_tied": cluster_sign_flip.n_tied,
+            "mean_cluster_diff": cluster_sign_flip.mean_cluster_diff,
+            "median_cluster_diff": cluster_sign_flip.median_cluster_diff,
+            "n_permutations": cluster_sign_flip.n_permutations,
+            "p_value": cluster_sign_flip.p_value,
+            "exchangeability_assumption": (
+                "Under the null of no true difference between the two checkpoints, the SIGN "
+                "of each query's own accuracy_diff_b_minus_a is exchangeable (equally likely "
+                "positive or negative), independently across queries. This does not assume "
+                "pairs within a query are independent, and does not assume anything about the "
+                "magnitude of each query's difference."
+            ),
+            "power_caveat": (
+                f"Only {cluster_sign_flip.n_clusters} query clusters: p-values from this test "
+                f"are discrete (coarsest possible two-sided p = 2/{cluster_sign_flip.n_permutations} "
+                f"= {2 / cluster_sign_flip.n_permutations:.5f}) and power is low. Failing to reject "
+                "the null here is not evidence of equivalence between the two checkpoints."
+            ),
+        },
+        "evidence_columns": ["pair_level_mcnemar", "query_cluster_permutation", "query_cluster_bootstrap_ci"],
+        "conclusion_category": conclusion_category,
     }
 
 
@@ -349,9 +457,9 @@ def build_manifest(
         )
 
     return {
-        "schema_version": "lggsn_analysis_phase3_v1",
+        "schema_version": "lggsn_analysis_phase4_v1",
         "task_id": "lggsn_statistical_analysis",
-        "phase": 3,
+        "phase": 4,
         "git_commit": _git_commit(repo_root),
         "core_checkpoint_names": list(CORE_CHECKPOINT_NAMES),
         "planned_comparisons": [list(pair) for pair in PLANNED_COMPARISONS],
@@ -373,6 +481,16 @@ def build_manifest(
             "within one query (research_agent_pilots/lggsn_suite/eval_core.py's build_pairs), "
             "so pairs sharing a query are correlated, not independent -- resampling "
             "individual pairs i.i.d. would understate the true sampling variance."
+        ),
+        "cluster_permutation_resampling_unit": CLUSTER_PERMUTATION_RESAMPLING_UNIT,
+        "cluster_permutation_note": (
+            "Phase 4 addition: exact cluster-level (query-as-unit) sign-flip permutation test, "
+            "added alongside -- never replacing -- the pair-level exact McNemar test and the "
+            "query-cluster bootstrap CI above. Enumerates all 2**n_clusters sign assignments "
+            "exactly (no seed: nothing is randomly sampled). Explicitly not McNemar's test and "
+            "not reported as one. See statistics.cluster_sign_flip_test's docstring for the "
+            "exchangeability assumption and each comparison's `cluster_sign_flip` block for the "
+            "per-comparison power caveat."
         ),
         "command": command,
         "started_at": started_at,
