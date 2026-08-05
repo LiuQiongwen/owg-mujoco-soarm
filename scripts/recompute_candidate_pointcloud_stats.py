@@ -9,17 +9,31 @@ Why this exists
 `data.transition_logger.compute_pc_stats` is called once per scene, before
 candidates are even sampled (see `scripts/risk_gated_vla_phase1_eval.py`'s
 `build_pool()` and `scripts/collect_recovery_data.py`'s
-`build_pool_recovery()`). The resulting 9-dim stat is then attached
+`build_pool_recovery()`). The resulting 9-dim stat used to be attached
 identically to every candidate in that scene via
-`world_model/train_counterfactual_critic.py`'s `feature()`:
+`world_model/train_counterfactual_critic.py`'s `feature()`. This is now
+fixed for FRESH data collected via `risk_gated_vla_phase1_eval.py`'s
+`run_scene()` (it computes a real per-candidate local stat as it collects).
+This script is for retroactively backfilling that same fix onto ALREADY
+COLLECTED data, without re-running any physics.
 
-    pc = [float(v) for v in rec["pc_stats_before"]]   # same vector, every candidate
+2026-08-05 update: this script now calls
+`data.transition_logger.compute_pc_stats_local()` directly -- the same
+function `run_scene()` uses for fresh collection -- instead of a private
+reimplementation. There is now exactly one implementation of "crop to a
+candidate's local neighborhood," not two that could silently drift apart.
 
-So the critic's point-cloud feature currently carries zero candidate-specific
-geometric signal -- only scene-level signal, duplicated across candidates.
-This script fixes that by re-deriving a LOCAL point-cloud stat per candidate,
-cropped around that candidate's own gripper position, instead of the whole
-object.
+2026-08-05 fix (real bug, not just cleanup): this script previously wrote
+its output to a NEW record-level field `pc_stats_per_candidate` (a list,
+parallel to `oracle_per_candidate`). `feature()` does not read that field --
+it reads `cand.get("pc_stats_local", ...)`, a field on EACH INDIVIDUAL
+candidate dict inside `oracle_per_candidate`, matching exactly what
+`run_scene()` writes for fresh collection. The old output schema was
+silently incompatible: pointing training at it would have fallen through
+to the old shared-stat behavior on every candidate, with no error and no
+warning. Fixed to write `cand["pc_stats_local"]` in place, matching the
+live-collection schema exactly, so retroactively-fixed and freshly-
+collected data are interchangeable to every downstream consumer.
 
 How this avoids re-collecting data
 -----------------------------------
@@ -35,9 +49,12 @@ labels are copied through unchanged.
 IMPORTANT -- this script has NOT been run against real data
 -------------------------------------------------------------
 `results/` is gitignored and no scenes.jsonl-format file exists in this
-checkout, so this could not be executed or verified here. Also: two
-different scene-building conventions were found in this codebase with
-DIFFERENT `centre_y` constants --
+checkout, so this could not be executed or verified here (the fix itself,
+and the crop-radius choice below, WERE verified with real MuJoCo data via
+fresh collection in this same session -- see
+scripts/risk_gated_vla_phase1_eval.py's run_scene() and the accompanying
+report). Also: two different scene-building conventions were found in this
+codebase with DIFFERENT `centre_y` constants --
   scripts/risk_gated_vla_phase1_eval.py:   EVAL_CENTRE_Y = -0.30  (default here)
   scripts/eval_wm_reranking_full.py:       _CENTRE_Y      = -0.40
   scripts/collect_recovery_data.py's build_pool_recovery() imports
@@ -57,13 +74,14 @@ Usage (in the tango conda env):
     conda run -n tango python scripts/recompute_candidate_pointcloud_stats.py \\
         --in results/risk_gated_vla/<split>/scenes.jsonl \\
         --out results/risk_gated_vla/<split>/scenes_with_candidate_pc.jsonl \\
-        --crop-radius 0.05
+        --crop-radius 0.04
 
-Output format: same records as the input, plus a new
-`pc_stats_per_candidate` field: a list of 9-dim vectors, one per entry in
-`oracle_per_candidate`, in the same order. `pc_stats_before` (the old
+Output format: same records as the input, with each entry in
+`oracle_per_candidate` gaining a new `pc_stats_local` field (9-dim, in
+place, same schema fresh collection produces). `pc_stats_before` (the old
 scene-level stat) is left in place, unmodified, for backward compatibility
--- callers that want the fix must opt in by reading the new field.
+-- callers that want the fix get it automatically via feature()'s existing
+`cand.get("pc_stats_local", rec["pc_stats_before"])` fallback logic.
 """
 import argparse
 import json
@@ -77,7 +95,7 @@ import os
 os.environ.setdefault("MUJOCO_GL", "egl")
 
 from tango_robot.env_soarm import EnvironmentSoArm
-from data.transition_logger import compute_pc_stats
+from data.transition_logger import compute_pc_stats_local
 from scripts.eval_wm_reranking_full import OBJECTS, _SPREAD_XY, _DROP_Z, _SETTLE_STEPS
 
 
@@ -112,53 +130,19 @@ def replay_scene_and_get_points(env: EnvironmentSoArm, obj_key: str, seed: int,
     return oid, obj_pos, obj_quat, obs
 
 
-def crop_pc_stats(obs: dict, obj_id: int, center_xyz: np.ndarray,
-                   radius: float) -> np.ndarray:
-    """Same 9-dim layout as data.transition_logger.compute_pc_stats
-    (centroid(3) + std(3) + min_z(1) + max_z(1) + n_pts_norm(1)), but
-    computed over only the object-masked points within `radius` of
-    `center_xyz` (the candidate's own gripper position), not the whole
-    object. Returns zeros if too few points fall in the crop -- same
-    convention as the scene-level function it replaces."""
-    seg = obs.get("seg")
-    points = obs.get("points")
-    zero = np.zeros(9, dtype=np.float32)
-    if seg is None or points is None:
-        return zero
-
-    flat_seg = seg.ravel()
-    flat_pts = points.reshape(-1, 3) if points.ndim == 3 else points
-    n_min = min(len(flat_seg), len(flat_pts))
-    flat_seg = flat_seg[:n_min]
-    flat_pts = flat_pts[:n_min]
-
-    obj_mask = flat_seg == obj_id
-    if obj_mask.sum() < 5:
-        return zero
-    obj_pts = flat_pts[obj_mask]
-
-    dist = np.linalg.norm(obj_pts - center_xyz[None, :], axis=1)
-    local_mask = dist <= radius
-    if local_mask.sum() < 5:
-        return zero
-    local_pts = obj_pts[local_mask]
-
-    centroid = local_pts.mean(axis=0)
-    std = local_pts.std(axis=0) + 1e-6
-    min_z = float(local_pts[:, 2].min())
-    max_z = float(local_pts[:, 2].max())
-    n_norm = float(min(local_mask.sum() / 1000.0, 1.0))
-    return np.concatenate([centroid, std, [min_z, max_z, n_norm]]).astype(np.float32)
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                   formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--in", dest="in_path", required=True)
     ap.add_argument("--out", dest="out_path", required=True)
-    ap.add_argument("--crop-radius", type=float, default=0.05,
-                     help="metres; NOT validated against real gripper geometry in this "
-                          "pass -- eyeball a few crops before trusting this default.")
+    ap.add_argument("--crop-radius", type=float, default=0.04,
+                     help="metres; empirically validated in a separate session pass "
+                          "(swept 0.02-0.10m against real point clouds) -- 0.04 matches "
+                          "tango_robot/env_soarm.py's finger_length constant and avoids both "
+                          "the zero-point degeneracy seen at 0.02 and the over-smoothing seen "
+                          "approaching 0.10. Still worth spot-checking against this dataset's "
+                          "own point density before trusting it at scale (object/sensor setup "
+                          "may differ from what was swept).")
     ap.add_argument("--centre-y", type=float, default=-0.30,
                      help="must match whatever generated --in; see module docstring "
                           "for the two known conventions found in this codebase.")
@@ -194,13 +178,16 @@ def main():
                 if not args.allow_mismatch:
                     continue
 
-            per_candidate_stats = []
             for cand in rec["oracle_per_candidate"]:
                 pose = np.asarray(cand["candidate_pose"], dtype=np.float32)
-                stats = crop_pc_stats(obs, oid, pose[:3], args.crop_radius)
-                per_candidate_stats.append(stats.tolist())
+                stats = compute_pc_stats_local(obs, oid, pose[:3], radius=args.crop_radius)
+                # In place, on the candidate dict itself -- matches exactly what
+                # scripts/risk_gated_vla_phase1_eval.py::run_scene() writes for fresh
+                # collection, and exactly what feature()'s cand.get("pc_stats_local", ...)
+                # reads. NOT a parallel record-level list (that was the bug fixed
+                # 2026-08-05 -- see module docstring).
+                cand["pc_stats_local"] = [float(v) for v in stats]
 
-            rec["pc_stats_per_candidate"] = per_candidate_stats
             fout.write(json.dumps(rec) + "\n")
             n_written += 1
 
