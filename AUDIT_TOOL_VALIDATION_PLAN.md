@@ -151,9 +151,7 @@ maintainer before any publication, not published as a "gotcha."
 
 **CORRECTION, same day, before any marker was placed — caught by manual verification exactly as this plan's
 own rules require**: on closer reading, `main_simulation_loop` is NOT a candidate-scoring function at all.
-Tracing the call graph, the actual physical grasp action (`articulation_controller.apply_action(actions)`,
-computed via IK/pick-place `controller.forward(...)`) happens in a separate function,
-`handle_action_for_env` (line 77), called BEFORE `main_simulation_loop` runs. By the time
+Tracing the call graph, the candidate pose is committed before `main_simulation_loop` runs. By the time
 `main_simulation_loop` executes, the candidate has already been selected and the grasp already commanded —
 this function's job is purely to run a post-grasp stress test (lower the supporting surface, see if the
 object stays attached) and write the resulting outcome as a LABEL. Per this project's own causal-validity
@@ -162,6 +160,17 @@ labels-are-exempt corollary) — `simulation_quality` being execution-derived is
 violation. Treating this as a "found bug" would have been a false, unsupportable claim. **Do not pursue a
 marker in `main_simulation_loop` — it is a label-writing function, not a candidate-selection function, and
 is out of scope for this audit by design, not by oversight.**
+
+**FURTHER CORRECTION (2026-08-05, scoped Stage 2 re-verification before writing this into `paper_tro.tex`,
+see `causal_validity_audit/STAGE2_TRACEABILITY.md` Case 3 for full detail)**: the specific function named
+above as the action-commanding code, `handle_action_for_env`, is **not actually called anywhere** in
+Sim-Grasp (`grep -rn "handle_action_for_env(" --include="*.py" .` across the whole repo finds only its own
+`def` line) — it appears to be dead/vestigial code. The real commit mechanism is
+`RobotSpawner.spawn()` (`grasp_simulation.py:219-236`, direct kinematic placement via `XFormPrim` at the
+candidate pose), called at line 359, before `main_simulation_loop` at line 371. The causal-order conclusion
+above (candidate committed before the stress test that produces the label) is unaffected and still holds —
+only the specific function citation was wrong. Cite `RobotSpawner.spawn`, not `handle_action_for_env`, in
+any paper text.
 
 ## Stage 2 status as of 2026-08-02 — consolidated summary
 
