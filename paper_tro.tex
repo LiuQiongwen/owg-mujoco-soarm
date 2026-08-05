@@ -221,8 +221,10 @@ already-written code via a single per-function marker, requiring no
 pipeline rewrite. Also relevant, at the level of general practice rather
 than a formal criterion: LeakageDetector \cite{leakagedetector2025} is a
 PyCharm plugin that flags generic train/test-split leakage patterns in
-tabular ML code via static analysis, and closely related notebook-specific
-work does the same for Jupyter pipelines -- both operate on the same
+tabular ML code via static analysis; closer in mechanism, an
+abstract-interpretation-based static analysis \cite{urbanleakage2022}
+proves the absence of leakage in Jupyter notebooks at development time.
+Both operate on the same
 generic train/test boundary as Roth, not the temporal,
 already-executed-or-not boundary this domain requires, and neither targets
 robot-manipulation pipelines specifically. Concurrent work by Jiang et
@@ -487,6 +489,54 @@ including confirming that a success-derived label field is
 execution-derived (correct, since it is the training label, exempt under
 the Corollary) while the pose-derived features are genuinely
 pre-execution and safe for live selection.
+
+\subsection{Boundary checks against three real public codebases}
+\label{sec:externaltagger}
+
+\Cref{sec:external} manually checked the criterion against two published
+systems' stated designs; this section instead runs the automated tagger
+itself (\cref{sec:autotag}) against real, unmodified external source code,
+to check whether it applies outside this project's own pipelines at all.
+We deliberately do not call this a validation of the tagger's sensitivity:
+none of the three codebases below yielded a confirmed real-world
+violation, so what follows is a set of boundary/specificity checks and two
+genuine tool-development findings, not a demonstration that the tagger
+catches real external defects -- that would require an external, labeled
+true-positive corpus this investigation does not have.
+
+Two of three checked codebases are causally clean \emph{by construction},
+not by any property the tagger detected: GraspGen \cite{graspgen2025}
+(re-examined here at the code level, corroborating \cref{sec:external}'s
+citation-level claim) and Dex-Net's grasp-quality scoring
+\cite{mahler2017dexnet} both compute candidate scores purely analytically
+from geometry -- wrench-space/friction-cone metrics for Dex-Net, a
+point-cloud-and-pose discriminator for GraspGen -- with no
+execution-contingent input anywhere in the released code. Neither has an
+execution boundary for our criterion to be tested against at all, so a
+clean result here says nothing about detector sensitivity, only that
+nothing was misclassified as pre-execution when it should not have been.
+
+Sim-Grasp \cite{ligrasp2024simgrasp} does have a genuine
+candidate-pool$\to$physical-simulation$\to$label loop
+(\texttt{main\_simulation\_loop}), and running the tagger against it
+produced two real findings. First, it confirms one of
+\cref{sec:autotag}'s own documented limitations is not merely a
+synthetic-fixture artifact: the loop drives execution via
+\texttt{world.step(...)} rather than \texttt{env.step(...)}, and the
+tagger's hardcoded \texttt{env}-named-handle check misses it on real,
+unmodified external code exactly as predicted. Second, and more valuable
+methodologically, tracing the call graph before placing any marker caught
+a near-miss: the field this loop writes, \texttt{simulation\_quality},
+initially looked like a candidate-scoring feature worth flagging, but the
+actual grasp action is issued by a separate, earlier function --
+\texttt{main\_simulation\_loop} only records a post-hoc stress-test
+outcome as a label, and labels are explicitly exempt from the
+pre-execution requirement by this project's own corollary
+(\cref{sec:method}). Reporting this as a violation would have been a
+false, unsupportable claim, caught by exactly the manual-verification
+discipline this project's own self-corrections (\cref{sec:selfcorrections})
+already established as necessary -- the audit \emph{process}, not just
+the tool, working as designed.
 
 \subsection{An independently discovered infrastructure bug, and a stronger re-verification}
 \label{sec:rngbug}
@@ -1125,6 +1175,12 @@ M.~Carlson, F.~Ramos, S.~Birchfield, D.~Fox, and C.~Eppner,
   On-Generator Training,''
 \emph{arXiv:2507.13097}, 2025.
 
+\bibitem{ligrasp2024simgrasp}
+J.~Li and D.~J.~Cappelleri,
+``Sim-Grasp: Learning 6-DOF Grasp Policies for Cluttered Environments
+  Using a Synthetic Benchmark,''
+\emph{arXiv:2405.00841}, 2024.
+
 \bibitem{graspgenx2026}
 B.~Han, Y.-W.~Chao, E.~Coumans, C.~Eppner, B.~Sundaralingam,
 J.~Deng, S.~Birchfield, and A.~Murali,
@@ -1165,6 +1221,11 @@ E.~A.~AlOmar, C.~DeMario, R.~Shagawat, and B.~Kreiser,
 ``LeakageDetector: An Open Source Data Leakage Analysis Tool in
   Machine Learning Pipelines,''
 \emph{arXiv:2503.14723}, 2025.
+
+\bibitem{urbanleakage2022}
+F.~Drobnjaković, P.~Subotić, and C.~Urban,
+``Abstract Interpretation-Based Data Leakage Static Analysis,''
+\emph{arXiv:2211.16073}, 2022.
 
 \bibitem{benchmarkaudit2026}
 T.~Jiang, X.~Tan, S.~Wheeler, L.~Sun, T.~W.~Ayalew, and M.~Walter,
