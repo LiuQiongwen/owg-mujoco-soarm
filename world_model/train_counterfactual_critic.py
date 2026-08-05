@@ -38,7 +38,13 @@ def feature(rec: dict, cand: dict, relative: bool) -> list[float]:
     yaw = float(pose[3])
     base = [*xyz.tolist(), math.sin(yaw), math.cos(yaw),
             float(pose[4]), float(pose[5])]
-    pc = [float(v) for v in rec["pc_stats_before"]]
+    # Prefer the candidate's own local point-cloud stats when present (fixes a
+    # real defect: pc_stats_before is computed once per scene, before any
+    # candidate is sampled, so it used to be identical for every candidate in
+    # the scene -- see data/transition_logger.py's compute_pc_stats_local()).
+    # Falls back to the old shared scene-level stat for records collected
+    # before this fix, so this function still works unmodified on legacy data.
+    pc = [float(v) for v in cand.get("pc_stats_local", rec["pc_stats_before"])]
     onehot = [float(rec["object"] == name) for name in OBJECTS]
     return base + pc + onehot
 

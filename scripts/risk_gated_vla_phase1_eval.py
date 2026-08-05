@@ -60,12 +60,12 @@ os.environ.setdefault("MUJOCO_GL", "egl")
 from causal_validity_audit.provenance import audit_feature_set
 
 audit_feature_set(
-    ["grasp_pose", "obj_pos_before", "obj_quat_before", "pc_stats_before"],
+    ["grasp_pose", "obj_pos_before", "obj_quat_before", "pc_stats_before", "pc_stats_local"],
     context="risk_gated_vla_phase1_eval.py candidate-selection features",
 )
 
 from tango_robot.env_soarm import EnvironmentSoArm, TABLE_TOP_Z
-from data.transition_logger import compute_pc_stats
+from data.transition_logger import compute_pc_stats, compute_pc_stats_local
 from world_model.train_mlp_predictor import load_model, MODEL_PATH
 from world_model.rerank_grasps import score_grasps
 from world_model.train_counterfactual_critic import load_ensemble, score_candidates
@@ -153,7 +153,7 @@ def build_pool(env: EnvironmentSoArm, obj_key: str, seed: int, k_grasps: int) ->
     candidates = np.stack([_sample_grasp(obj_pos, rng) for _ in range(k_grasps)])
 
     return {
-        "cx": cx, "cy": cy, "obj_name": obj_name,
+        "cx": cx, "cy": cy, "obj_name": obj_name, "oid": oid,
         "obj_pos": obj_pos, "obj_quat": obj_quat, "pc_stats": pc_stats,
         "candidates": candidates,
     }
@@ -225,6 +225,14 @@ def run_scene(env, obj_key: str, obj_idx: int, scene_idx: int, base_seed: int,
     pool = build_pool(env, obj_key, seed, k_grasps)
     scores = score_pool(pool, model, obj_key, critic_ensemble, critic_relative)
 
+    # Captured once per scene, immediately after build_pool() and before any
+    # execute_candidate() call moves the scene -- the SAME pre-execution
+    # observation build_pool() itself used for pool["pc_stats"], just kept
+    # around so each candidate can be cropped against it individually below.
+    # No new physics execution, no extra scene reload: the object hasn't
+    # moved since build_pool()'s own internal capture.
+    obs_for_local_crop = env.get_obs(pointcloud=True)
+
     rand_rng = np.random.default_rng(random_choice_seed(base_seed, obj_key, obj_idx, scene_idx))
     idx_by_method = {
         "random": int(rand_rng.integers(0, k_grasps)),
@@ -249,6 +257,10 @@ def run_scene(env, obj_key: str, obj_idx: int, scene_idx: int, base_seed: int,
         res["geo_score"] = float(scores["geo_scores"][i])
         res["wm_score"] = float(scores["wm_scores"][i])
         res["success_prob"] = float(scores["preds"]["success_prob"][i])
+        local_stats = compute_pc_stats_local(
+            obs_for_local_crop, pool["oid"], pool["candidates"][i][:3]
+        )
+        res["pc_stats_local"] = [float(v) for v in local_stats]
         oracle_per_candidate.append(res)
     oracle_success = any(c["success"] for c in oracle_per_candidate)
 

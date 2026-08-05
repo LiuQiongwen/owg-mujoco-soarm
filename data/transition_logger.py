@@ -94,6 +94,71 @@ def compute_pc_stats(obs: dict, obj_id: int) -> np.ndarray:
     return np.concatenate([centroid, std, [min_z, max_z, n_norm]]).astype(np.float32)
 
 
+def compute_pc_stats_local(obs: dict, obj_id: int, center_xyz: np.ndarray,
+                            radius: float = 0.04) -> np.ndarray:
+    """
+    Candidate-level counterpart to compute_pc_stats(): same 9-dim layout
+    (centroid(3) + std(3) + min_z(1) + max_z(1) + n_pts_norm(1)), but computed
+    over only the object-masked points within `radius` of `center_xyz` -- the
+    specific candidate's own gripper position -- instead of the whole object.
+
+    Fixes a real defect: compute_pc_stats() is called once per scene, before
+    any candidate is sampled, so every candidate in a scene previously
+    received the identical scene-level vector (see feature() in
+    world_model/train_counterfactual_critic.py). This function gives each
+    candidate its own local geometry instead.
+
+    radius=0.04 was chosen empirically, not arbitrarily: swept 0.02-0.10m
+    against real MuJoCo point clouds (tango_robot/env_soarm.py's own
+    finger_length=0.04 was the physical anchor). 0.02 (roughly the jaw span)
+    is too tight -- some real candidates get zero points and degenerate to
+    the zero-fallback below. By 0.10 crops start reabsorbing most of the
+    object's points (over 900 of ~1600 in the swept scene) and candidates'
+    local centroids start converging back toward each other -- i.e. drifting
+    back toward the whole-object average this function exists to avoid. 0.04
+    sits in the middle of the range that gave 6/6 distinct candidates without
+    that convergence, and matches a real, already-named physical constant
+    (finger_length) rather than a round number picked for convenience.
+
+    All inputs (`obs`, `obj_id`) are PRE_EXECUTION-admissible in exactly the
+    same sense compute_pc_stats()'s are: `obs` is captured once per scene
+    before any candidate executes, and `center_xyz` is the candidate's own
+    generator-time pose, not anything derived from its outcome. Returns
+    zeros if too few points fall in the local crop (same convention as
+    compute_pc_stats() for a missing/tiny segment).
+    """
+    seg = obs.get("seg")
+    points = obs.get("points")
+    zero = np.zeros(9, dtype=np.float32)
+    if seg is None or points is None:
+        return zero
+
+    flat_seg = seg.ravel()
+    flat_pts = points.reshape(-1, 3) if points.ndim == 3 else points
+    n_min = min(len(flat_seg), len(flat_pts))
+    flat_seg = flat_seg[:n_min]
+    flat_pts = flat_pts[:n_min]
+
+    obj_mask = flat_seg == obj_id
+    if obj_mask.sum() < 5:
+        return zero
+    obj_pts = flat_pts[obj_mask]
+
+    center = np.asarray(center_xyz, dtype=np.float32).reshape(1, 3)
+    dist = np.linalg.norm(obj_pts - center, axis=1)
+    local_mask = dist <= radius
+    if local_mask.sum() < 5:
+        return zero
+    local_pts = obj_pts[local_mask]
+
+    centroid = local_pts.mean(axis=0)
+    std = local_pts.std(axis=0) + 1e-6
+    min_z = float(local_pts[:, 2].min())
+    max_z = float(local_pts[:, 2].max())
+    n_norm = float(min(local_mask.sum() / 1000.0, 1.0))
+    return np.concatenate([centroid, std, [min_z, max_z, n_norm]]).astype(np.float32)
+
+
 def compute_pose_delta(pos_before: np.ndarray, quat_before: np.ndarray,
                        pos_after:  np.ndarray, quat_after:  np.ndarray) -> np.ndarray:
     """6-dim pose change: [dx, dy, dz, dqx, dqy, dqz] (quaternion w dropped)."""

@@ -231,6 +231,16 @@ WORLD_MODEL_FIELDS = {
         "compute_pc_stats(obs_before, oid) -- derived from the pre-grasp point cloud "
         "capture only, no execution state involved",
     ),
+    "pc_stats_local": FieldSpec(
+        Provenance.PRE_EXECUTION,
+        "compute_pc_stats_local(obs_before, oid, candidate_pose[:3]) -- same pre-grasp "
+        "point cloud capture as pc_stats_before, cropped around the CANDIDATE's own "
+        "generator-time pose rather than the whole object. The crop center is the "
+        "candidate's proposed position (known before it executes, same provenance as "
+        "grasp_pose itself), not anything derived from that candidate's own outcome or "
+        "any other candidate's outcome -- pool-relative-but-not-execution-derived, "
+        "the same category grasp_pose already occupies.",
+    ),
     "success": FieldSpec(Provenance.EXECUTION_DERIVED, "the label itself -- valid as a training target, not as model input"),
     "dz": FieldSpec(Provenance.EXECUTION_DERIVED, "obj_pos_after[2] - obj_pos_before[2] -- requires execution to have happened"),
     "fell_off": FieldSpec(Provenance.EXECUTION_DERIVED, "thresholded on obj_pos_after -- post-execution only"),
