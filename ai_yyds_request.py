@@ -1,7 +1,11 @@
+import os
+
 import requests
 
-# 设置 API 密钥
-api_key = 'sk-A9q5TscQFLIV7ZTAB29f5c93E1D44f4880F91c24FcAa4eDd'  # 请替换为你的 AI-YYDS API 密钥
+# 设置 API 密钥（从环境变量读取，不再硬编码）
+api_key = os.environ.get('AI_YYDS_API_KEY')
+if not api_key:
+    raise RuntimeError("AI_YYDS_API_KEY is not set.")
 
 headers = {
     'Authorization': f'Bearer {api_key}',

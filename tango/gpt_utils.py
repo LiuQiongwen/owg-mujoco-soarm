@@ -101,9 +101,6 @@ def _extract_json_from_text(text: str):
 
 
 
-# Get OpenAI API Key from environment variable
-openai_api_key = os.environ.get('OPENAI_API_KEY', 'sk-A9q5TscQFLIV7ZTAB29f5c93E1D44f4880F91c24FcAa4eDd')
-
 API_URL = "https://api.openai.com/v1/chat/completions"
 
 
@@ -252,7 +249,12 @@ def compose_payload(images: List[np.ndarray], prompt: str, system_prompt: str, d
 
 
 def request_gpt(images: Union[np.ndarray, List[np.ndarray]], prompt: str, system_prompt: str, detail: str = "auto", temp: float = 0.0, n_tokens: int = 256, n: int = 1, return_logprobs: bool = False, in_context_examples: List[dict] = None, model_name: str = "gpt-4o", seed: Optional[int] = None) -> str:
-    api_key = os.environ.get('OPENAI_API_KEY', 'sk-A9q5TscQFLIV7ZTAB29f5c93E1D44f4880F91c24FcAa4eDd')
+    api_key = os.environ.get('OPENAI_API_KEY')
+    if not api_key:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set. request_gpt() requires a real key in "
+            "the environment; there is no built-in fallback."
+        )
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}"
