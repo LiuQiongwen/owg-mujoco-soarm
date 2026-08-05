@@ -1,5 +1,18 @@
 # Auto-Tagger Stage 1 Validation Results
 
+**Integrated into the T-RO paper-writing branch 2026-08-05.** This work was originally committed
+directly to local `main` (`1dba924`, 2026-08-03) and never merged into
+`feat/lggsn-statistical-analysis`, the branch `paper_tro.tex` has actually been written from this
+whole session — found via a deliberate inventory pass (`TRO_VALIDATION_INVENTORY.md`), confirmed
+`1dba924` touches only `causal_validity_audit/`-related files (no unrelated content mixed in), then
+cherry-picked cleanly (`dc817e7` on `integrate/tro-validation-stage1-stage2`, branched from
+`feat/lggsn-statistical-analysis`). Re-verified post-integration, in place: `run_validation_suite.py`
+reproduces the exact numbers below, `tests/test_auto_tagger_cross_function.py` passes (3/3), and the
+full repo test suite shows zero regressions (642 passed, 11 skipped, 0 failed vs. 639/11/0 pre-
+integration). Version pin for anyone citing these numbers: `source_commit=1dba924f3507248b`,
+`integration_commit=dc817e7db50c2ae17bca229b36efe2707a14e34d`,
+`auto_tagger.py` sha256=`b5b4c4a6cae1f996429d3d44e76151476c50c5b99cfe97cb019b45767875f862`.
+
 **Status: Stage 1 complete (2026-08-02), extended same day after Stage 2 contact with real code.** Per
 `AUDIT_TOOL_VALIDATION_PLAN.md`, this is the prerequisite evidence needed before Stage 2 (auditing real
 public codebases) can be interpreted at all — without it, a clean scan of public code is uninterpretable
