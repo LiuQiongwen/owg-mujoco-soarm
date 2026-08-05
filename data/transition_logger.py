@@ -175,6 +175,27 @@ def build_feature(grasp_pose:  np.ndarray,
     Assemble the 22-dim feature vector used by the MLP.
 
     All inputs are already in robot-base frame (same coordinate system as env).
+
+    KNOWN DEFECT, NOT FIXED HERE (found 2026-08-05, documented not patched): every caller
+    (world_model/rerank_grasps.py's rerank()/score_grasps(), consumed by
+    scripts/risk_gated_vla_phase1_eval.py's "world_critic" method) passes the SAME
+    scene-level `pc_stats` for every candidate in a pool -- the identical bug fixed
+    in world_model/train_counterfactual_critic.py::feature() (see
+    data.transition_logger.compute_pc_stats_local() and that fix's commit history),
+    just in this older feature assembly function instead.
+
+    Deliberately NOT fixed here: this function backs `world_model/mlp_predictor.pkl`,
+    the exact "predecessor"/"stale checkpoint" the risk-gated VLA paper's own
+    diagnosis (Section 3.4/4.1) already found chance-level (AUROC=0.4996) for two
+    OTHER, independent reasons (seed-coupling and success-criterion defects in the
+    harness that trained/evaluated it). This defect is consistent with, not a
+    contradiction of, that finding -- a model trained on features with zero
+    candidate-specific point-cloud signal would plausibly fail regardless of the
+    other two fixes. Patching this function would mean retraining a pipeline the
+    project's own paper already correctly diagnosed and moved away from in favor of
+    the object-relative counterfactual critic; there is no result that depends on
+    doing so. Left as a documented fact for whoever next touches this code, not a
+    silent gap.
     """
     feat = np.concatenate([
         np.asarray(grasp_pose, dtype=np.float32).ravel()[:6],
