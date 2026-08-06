@@ -362,6 +362,41 @@ def _manifest_entry(obj_name: str) -> dict:
 
 # ── mesh helpers ──────────────────────────────────────────────────────────────
 
+def _col_geom_name(obj_idx: int, part: int, n_parts: int) -> str:
+    """Collision geom name for one part of an object's collision geometry.
+
+    Single-part keeps the historical name (`ycb_col_geom_0`) so single-mesh
+    objects are byte-identical to before multi-part support was added;
+    multi-part appends `_p<i>`. Anything that looks geoms up by name must use
+    this helper (see `_col_geom_names`) rather than hardcoding the old name,
+    or it will silently miss every part of a decomposed object.
+    """
+    return (f"ycb_col_geom_{obj_idx}" if n_parts == 1
+            else f"ycb_col_geom_{obj_idx}_p{part}")
+
+
+def _col_geom_names(model, obj_idx: int) -> List[str]:
+    """Every collision geom name actually present for `obj_idx`, single- or
+    multi-part. Resolves against the compiled model, so it stays correct
+    regardless of how many parts the manifest declared."""
+    single = f"ycb_col_geom_{obj_idx}"
+    try:
+        model.geom(single)
+        return [single]
+    except Exception:
+        pass
+    names, i = [], 0
+    while True:
+        n = f"ycb_col_geom_{obj_idx}_p{i}"
+        try:
+            model.geom(n)
+        except Exception:
+            break
+        names.append(n)
+        i += 1
+    return names
+
+
 def _find_ycb_mesh(obj_dir: str) -> str:
     """Auto-discover the best available visual mesh for a YCB object directory."""
     candidates = [
@@ -406,17 +441,58 @@ def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
     entry   = _manifest_entry(obj_name)
 
     # ── mesh resolution ───────────────────────────────────────────────────────
+    # `collision_meshes` (plural, list) selects multi-part convex-decomposition
+    # collision -- one <geom> per part, which is the correct way to use a CoACD/
+    # V-HACD decomposition and the only way a concave object gets concave contact
+    # behaviour. `collision_mesh` (singular) is the original single-mesh path and
+    # is untouched: an object without `collision_meshes` produces byte-identical
+    # XML to before this was added, so no existing result changes.
+    # Paths in `collision_meshes` may be absolute or repo-relative (the CoACD
+    # assets live in YCB_Dataset/ycb/<name>/, a different tree from YCB_ROOT).
+    col_meshes: List[str] = []
     if entry:
+        # `visual_mesh_path` is repo-relative and must be used whenever
+        # `collision_meshes` is, because a decomposition is only valid in the
+        # frame of the mesh it was computed from. The CoACD parts under
+        # YCB_Dataset/ycb/ are aligned to that tree's own textured.obj and are
+        # offset by 2-9 cm from YCB_ROOT's *_reoriented.obj -- pairing them
+        # across trees silently misaligns visual and collision geometry.
+        vis_rel = entry.get("visual_mesh_path", "")
         vis_name = entry.get("visual_mesh", "")
-        col_name = entry.get("collision_mesh", "collision_vhacd.obj")
-        vis_mesh = (os.path.join(obj_dir, vis_name) if vis_name
-                    else _find_ycb_mesh(obj_dir))
-        col_path = os.path.join(obj_dir, col_name)
-        col_mesh = col_path if os.path.isfile(col_path) else vis_mesh
+        if vis_rel:
+            vis_mesh = (vis_rel if os.path.isabs(vis_rel)
+                        else os.path.join(_PROJ_ROOT, vis_rel))
+            if not os.path.isfile(vis_mesh):
+                raise FileNotFoundError(
+                    f"{obj_name}: visual_mesh_path does not exist: {vis_mesh}")
+        else:
+            vis_mesh = (os.path.join(obj_dir, vis_name) if vis_name
+                        else _find_ycb_mesh(obj_dir))
+        if entry.get("collision_meshes") and not vis_rel:
+            raise ValueError(
+                f"{obj_name}: 'collision_meshes' requires 'visual_mesh_path' from "
+                f"the same asset tree -- a convex decomposition is only valid in "
+                f"the frame of the mesh it was computed from.")
+        multi = entry.get("collision_meshes") or []
+        for rel in multi:
+            p = rel if os.path.isabs(rel) else os.path.join(_PROJ_ROOT, rel)
+            if os.path.isfile(p):
+                col_meshes.append(p)
+            else:
+                print(f"[WARN] {obj_name}: collision part not found, skipping: {p}")
+        if multi and not col_meshes:
+            raise FileNotFoundError(
+                f"{obj_name}: 'collision_meshes' listed {len(multi)} parts but none "
+                f"exist on disk -- refusing to silently fall back to a single mesh, "
+                f"which would change the object's contact geometry without warning.")
+        if not col_meshes:
+            col_name = entry.get("collision_mesh", "collision_vhacd.obj")
+            col_path = os.path.join(obj_dir, col_name)
+            col_meshes = [col_path if os.path.isfile(col_path) else vis_mesh]
     else:
         vis_mesh = _find_ycb_mesh(obj_dir)
         col_path = os.path.join(obj_dir, "collision_vhacd.obj")
-        col_mesh = col_path if os.path.isfile(col_path) else vis_mesh
+        col_meshes = [col_path if os.path.isfile(col_path) else vis_mesh]
 
     print(f"[INFO] Using mesh for {obj_name}: {Path(vis_mesh).name}"
           + ("" if entry else "  (manifest entry missing — using defaults)"))
@@ -450,23 +526,39 @@ def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
         material_block = f'  <material name="ycb_mat_{obj_idx}" rgba="0.8 0.8 0.8 1"/>\n'
 
     # ── XML assembly ──────────────────────────────────────────────────────────
+    # Single part keeps the original mesh/geom names exactly ("ycb_col_0"),
+    # so single-mesh objects emit byte-identical XML to before multi-part
+    # support existed. Multi-part appends a suffix ("ycb_col_0_p3").
+    def _col_id(i: int) -> str:
+        return f"ycb_col_{obj_idx}" if len(col_meshes) == 1 else f"ycb_col_{obj_idx}_p{i}"
+
+    col_assets = "".join(
+        f'  <mesh name="{_col_id(i)}" file="{p}" scale="{scale_str}"/>\n'
+        for i, p in enumerate(col_meshes))
     asset = f"""
   <mesh name="ycb_vis_{obj_idx}" file="{vis_mesh}" scale="{scale_str}"/>
-  <mesh name="ycb_col_{obj_idx}" file="{col_mesh}" scale="{scale_str}"/>
-{material_block}"""
+{col_assets}{material_block}"""
 
     # Initial body pos matches _park_pos(obj_idx): above floor, far from workspace
     park_x = 2.0 + obj_idx * 0.5
     geom_pos_attr = f' pos="0 0 {geom_z_offset:.6f}"' if geom_z_offset != 0.0 else ""
+    # Mass is split evenly across parts so the body's total mass still equals the
+    # manifest's measured value. This makes the inertia tensor part-distribution
+    # dependent rather than true-density dependent -- an approximation, but the
+    # total mass (the quantity that actually is measured) is exact.
+    per_part_mass = mass / len(col_meshes)
+    col_geoms = "".join(
+        f'      <geom name="{_col_geom_name(obj_idx, i, len(col_meshes))}" '
+        f'type="mesh" mesh="{_col_id(i)}"\n'
+        f'            mass="{per_part_mass}" friction="{friction_str}"\n'
+        f'            contype="1" conaffinity="1"{geom_pos_attr}/>\n'
+        for i in range(len(col_meshes)))
     body = f"""
     <body name="obj_{obj_idx}" pos="{park_x} 0 0.15">
       <freejoint name="obj_joint_{obj_idx}"/>
       <geom name="ycb_vis_geom_{obj_idx}" type="mesh" mesh="ycb_vis_{obj_idx}"
             material="ycb_mat_{obj_idx}" contype="0" conaffinity="0" group="2"{geom_pos_attr}/>
-      <geom name="ycb_col_geom_{obj_idx}" type="mesh" mesh="ycb_col_{obj_idx}"
-            mass="{mass}" friction="{friction_str}"
-            contype="1" conaffinity="1"{geom_pos_attr}/>
-    </body>
+{col_geoms}    </body>
 """
     return asset, body
 
@@ -1793,7 +1885,11 @@ class EnvironmentSoArm:
         # Remap geom IDs → logical obj_ids so that (seg == obj_id) works downstream
         seg = np.zeros_like(geom_ids)
         for list_pos, (oid, pool_slot) in enumerate(zip(self.obj_ids, self._pool_slots)):
-            for geom_name in (f"ycb_vis_geom_{pool_slot}", f"ycb_col_geom_{pool_slot}"):
+            # Every collision part must be remapped, not just a single geom --
+            # a decomposed object would otherwise appear only partially in the
+            # segmentation map, silently shrinking its mask.
+            for geom_name in ([f"ycb_vis_geom_{pool_slot}"]
+                              + _col_geom_names(self.model, pool_slot)):
                 try:
                     gid = self.model.geom(geom_name).id
                     seg[geom_ids == gid] = oid
@@ -2226,7 +2322,8 @@ class EnvironmentSoArm:
             _diag_obj_body_ids = {self.model.body(f"obj_{slot}").id for slot in self._pool_slots}
             _diag_obj_geom_ids = set()
             for _slot in self._pool_slots:
-                for _gname in (f"ycb_vis_geom_{_slot}", f"ycb_col_geom_{_slot}"):
+                for _gname in ([f"ycb_vis_geom_{_slot}"]
+                               + _col_geom_names(self.model, _slot)):
                     try:
                         _diag_obj_geom_ids.add(self.model.geom(_gname).id)
                     except Exception:

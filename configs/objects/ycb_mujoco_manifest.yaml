@@ -115,3 +115,220 @@ objects:
     geom_z_offset:  -0.0965        # shifts both geoms so body origin = mesh CoM; enables lifted check
     spawn_z_offset: 0.15
     xml:            owg_robot/assets/ycb/scissors.xml
+
+# ─── CoACD object set (added 2026-08-06) ──────────────────────────────────────
+# Expansion set for the object-generalization study. Distinct from the entries
+# above: collision geometry is a CoACD convex DECOMPOSITION (multiple parts,
+# one <geom> each) rather than a single V-HACD hull, which is the only way a
+# concave object gets concave contact behaviour -- measured on PowerDrill, the
+# single V-HACD hull encloses 100.5% of the true convex-hull volume (i.e. it
+# fills in the trigger guard entirely) vs CoACD's 45.0%.
+#
+# mass:     YCB OFFICIAL MEASURED values, read from each object's own
+#           tango_robot/assets/ycb_objects/Ycb*/model.urdf <mass value=...>.
+#           Verified to match this file's pre-existing entries wherever they
+#           overlap, confirming they are the official figures.
+# friction: ESTIMATES, as everywhere else in this file -- YCB publishes no
+#           friction coefficients for any object. The parenthetical is the
+#           material rationale for the chosen value, not a measurement.
+#
+# visual_mesh_path/collision_meshes are repo-relative and BOTH point into
+# YCB_Dataset/ycb/: the CoACD parts are only valid in the frame of that tree's
+# own textured.obj (they sit 2-9 cm away from YCB_ROOT's *_reoriented.obj).
+
+  BananaC:
+    pool_name:        YcbBanana
+    visual_mesh_path: YCB_Dataset/ycb/banana/textured.obj
+    collision_meshes:   # CoACD, 4 part(s)
+      - YCB_Dataset/ycb/banana/textured_coacd_0.stl
+      - YCB_Dataset/ycb/banana/textured_coacd_1.stl
+      - YCB_Dataset/ycb/banana/textured_coacd_2.stl
+      - YCB_Dataset/ycb/banana/textured_coacd_3.stl
+    mass:             0.166          # kg -- YCB OFFICIAL MEASURED
+    friction:         [2.0, 0.05, 0.01]   # ESTIMATE (smooth waxy skin)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  CrackerBoxC:
+    pool_name:        YcbCrackerBox
+    visual_mesh_path: YCB_Dataset/ycb/cracker_box/textured.obj
+    collision_meshes:   # CoACD, 2 part(s)
+      - YCB_Dataset/ycb/cracker_box/textured_coacd_0.stl
+      - YCB_Dataset/ycb/cracker_box/textured_coacd_1.stl
+    mass:             0.411          # kg -- YCB OFFICIAL MEASURED
+    friction:         [1.8, 0.05, 0.01]   # ESTIMATE (cardboard)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  FoamBrickC:
+    pool_name:        YcbFoamBrick
+    visual_mesh_path: YCB_Dataset/ycb/foam_brick/textured.obj
+    collision_meshes:   # CoACD, 5 part(s)
+      - YCB_Dataset/ycb/foam_brick/textured_coacd_0.stl
+      - YCB_Dataset/ycb/foam_brick/textured_coacd_1.stl
+      - YCB_Dataset/ycb/foam_brick/textured_coacd_2.stl
+      - YCB_Dataset/ycb/foam_brick/textured_coacd_3.stl
+      - YCB_Dataset/ycb/foam_brick/textured_coacd_4.stl
+    mass:             0.28          # kg -- YCB OFFICIAL MEASURED
+    friction:         [2.5, 0.05, 0.01]   # ESTIMATE (high-friction foam)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  GelatinBoxC:
+    pool_name:        YcbGelatinBox
+    visual_mesh_path: YCB_Dataset/ycb/gelatin_box/textured.obj
+    collision_meshes:   # CoACD, 3 part(s)
+      - YCB_Dataset/ycb/gelatin_box/textured_coacd_0.stl
+      - YCB_Dataset/ycb/gelatin_box/textured_coacd_1.stl
+      - YCB_Dataset/ycb/gelatin_box/textured_coacd_2.stl
+    mass:             0.097          # kg -- YCB OFFICIAL MEASURED
+    friction:         [1.8, 0.05, 0.01]   # ESTIMATE (cardboard)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  HammerC:
+    pool_name:        YcbHammer
+    visual_mesh_path: YCB_Dataset/ycb/hammer/textured.obj
+    collision_meshes:   # CoACD, 5 part(s)
+      - YCB_Dataset/ycb/hammer/textured_coacd_0.stl
+      - YCB_Dataset/ycb/hammer/textured_coacd_1.stl
+      - YCB_Dataset/ycb/hammer/textured_coacd_2.stl
+      - YCB_Dataset/ycb/hammer/textured_coacd_3.stl
+      - YCB_Dataset/ycb/hammer/textured_coacd_4.stl
+    mass:             0.4          # kg -- YCB OFFICIAL MEASURED
+    friction:         [2.2, 0.05, 0.01]   # ESTIMATE (rubber grip, steel head)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  MasterChefCanC:
+    pool_name:        YcbMasterChefCan
+    visual_mesh_path: YCB_Dataset/ycb/master_chef_can/textured.obj
+    collision_meshes:   # CoACD, 5 part(s)
+      - YCB_Dataset/ycb/master_chef_can/textured_coacd_0.stl
+      - YCB_Dataset/ycb/master_chef_can/textured_coacd_1.stl
+      - YCB_Dataset/ycb/master_chef_can/textured_coacd_2.stl
+      - YCB_Dataset/ycb/master_chef_can/textured_coacd_3.stl
+      - YCB_Dataset/ycb/master_chef_can/textured_coacd_4.stl
+    mass:             0.404          # kg -- YCB OFFICIAL MEASURED
+    friction:         [1.5, 0.05, 0.01]   # ESTIMATE (smooth metal)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  MediumClampC:
+    pool_name:        YcbMediumClamp
+    visual_mesh_path: YCB_Dataset/ycb/medium_clamp/textured.obj
+    collision_meshes:   # CoACD, 5 part(s)
+      - YCB_Dataset/ycb/medium_clamp/textured_coacd_0.stl
+      - YCB_Dataset/ycb/medium_clamp/textured_coacd_1.stl
+      - YCB_Dataset/ycb/medium_clamp/textured_coacd_2.stl
+      - YCB_Dataset/ycb/medium_clamp/textured_coacd_3.stl
+      - YCB_Dataset/ycb/medium_clamp/textured_coacd_4.stl
+    mass:             0.259          # kg -- YCB OFFICIAL MEASURED
+    friction:         [2.0, 0.05, 0.01]   # ESTIMATE (plastic)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  MustardBottleC:
+    pool_name:        YcbMustardBottle
+    visual_mesh_path: YCB_Dataset/ycb/mustard_bottle/textured.obj
+    collision_meshes:   # CoACD, 3 part(s)
+      - YCB_Dataset/ycb/mustard_bottle/textured_coacd_0.stl
+      - YCB_Dataset/ycb/mustard_bottle/textured_coacd_1.stl
+      - YCB_Dataset/ycb/mustard_bottle/textured_coacd_2.stl
+    mass:             0.603          # kg -- YCB OFFICIAL MEASURED
+    friction:         [2.0, 0.05, 0.01]   # ESTIMATE (plastic)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  PearC:
+    pool_name:        YcbPear
+    visual_mesh_path: YCB_Dataset/ycb/pear/textured.obj
+    collision_meshes:   # CoACD, 4 part(s)
+      - YCB_Dataset/ycb/pear/textured_coacd_0.stl
+      - YCB_Dataset/ycb/pear/textured_coacd_1.stl
+      - YCB_Dataset/ycb/pear/textured_coacd_2.stl
+      - YCB_Dataset/ycb/pear/textured_coacd_3.stl
+    mass:             0.049          # kg -- YCB OFFICIAL MEASURED
+    friction:         [1.5, 0.05, 0.01]   # ESTIMATE (smooth skin)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  PottedMeatCanC:
+    pool_name:        YcbPottedMeatCan
+    visual_mesh_path: YCB_Dataset/ycb/potted_meat_can/textured.obj
+    collision_meshes:   # CoACD, 5 part(s)
+      - YCB_Dataset/ycb/potted_meat_can/textured_coacd_0.stl
+      - YCB_Dataset/ycb/potted_meat_can/textured_coacd_1.stl
+      - YCB_Dataset/ycb/potted_meat_can/textured_coacd_2.stl
+      - YCB_Dataset/ycb/potted_meat_can/textured_coacd_3.stl
+      - YCB_Dataset/ycb/potted_meat_can/textured_coacd_4.stl
+    mass:             0.37          # kg -- YCB OFFICIAL MEASURED
+    friction:         [1.5, 0.05, 0.01]   # ESTIMATE (smooth metal)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  PowerDrillC:
+    pool_name:        YcbPowerDrill
+    visual_mesh_path: YCB_Dataset/ycb/power_drill/textured.obj
+    collision_meshes:   # CoACD, 5 part(s)
+      - YCB_Dataset/ycb/power_drill/textured_coacd_0.stl
+      - YCB_Dataset/ycb/power_drill/textured_coacd_1.stl
+      - YCB_Dataset/ycb/power_drill/textured_coacd_2.stl
+      - YCB_Dataset/ycb/power_drill/textured_coacd_3.stl
+      - YCB_Dataset/ycb/power_drill/textured_coacd_4.stl
+    mass:             0.895          # kg -- YCB OFFICIAL MEASURED
+    friction:         [2.5, 0.05, 0.01]   # ESTIMATE (rubber grip)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  ScissorsC:
+    pool_name:        YcbScissors
+    visual_mesh_path: YCB_Dataset/ycb/scissors/textured.obj
+    collision_meshes:   # CoACD, 5 part(s)
+      - YCB_Dataset/ycb/scissors/textured_coacd_0.stl
+      - YCB_Dataset/ycb/scissors/textured_coacd_1.stl
+      - YCB_Dataset/ycb/scissors/textured_coacd_2.stl
+      - YCB_Dataset/ycb/scissors/textured_coacd_3.stl
+      - YCB_Dataset/ycb/scissors/textured_coacd_4.stl
+    mass:             0.3          # kg -- YCB OFFICIAL MEASURED
+    friction:         [1.5, 0.05, 0.01]   # ESTIMATE (smooth metal)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  StrawberryC:
+    pool_name:        YcbStrawberry
+    visual_mesh_path: YCB_Dataset/ycb/strawberry/textured.obj
+    collision_meshes:   # CoACD, 5 part(s)
+      - YCB_Dataset/ycb/strawberry/textured_coacd_0.stl
+      - YCB_Dataset/ycb/strawberry/textured_coacd_1.stl
+      - YCB_Dataset/ycb/strawberry/textured_coacd_2.stl
+      - YCB_Dataset/ycb/strawberry/textured_coacd_3.stl
+      - YCB_Dataset/ycb/strawberry/textured_coacd_4.stl
+    mass:             0.2          # kg -- YCB OFFICIAL MEASURED
+    friction:         [1.8, 0.05, 0.01]   # ESTIMATE (textured plastic)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  TennisBallC:
+    pool_name:        YcbTennisBall
+    visual_mesh_path: YCB_Dataset/ycb/tennis_ball/textured.obj
+    collision_meshes:   # CoACD, 1 part(s)
+      - YCB_Dataset/ycb/tennis_ball/textured_coacd_0.stl
+    mass:             0.158          # kg -- YCB OFFICIAL MEASURED
+    friction:         [2.5, 0.05, 0.01]   # ESTIMATE (felt surface)
+    scale:            1.0
+    spawn_z_offset:   0.12
+
+  TomatoSoupCanC:
+    pool_name:        YcbTomatoSoupCan
+    visual_mesh_path: YCB_Dataset/ycb/tomato_soup_can/textured.obj
+    collision_meshes:   # CoACD, 5 part(s)
+      - YCB_Dataset/ycb/tomato_soup_can/textured_coacd_0.stl
+      - YCB_Dataset/ycb/tomato_soup_can/textured_coacd_1.stl
+      - YCB_Dataset/ycb/tomato_soup_can/textured_coacd_2.stl
+      - YCB_Dataset/ycb/tomato_soup_can/textured_coacd_3.stl
+      - YCB_Dataset/ycb/tomato_soup_can/textured_coacd_4.stl
+    mass:             0.349          # kg -- YCB OFFICIAL MEASURED
+    friction:         [1.5, 0.05, 0.01]   # ESTIMATE (smooth metal)
+    scale:            1.0
+    spawn_z_offset:   0.12
