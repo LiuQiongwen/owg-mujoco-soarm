@@ -513,7 +513,13 @@ def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
     friction_str = " ".join(str(v) for v in friction)
 
     # ── texture / material ────────────────────────────────────────────────────
-    tex_file = os.path.join(obj_dir, "texture_map.png")
+    # Look for the texture next to the visual mesh first: an object whose
+    # visual_mesh_path points into a different asset tree keeps its own
+    # texture there, and falling back to obj_dir would silently render it
+    # untextured grey.
+    tex_file = os.path.join(os.path.dirname(vis_mesh), "texture_map.png")
+    if not os.path.isfile(tex_file):
+        tex_file = os.path.join(obj_dir, "texture_map.png")
     if not os.path.isfile(tex_file):
         tex_file = ""
 
@@ -542,22 +548,54 @@ def _ycb_asset_tag(obj_name: str, obj_idx: int) -> Tuple[str, str]:
     # Initial body pos matches _park_pos(obj_idx): above floor, far from workspace
     park_x = 2.0 + obj_idx * 0.5
     geom_pos_attr = f' pos="0 0 {geom_z_offset:.6f}"' if geom_z_offset != 0.0 else ""
-    # Mass is split evenly across parts so the body's total mass still equals the
-    # manifest's measured value. This makes the inertia tensor part-distribution
-    # dependent rather than true-density dependent -- an approximation, but the
-    # total mass (the quantity that actually is measured) is exact.
-    per_part_mass = mass / len(col_meshes)
+    # Mass is distributed across parts BY VOLUME, not evenly. Splitting evenly
+    # gets the total right but the spatial distribution wrong, which makes the
+    # body's inertia tensor non-physical: MuJoCo derives each geom's inertia
+    # from its own shape plus its mass, so an even split implies a per-part
+    # density of (M/N)/V_i that varies with part size. Measured on this asset
+    # set, CoACD parts are highly unequal -- the mustard bottle's parts hold
+    # [44.8%, 5.1%, 50.1%] of the volume, so an even split gives the 5.1% part
+    # ~9.8x the density of its neighbours (hammer: 12.8x). This showed up as
+    # intermittent mjWARN_BADQACC on the object freejoint's ROTATIONAL DOFs
+    # during gripper closing -- exactly the signature of a wrong rotational
+    # inertia -- at 1-in-3 grasps for the mustard bottle, while the nearly
+    # equal-volume cracker box (1.7x) never warned.
+    # Volume-weighting reproduces the uniform-density inertia the single hull
+    # would have had, while keeping total mass exactly equal to the YCB
+    # measured value. Convex-decomposition parts may overlap slightly, so
+    # weights are normalised by their own sum rather than by mesh volume.
+    _part_vols = []
+    for _p in col_meshes:
+        try:
+            import trimesh as _tm
+            _m = _tm.load(_p, force="mesh")
+            _part_vols.append(float(_m.volume if _m.is_watertight
+                                    else _m.convex_hull.volume))
+        except Exception:
+            _part_vols.append(0.0)
+    _vsum = sum(_part_vols)
+    if _vsum > 0 and all(v > 0 for v in _part_vols):
+        part_masses = [mass * v / _vsum for v in _part_vols]
+    else:
+        # Unreadable/degenerate parts: fall back to an even split, but say so --
+        # silently shipping a wrong inertia tensor is what this block exists to
+        # prevent.
+        if len(col_meshes) > 1:
+            print(f"[WARN] {obj_name}: could not compute part volumes; falling back "
+                  f"to an even mass split (inertia tensor will be approximate).")
+        part_masses = [mass / len(col_meshes)] * len(col_meshes)
     col_geoms = "".join(
         f'      <geom name="{_col_geom_name(obj_idx, i, len(col_meshes))}" '
         f'type="mesh" mesh="{_col_id(i)}"\n'
-        f'            mass="{per_part_mass}" friction="{friction_str}"\n'
+        f'            mass="{part_masses[i]}" friction="{friction_str}"\n'
         f'            contype="1" conaffinity="1"{geom_pos_attr}/>\n'
         for i in range(len(col_meshes)))
     body = f"""
     <body name="obj_{obj_idx}" pos="{park_x} 0 0.15">
       <freejoint name="obj_joint_{obj_idx}"/>
       <geom name="ycb_vis_geom_{obj_idx}" type="mesh" mesh="ycb_vis_{obj_idx}"
-            material="ycb_mat_{obj_idx}" contype="0" conaffinity="0" group="2"{geom_pos_attr}/>
+            material="ycb_mat_{obj_idx}" contype="0" conaffinity="0" group="2"
+            mass="0"{geom_pos_attr}/>
 {col_geoms}    </body>
 """
     return asset, body
