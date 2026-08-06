@@ -550,6 +550,61 @@ a validated correctness improvement to the representation with a measured,
 significant secondary effect, not as a revision to this paper's central
 claim.
 
+\subsection{Feature ablation: is the object one-hot a shortcut?}
+\label{sec:onehot}
+
+The critic's input includes a 3-class object one-hot
+(\cref{sec:critic}), which invites a fair objection: on a three-object
+benchmark, an identity prior could be doing the work that the
+object-relative geometry is credited with. We test this directly on the
+paper's own population -- trained on the same 120-scene base-100 batch and
+evaluated on the same 90-scene base-200 dev-test batch as
+\cref{sec:pcfix}, offline-re-scored against real, physically executed
+per-candidate outcomes, using the unmodified
+\texttt{object\_counterfactual} architecture and training code (5 seeds
+$\times$ 400 epochs per variant, ensemble-mean top-1 selection). The
+frozen confirmatory batch was again not touched.
+
+\begin{table}[t]
+\centering
+\caption{Feature ablation on the base-200 dev-test batch ($n{=}90$),
+offline re-scoring. Exact two-sided McNemar against the live-executed
+geometric baseline.}
+\label{tab:onehot}
+\begin{tabular}{lcc}
+\toprule
+Variant & Dev-test top-1 & vs.\ geometry \\
+\midrule
+Geometry (live-executed) & $37/90$ ($41.1\%$) & --- \\
+Relative pose only       & $46/90$ ($51.1\%$) & $p{=}0.108$ \\
+\; $+$ point cloud       & $48/90$ ($53.3\%$) & $p{=}0.0347$ \\
+\; $+$ object one-hot    & $48/90$ ($53.3\%$) & $p{=}0.0433$ \\
+\; $+$ both (deployed)   & $48/90$ ($53.3\%$) & $p{=}0.0347$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{The shortcut hypothesis is not supported.} Point-cloud geometry
+alone and the object one-hot alone reach the same top-1 count ($48/90$
+each), and neither dominates the other: they disagree on only 12 of 90
+scenes, split evenly (6 each way, $p{=}1.0$). Dropping the one-hot
+entirely (relative pose $+$ point cloud) retains full significance against
+geometry ($p{=}0.0347$), so the reported effect does not rest on object
+identity.
+
+\textbf{What the ablation does not resolve.} At this scale the two feature
+families are \emph{interchangeable rather than separable}: adding both
+(the deployed variant) is indistinguishable from either alone ($p{=}1.0$
+in both pairwise comparisons), so we cannot attribute the gain to one of
+them. Relative pose by itself captures most of the numerical gap over
+geometry ($46/90$ vs.\ $37/90$) but falls short of this paper's own
+significance bar ($p{=}0.108$), and is likewise not separable from the
+full variant ($p{=}0.804$). This has the same shape as the pairwise-loss
+ablation in \cref{sec:ablation}: a real point estimate that the current
+sample size cannot resolve into a clean per-feature attribution. We report
+it as bounding what may be claimed -- the object one-hot is not carrying
+the result -- rather than as a positive attribution to geometry.
+
 \subsection{Mechanistic analysis: multi-head decomposition (offline,
 complementary)}
 \label{sec:mechanistic}
