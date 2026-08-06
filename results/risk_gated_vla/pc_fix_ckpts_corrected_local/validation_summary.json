@@ -1,0 +1,152 @@
+[
+  {
+    "variant": "global_bce",
+    "seed": 0,
+    "auc": 0.7930061559507524,
+    "top1": 0.5833333333333334,
+    "oracle": 0.75,
+    "mixed_top1": 0.7777777777777778,
+    "mixed_n": 18,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/global_bce_seed0.pt"
+  },
+  {
+    "variant": "global_bce",
+    "seed": 1,
+    "auc": 0.7930213389504533,
+    "top1": 0.5,
+    "oracle": 0.7083333333333334,
+    "mixed_top1": 0.7058823529411765,
+    "mixed_n": 17,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/global_bce_seed1.pt"
+  },
+  {
+    "variant": "global_bce",
+    "seed": 2,
+    "auc": 0.7607272727272727,
+    "top1": 0.625,
+    "oracle": 0.8333333333333334,
+    "mixed_top1": 0.75,
+    "mixed_n": 20,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/global_bce_seed2.pt"
+  },
+  {
+    "variant": "global_bce",
+    "seed": 3,
+    "auc": 0.7496397999830494,
+    "top1": 0.5,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.631578947368421,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/global_bce_seed3.pt"
+  },
+  {
+    "variant": "global_bce",
+    "seed": 4,
+    "auc": 0.8141484858352328,
+    "top1": 0.5833333333333334,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.7368421052631579,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/global_bce_seed4.pt"
+  },
+  {
+    "variant": "object_bce",
+    "seed": 0,
+    "auc": 0.8177154582763337,
+    "top1": 0.5833333333333334,
+    "oracle": 0.75,
+    "mixed_top1": 0.7777777777777778,
+    "mixed_n": 18,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/object_bce_seed0.pt"
+  },
+  {
+    "variant": "object_bce",
+    "seed": 1,
+    "auc": 0.7993405989559483,
+    "top1": 0.5416666666666666,
+    "oracle": 0.7083333333333334,
+    "mixed_top1": 0.7647058823529411,
+    "mixed_n": 17,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/object_bce_seed1.pt"
+  },
+  {
+    "variant": "object_bce",
+    "seed": 2,
+    "auc": 0.8078383838383838,
+    "top1": 0.5833333333333334,
+    "oracle": 0.8333333333333334,
+    "mixed_top1": 0.7,
+    "mixed_n": 20,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/object_bce_seed2.pt"
+  },
+  {
+    "variant": "object_bce",
+    "seed": 3,
+    "auc": 0.7434528349860158,
+    "top1": 0.5416666666666666,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.6842105263157895,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/object_bce_seed3.pt"
+  },
+  {
+    "variant": "object_bce",
+    "seed": 4,
+    "auc": 0.8625040703353957,
+    "top1": 0.625,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.7894736842105263,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/object_bce_seed4.pt"
+  },
+  {
+    "variant": "object_counterfactual",
+    "seed": 0,
+    "auc": 0.7959986320109439,
+    "top1": 0.5833333333333334,
+    "oracle": 0.75,
+    "mixed_top1": 0.7777777777777778,
+    "mixed_n": 18,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/object_counterfactual_seed0.pt"
+  },
+  {
+    "variant": "object_counterfactual",
+    "seed": 1,
+    "auc": 0.7974173459107977,
+    "top1": 0.5416666666666666,
+    "oracle": 0.7083333333333334,
+    "mixed_top1": 0.7647058823529411,
+    "mixed_n": 17,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/object_counterfactual_seed1.pt"
+  },
+  {
+    "variant": "object_counterfactual",
+    "seed": 2,
+    "auc": 0.8037171717171717,
+    "top1": 0.7083333333333334,
+    "oracle": 0.8333333333333334,
+    "mixed_top1": 0.85,
+    "mixed_n": 20,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/object_counterfactual_seed2.pt"
+  },
+  {
+    "variant": "object_counterfactual",
+    "seed": 3,
+    "auc": 0.7308246461564539,
+    "top1": 0.5,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.631578947368421,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/object_counterfactual_seed3.pt"
+  },
+  {
+    "variant": "object_counterfactual",
+    "seed": 4,
+    "auc": 0.8700748941712797,
+    "top1": 0.625,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.7894736842105263,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_corrected_local/object_counterfactual_seed4.pt"
+  }
+]

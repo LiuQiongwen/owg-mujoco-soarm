@@ -1,0 +1,19 @@
+{
+  "objects": [
+    "cracker",
+    "mustard",
+    "drill"
+  ],
+  "seeds": 40,
+  "k_grasps": 10,
+  "base_seed": 100,
+  "model_path": "world_model/mlp_predictor.pkl",
+  "git_hash": "ad22694fd9c43993ba915c339dc582a8f6756a11",
+  "git_dirty": false,
+  "ik_topdown_bias": "0.0",
+  "eval_centre_y": -0.3,
+  "critic_model_dir": "",
+  "critic_variant": "object_counterfactual",
+  "script": "scripts/risk_gated_vla_phase1_eval.py",
+  "started_at": 1785919434.117281
+}

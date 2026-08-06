@@ -1,0 +1,152 @@
+[
+  {
+    "variant": "global_bce",
+    "seed": 0,
+    "auc": 0.7495725034199726,
+    "top1": 0.5416666666666666,
+    "oracle": 0.75,
+    "mixed_top1": 0.7222222222222222,
+    "mixed_n": 18,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/global_bce_seed0.pt"
+  },
+  {
+    "variant": "global_bce",
+    "seed": 1,
+    "auc": 0.7870684128583204,
+    "top1": 0.5416666666666666,
+    "oracle": 0.7083333333333334,
+    "mixed_top1": 0.7647058823529411,
+    "mixed_n": 17,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/global_bce_seed1.pt"
+  },
+  {
+    "variant": "global_bce",
+    "seed": 2,
+    "auc": 0.7467474747474747,
+    "top1": 0.75,
+    "oracle": 0.8333333333333334,
+    "mixed_top1": 0.9,
+    "mixed_n": 20,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/global_bce_seed2.pt"
+  },
+  {
+    "variant": "global_bce",
+    "seed": 3,
+    "auc": 0.7549792355284346,
+    "top1": 0.5416666666666666,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.6842105263157895,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/global_bce_seed3.pt"
+  },
+  {
+    "variant": "global_bce",
+    "seed": 4,
+    "auc": 0.8261966786063172,
+    "top1": 0.6666666666666666,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.8421052631578947,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/global_bce_seed4.pt"
+  },
+  {
+    "variant": "object_bce",
+    "seed": 0,
+    "auc": 0.835499316005472,
+    "top1": 0.625,
+    "oracle": 0.75,
+    "mixed_top1": 0.8333333333333334,
+    "mixed_n": 18,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/object_bce_seed0.pt"
+  },
+  {
+    "variant": "object_bce",
+    "seed": 1,
+    "auc": 0.8009891015660775,
+    "top1": 0.5833333333333334,
+    "oracle": 0.7083333333333334,
+    "mixed_top1": 0.8235294117647058,
+    "mixed_n": 17,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/object_bce_seed1.pt"
+  },
+  {
+    "variant": "object_bce",
+    "seed": 2,
+    "auc": 0.8268282828282828,
+    "top1": 0.75,
+    "oracle": 0.8333333333333334,
+    "mixed_top1": 0.9,
+    "mixed_n": 20,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/object_bce_seed2.pt"
+  },
+  {
+    "variant": "object_bce",
+    "seed": 3,
+    "auc": 0.774387659971184,
+    "top1": 0.5833333333333334,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.7368421052631579,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/object_bce_seed3.pt"
+  },
+  {
+    "variant": "object_bce",
+    "seed": 4,
+    "auc": 0.8655161185281667,
+    "top1": 0.7083333333333334,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.8947368421052632,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/object_bce_seed4.pt"
+  },
+  {
+    "variant": "object_counterfactual",
+    "seed": 0,
+    "auc": 0.8158344733242134,
+    "top1": 0.5833333333333334,
+    "oracle": 0.75,
+    "mixed_top1": 0.7777777777777778,
+    "mixed_n": 18,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/object_counterfactual_seed0.pt"
+  },
+  {
+    "variant": "object_counterfactual",
+    "seed": 1,
+    "auc": 0.7881674145984064,
+    "top1": 0.5833333333333334,
+    "oracle": 0.7083333333333334,
+    "mixed_top1": 0.8235294117647058,
+    "mixed_n": 17,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/object_counterfactual_seed1.pt"
+  },
+  {
+    "variant": "object_counterfactual",
+    "seed": 2,
+    "auc": 0.8261818181818181,
+    "top1": 0.75,
+    "oracle": 0.8333333333333334,
+    "mixed_top1": 0.9,
+    "mixed_n": 20,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/object_counterfactual_seed2.pt"
+  },
+  {
+    "variant": "object_counterfactual",
+    "seed": 3,
+    "auc": 0.7514196118315112,
+    "top1": 0.5833333333333334,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.7368421052631579,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/object_counterfactual_seed3.pt"
+  },
+  {
+    "variant": "object_counterfactual",
+    "seed": 4,
+    "auc": 0.860875936177141,
+    "top1": 0.7083333333333334,
+    "oracle": 0.7916666666666666,
+    "mixed_top1": 0.8947368421052632,
+    "mixed_n": 19,
+    "checkpoint": "results/risk_gated_vla/pc_fix_ckpts_old_shared/object_counterfactual_seed4.pt"
+  }
+]
