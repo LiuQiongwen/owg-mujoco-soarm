@@ -605,6 +605,65 @@ sample size cannot resolve into a clean per-feature attribution. We report
 it as bounding what may be claimed -- the object one-hot is not carrying
 the result -- rather than as a positive attribution to geometry.
 
+\subsection{Leave-one-object-out: does point-cloud geometry generalize?}
+\label{sec:loo}
+
+\Cref{sec:onehot}'s tie between point-cloud and object-identity features
+is a within-distribution result: on a closed three-object benchmark, the
+two are structurally correlated, since point-cloud shape is itself
+strongly predictive of which object is in the scene. We attempted to
+break this collinearity directly, rather than argue about it: train on
+two of the three objects only, and evaluate on the third, entirely
+unseen during training -- object identity is not merely zeroed for the
+held-out class here, it is undefined, so no identity shortcut is even
+available. If point-cloud geometry carries real, object-general
+per-candidate signal, a relative-pose-plus-point-cloud critic trained
+this way should still beat pose-only on the held-out object. Same real
+population as \cref{sec:onehot,sec:pcfix} (no new data collection),
+\texttt{object\_counterfactual} architecture, 5 seeds $\times$ 400 epochs
+per (held-out object, variant) pair, pooled across all three folds for
+$n{=}90$ -- but now every prediction comes from a model that never saw
+that scene's object during training. Confirmatory batch untouched.
+
+\begin{table}[t]
+\centering
+\caption{Leave-one-object-out, pooled across three folds ($n{=}90$),
+each scene scored by a model that never saw its object during training.}
+\label{tab:loo}
+\begin{tabular}{lcc}
+\toprule
+Variant & Held-out top-1 & vs.\ geometry \\
+\midrule
+Geometry (live-executed) & $37/90$ ($41.1\%$) & --- \\
+Relative pose only       & $24/90$ ($26.7\%)$ & $p{=}0.0533$ \\
+\; $+$ point cloud       & $27/90$ ($30.0\%)$ & $p{=}0.1102$ \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Both variants trend against geometry, not toward it; pose-only vs.\ pose$+$point-cloud: $p{=}0.7283$.}
+\end{table}
+
+\textbf{This does not resolve \cref{sec:onehot}'s tie in the hoped
+direction -- it reveals a more fundamental limit.} Both leave-one-out
+variants substantially \emph{underperform} geometry on the held-out
+object, the opposite of the in-distribution pattern, and remain
+statistically indistinguishable from each other ($p{=}0.7283$, essentially
+unchanged from \cref{sec:onehot}'s in-distribution $p{=}1.0$). We cannot
+conclude point-cloud geometry carries object-general signal from this
+test, because neither feature variant generalizes to an unseen object at
+all in this setting: the critic's in-distribution gain over geometry
+appears to rest substantially on something that does not transfer, not
+on object-general geometric reasoning. This independently replicates,
+via a structurally different mechanism (leave-one-out among the three
+training objects, not a genuinely novel category), the same qualitative
+finding as this project's companion T-RO submission's zero-shot pear
+probe on the same critic family -- every variant loses to geometry
+out-of-distribution there too. We report this as a real negative result
+bounding \cref{sec:onehot}'s claim, not as a resolution of it: the object
+one-hot is not a shortcut relative to point-cloud geometry, but neither
+feature demonstrably generalizes beyond the three-object training
+distribution this paper evaluates within.
+
 \subsection{Mechanistic analysis: multi-head decomposition (offline,
 complementary)}
 \label{sec:mechanistic}
