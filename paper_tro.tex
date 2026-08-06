@@ -551,9 +551,22 @@ itself correctly.
 published systems. Here we report what happened when the automated
 tagger (\cref{sec:autotag}) was pointed at code we did not write, with
 no prior familiarity, and no marker placed until after independent
-verification. These are boundary/specificity checks against two systems,
-not a benchmark: we make no claim that either codebase is exhaustively
-verified clean, only what is reported for the specific paths inspected.
+verification. These are boundary/specificity checks against three
+systems, not a benchmark: we make no claim that any codebase is
+exhaustively verified clean, only what is reported for the specific
+paths inspected.
+
+Two of the three are causally clean \emph{by construction}, not by any
+property the tagger detected: GraspGen (already checked at the code
+level in \cref{sec:external}) and Dex-Net's grasp-quality scoring
+\cite{mahler2017dexnet} both compute
+candidate scores purely analytically from geometry -- a point-cloud-and-
+pose discriminator for GraspGen, wrench-space/friction-cone metrics for
+Dex-Net -- with no execution-contingent input anywhere in the released
+scoring code. Neither has an execution boundary for our criterion to be
+tested against at all, so a clean result here says nothing about
+detector sensitivity, only that nothing was misclassified as
+pre-execution when it should not have been.
 
 Auditing Sim-Grasp \cite{simgrasp2024}
 (\texttt{grasp\_simulation.py::main\_simulation\_loop}) exposed a
@@ -657,6 +670,182 @@ the strongest predictor found in this entire investigation carries zero
 real selection-relevant signal once correctly decomposed -- a sharper
 demonstration of this paper's thesis than the original finding it was
 built to test.
+
+\subsection{Prospective application: an object-relative counterfactual grasp critic}
+\label{sec:critic}
+
+\Cref{sec:retro,sec:selfcorrections,sec:rngbug} show the criterion catching
+mistakes \emph{after} they were made. This section applies it \emph{from
+the start}, on a different learned-critic pipeline (\texttt{world\_model/},
+predating \cref{sec:method} entirely). Reproducing a predecessor
+checkpoint's previously reported $+15.6$-point gain directly against the
+original data, we found it invalid on two grounds unrelated to the
+criterion itself -- a seed-coupling bug that defeated its paired
+evaluation design, and a success criterion that saturated regardless of
+candidate quality -- and, once both were fixed, that checkpoint fails
+outright under the corrected harness: AUROC $=0.4996$ on 1{,}500 real
+per-candidate labels, chance level. We rebuilt the critic
+causally-admissible by construction (candidate pose relative to the
+target object, point-cloud statistics, object identity, every field
+registered \texttt{PRE\_EXECUTION} and checked by the same gate as this
+paper's other pipelines): live-executed on two scene batches disjoint
+from training and from each other, it beats a geometric baseline on
+both, $+15.6$ and $+14.0$ percentage points (exact McNemar $p<0.003$
+both). The full architecture, training procedure, and this
+investigation's own honestly-reported negative and incomplete findings
+(an uncertainty risk gate with no measurable benefit; the pairwise loss
+term's independent contribution left unresolved at the current data
+scale; a small-data imitation-policy pilot that fails its first rollout)
+are reported in full in a companion submission dedicated to this critic
+-- consistent with this paper's own house style of not re-presenting a
+result as a second paper's novelty, the same convention that companion
+paper applies to this one. We summarize here only what is needed to
+illustrate the criterion applied prospectively, not retrospectively, and
+to support \cref{sec:fourobj}'s extension of this same critic to a
+fourth object.
+
+\subsection{Mechanistic analysis: multi-head decomposition (companion result)}
+\label{sec:multihead}
+
+A second, complementary experiment on the same three-object critic
+(\cref{sec:critic}) -- explicitly offline re-scoring, never pooled with
+\cref{sec:critic}'s live-executed numbers -- decomposes prediction into
+four heads (bilateral contact, lift, success, and a three-class
+failure-type) to ask \emph{why and where} the critic works, not just
+whether it does. On the frozen confirmatory batch, the success head
+alone reaches $+10.7$ points over geometry (exact McNemar $p=0.0052$),
+directionally consistent with \cref{sec:critic}'s live-executed result,
+with a specific, actionable asymmetry a single-head critic cannot show:
+the model is conservative rather than overconfident on success. Full
+derivation, all four result tables, and the load-bearing per-object
+limitation this decomposition surfaces (a failure-type class with
+support collapsing to a single example once one object is excluded) are
+reported in the companion submission; \cref{sec:fourobj} extends this
+same offline-decomposition methodology to a fourth object.
+
+\subsection{Generalization to a fourth object, and a clean out-of-distribution boundary}
+\label{sec:fourobj}
+
+\Cref{sec:critic,sec:multihead} establish the causally-admissible critic on
+three objects (cracker, mustard, drill). This section asks whether the
+result generalizes to an object added after the critic's design was frozen,
+and whether it generalizes zero-shot to an object never trained on at all
+--- two different, and differently answered, questions. We added a fourth
+object, a real YCB Tomato Soup Can (internally keyed as
+\texttt{cylinder}, a pre-existing asset alias, not a substitute object),
+using an independent train/dev/confirmatory seed chain (701/801/901)
+disjoint from the three-object study. A YCB banana was considered and
+excluded before any critic training: a controlled asset sanity check
+produced zero bilateral contact under the current grasp protocol, an
+asset-geometry issue orthogonal to this section's claim. A YCB pear was
+held out entirely as a zero-shot out-of-distribution (OOD) probe --- never
+in the training, dev, or confirmatory pool for any checkpoint below.
+
+Retrained with a four-way object one-hot (three-object checkpoints and
+training code untouched), the isolated four-object critic reaches AUROC
+$=0.8903$, Brier $=0.1076$, and $\mathrm{ECE}=0.0304$ on an independent
+confirmatory set (offline re-scoring, 200 scenes, disjoint from dev
+selection --- the same methodology as \cref{sec:multihead}, not
+\cref{sec:critic}'s live-executed evaluation), with pooled offline top-1
+$52.5\%$ (cracker $18\%$, mustard $78\%$, drill $28\%$, Tomato Soup Can
+$86\%$).
+
+A separate, live-executed neighborhood-robustness evaluation (candidate
+selection under five local pose/yaw perturbations per scene, 30
+scenes/object, 120 scenes total, \cref{tab:fourobj_neighborhood}) beats
+geometry pooled for every critic variant (McNemar's exact
+$p{<}1{\times}10^{-6}$, Holm-adjusted). The gain is object-dependent:
+strong for cracker and drill, significant but smaller for Tomato Soup Can
+($p=0.0113$), and not significant for mustard (already near ceiling for
+geometry alone at this task). Evaluated zero-shot on the held-out pear ---
+an all-zero object one-hot, never seen in training --- every critic
+variant \emph{loses} to geometry (point $28.7\%$, mean $27.3\%$,
+worst-case $28.0\%$ vs.\ geometry's $40.0\%$; McNemar's exact
+$p<0.02$ for all three, favoring geometry). We report this as a clean,
+explicit negative boundary, not pooled with the in-distribution result:
+this critic improves candidate selection and local-perturbation robustness
+within its trained object distribution, and does not presently generalize
+zero-shot beyond it.
+
+\begin{table}[t]
+\centering
+\caption{Live-executed neighborhood-robustness selection, four-object critic vs.\ geometry (\cref{sec:fourobj}), and the zero-shot pear OOD probe (last row, not pooled with the rest).}
+\label{tab:fourobj_neighborhood}
+\small
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Object ($n{=}150$ each) & Geometry & Point & Mean & Worst-case \\
+\midrule
+Cracker & $7.3\%$ & $29.3\%$ & $28.0\%$ & $30.7\%$ \\
+Mustard (n.s., all three) & $83.3\%$ & $80.0\%$ & $80.0\%$ & $83.3\%$ \\
+Drill & $43.3\%$ & $66.0\%$ & $64.7\%$ & $66.7\%$ \\
+Tomato Soup Can ($p{=}0.0113$) & $69.3\%$ & $80.0\%$ & $80.0\%$ & $80.0\%$ \\
+Pooled ($n{=}600$, $p{<}10^{-6}$) & $50.8\%$ & $63.8\%$ & $63.2\%$ & $65.2\%$ \\
+\midrule
+Pear OOD ($n{=}150$, zero-shot) & $\mathbf{40.0\%}$ & $28.7\%$ & $27.3\%$ & $28.0\%$ \\
+\bottomrule
+\end{tabular}
+\\[0.3em]
+{\footnotesize Row-level $p$-values are object-stratified tests over all three critic variants jointly, not per-column; pooled $p$-values (bottom two rows) are Holm-adjusted paired McNemar per variant, all $p{<}10^{-6}$. Bold marks the winning column for pear, the one row where geometry beats every critic variant ($p<0.02$ for all three), reported as an explicit negative boundary.}
+\end{table}
+
+A further question is whether a learned auxiliary head that directly
+predicts local-perturbation survival (\texttt{local\_perturbation\_survival},
+trained on an exhaustive candidate-level label set that executes every
+candidate rather than only the selected one, removing the selection bias
+this project's own audit criterion exists to catch) adds value beyond the
+neighborhood-aggregation methods already reported above. Offline, on a
+frozen four-object confirmatory split (four independent object batches,
+500 candidate labels each, no confirmatory labels used for training or
+model selection), the head discriminates well above chance: pooled AUROC
+$=0.8896$ ($n=2{,}000$), strongest on Tomato Soup Can ($0.9656$) and
+weakest on drill ($0.7854$). Used live, as a candidate-selection method in
+its own right, on a fresh 120-scene evaluation disjoint from the head's
+own training and dev data, it beats geometry pooled (McNemar's exact
+$p<0.0001$, driven mainly by mustard and Tomato Soup Can), but is
+statistically indistinguishable from the already-reported neighborhood
+mean/point aggregators (pooled $p=0.857$; per object, only mustard reaches
+significance against geometry among the head-vs-geometry comparisons, and
+none of the head-vs-neighborhood-method comparisons reach significance in
+either direction). A related uncertainty-penalized score,
+$\mathrm{mean}-0.5{\times}\mathrm{std}$ over the same five perturbations,
+shows the identical pattern: it beats geometry (McNemar's exact
+$p=0.00012$) but is not distinguishable from the plain neighborhood mean or
+worst-case aggregators already in \cref{tab:fourobj_neighborhood} (all
+$p\geq1.0$ against those two). We report both as consolidating negatives:
+a learned robustness signal and an uncertainty-penalized heuristic both
+recover the same benefit as the simpler neighborhood aggregators already
+established above, not a further, separable improvement over them
+(\cref{tab:fourobj_negative}).
+
+\begin{table}[t]
+\centering
+\caption{Consolidating negative results, robustness-head and uncertainty-penalized extensions (\cref{sec:fourobj}), reported with equal rigor to the positive findings above.}
+\label{tab:fourobj_negative}
+\small
+\begin{tabular}{@{}p{0.32\linewidth}p{0.6\linewidth}@{}}
+\toprule
+Item & Result \\
+\midrule
+Robustness head vs.\ geometry & Beats geometry pooled ($p{<}0.0001$); driven by mustard ($p{=}0.0051$) and Tomato Soup Can ($p{=}0.0001$) \\
+Robustness head vs.\ neighborhood mean/point & Statistically indistinguishable (pooled $p{=}0.857$); no per-object comparison reaches significance either direction \\
+Uncertainty-penalized score ($\mathrm{mean}-0.5\mathrm{std}$) vs.\ geometry & Beats geometry ($p{=}0.00012$) \\
+Uncertainty-penalized score vs.\ neighborhood mean/worst-case & Statistically indistinguishable ($p\geq1.0$ both) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Taken together, this section supports a bounded version of \cref{sec:critic}'s
+claim: an object-centric, causally-admissible critic improves candidate
+selection and local-perturbation robustness on a fourth object added after
+the design was frozen, the benefit is object-dependent (near-ceiling
+objects show no measurable gain), it does not generalize zero-shot to an
+unseen object class, and neither a learned auxiliary robustness head nor an
+uncertainty-penalized heuristic measurably improves on the simplest
+neighborhood-aggregation baseline already established. All results in this
+section are simulation-only, live-executed unless stated otherwise as
+offline re-scoring, consistent with \cref{sec:critic,sec:multihead}'s own
+distinction between the two.
 
 \subsection{A complementary question: causal validity vs.\ accuracy relevance}
 \label{sec:lggsnablation}
