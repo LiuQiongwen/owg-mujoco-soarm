@@ -112,6 +112,12 @@ def run_arm(env, obj_key: str, seed: int, opening_m: float) -> dict:
         "left_contacts": int(m.get("left_contacts", 0)),
         "right_contacts": int(m.get("right_contacts", 0)),
         "min_true_opening_m": m.get("close_min_true_opening_m"),
+        # SETTLED opening at the post-close snapshot (before the weld decision),
+        # as opposed to min_true_opening_m's minimum over the whole close+settle
+        # trace. The trace minimum catches transient compliant-contact overshoot
+        # and is NOT the quantity a close-probe criterion (DISF-style: does the
+        # jaw stall wider than its free-closing target) should be built on.
+        "settled_true_opening_m": m.get("true_opening_m"),
         "proxy_obj_dist_fixed_m": m.get("close_min_proxy_obj_dist_fixed_m"),
         "proxy_obj_dist_moving_m": m.get("close_min_proxy_obj_dist_moving_m"),
         "pad_obj_dist_fixed_m": m.get("pad_obj_dist_fixed_m"),

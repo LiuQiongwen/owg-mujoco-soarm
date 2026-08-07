@@ -779,6 +779,8 @@ class EnvironmentSoArm:
                  enable_close_window_diagnostics: bool = False,
                  enable_jaw_metrology: bool = False,
                  jaw_contact_model: str = JAW_CONTACT_PROXY_SPHERES,
+                 enable_pad_fidelity_trace: bool = False,
+                 pad_fidelity_config=None,
                  **kwargs):
         self.vis        = vis
         self.debug      = debug
@@ -819,6 +821,29 @@ class EnvironmentSoArm:
                 f"got {jaw_contact_model!r}")
         self.jaw_contact_model = jaw_contact_model
         self._jaw_pad_geom_ids: list = []
+        # Opt-in, read-only pad-contact fidelity trace (default False = zero
+        # overhead, zero behaviour change; see tango_robot/pad_fidelity.py).
+        # Requires real pad geometry and jaw metrology, since it cross-checks
+        # bilateral_contact against pad-to-object distances that only exist
+        # in a measured_pads* jaw_contact_model, using the true_opening_m LUT
+        # that only exists when enable_jaw_metrology=True. Neither requirement
+        # changes control, contact parameters, or any success label -- both
+        # gate what this diagnostic can OBSERVE, not what the sim DOES.
+        if enable_pad_fidelity_trace:
+            if jaw_contact_model == JAW_CONTACT_PROXY_SPHERES:
+                raise ValueError(
+                    "enable_pad_fidelity_trace requires a measured_pads* "
+                    "jaw_contact_model (no pad geometry exists under "
+                    f"{JAW_CONTACT_PROXY_SPHERES!r})")
+            if not enable_jaw_metrology:
+                raise ValueError(
+                    "enable_pad_fidelity_trace requires enable_jaw_metrology=True")
+        self.enable_pad_fidelity_trace = bool(enable_pad_fidelity_trace)
+        if pad_fidelity_config is None:
+            from tango_robot.pad_fidelity import PadFidelityConfig
+            pad_fidelity_config = PadFidelityConfig()
+        self._pad_fidelity_cfg = pad_fidelity_config
+        self._pad_fidelity_trial = None
         # Opt-in synthetic D435i depth noise (default None = disabled, so
         # every existing caller's rendered depth is byte-identical to before
         # this was added). See _inject_depth_noise's docstring for the model.
@@ -2423,6 +2448,7 @@ class EnvironmentSoArm:
           3. Close gripper, wait, lift, verify.
         """
         self._jaw_close_trace = None   # never carry a previous attempt's trace
+        self._pad_fidelity_trial = None
         self.reset_robot()
 
         x, y, z = pos
@@ -2588,8 +2614,66 @@ class EnvironmentSoArm:
 
             self.step_simulation = _jaw_step
 
+        # Pad-fidelity sample recording, composed on top of whatever
+        # step_simulation is at this point (the jaw-metrology wrapper, since
+        # this requires it). Strictly additive: appends to a list, reads
+        # model/data, writes nothing back. Restored before the jaw-metrology
+        # wrapper below, mirroring that wrapper's own restore-before-diag
+        # ordering (undo in the reverse order composition happened).
+        _orig_step_for_padfid = None
+        if self.enable_pad_fidelity_trace and self._jaw_metrology is not None:
+            from tango_robot.pad_fidelity import PadFidelitySample, PadFidelityTrial
+            _orig_step_for_padfid = self.step_simulation
+            _padfid_trial = PadFidelityTrial(
+                object_name=(self.obj_names[self.obj_ids.index(_jaw_obj_id)]
+                            if _jaw_obj_id in self.obj_ids else None),
+                cfg=self._pad_fidelity_cfg)
+            self._pad_fidelity_trial = _padfid_trial
+            _padfid_gripper_bid = self._jaw_body_id
+
+            def _padfid_step(_n=[0]):
+                _orig_step_for_padfid()
+                _n[0] += 1
+                if _n[0] % 4:
+                    return
+                q = float(self.data.qpos[self._grip_qpos_adr])
+                pad_d = self._pad_to_obj_dist(_jaw_obj_gids) if _jaw_obj_gids else {}
+                lc = rc = 0
+                for _ci in range(self.data.ncon):
+                    _c = self.data.contact[_ci]
+                    _b1 = self.model.geom_bodyid[_c.geom1]
+                    _b2 = self.model.geom_bodyid[_c.geom2]
+                    if not ({_b1, _b2} & _obj_bodies_jaw):
+                        continue
+                    if self._jaw_body_id in (_b1, _b2):
+                        lc += 1
+                    if self._jaw_mv_body_id in (_b1, _b2):
+                        rc += 1
+                obj_rel = None
+                if _jaw_obj_id is not None:
+                    try:
+                        R = self.data.xmat[_padfid_gripper_bid].reshape(3, 3)
+                        gp = self.data.xpos[_padfid_gripper_bid]
+                        op = self.get_obj_pos(_jaw_obj_id)
+                        obj_rel = tuple((R.T @ (op - gp)).tolist())
+                    except Exception:
+                        obj_rel = None
+                _padfid_trial.samples.append(PadFidelitySample(
+                    step=_n[0],
+                    pad_obj_dist_fixed_m=pad_d.get("fixed"),
+                    pad_obj_dist_moving_m=pad_d.get("moving"),
+                    true_opening_m=_jm.true_opening_m(q),
+                    grip_qpos_rad=q,
+                    bilateral_contact=bool(lc and rc),
+                    obj_pos_rel_gripper_m=obj_rel))
+
+            self.step_simulation = _padfid_step
+
         contact_servo_audit = self._close_with_contact_servo(opening)
         self._steps(120)   # let gripper settle and contacts stabilize
+
+        if self.enable_pad_fidelity_trace and self._jaw_metrology is not None:
+            self.step_simulation = _orig_step_for_padfid
 
         if self._jaw_metrology is not None:
             self.step_simulation = _orig_step_for_jaw
@@ -2671,6 +2755,12 @@ class EnvironmentSoArm:
                 metrics_post["commanded_opening_m"] = float(opening)
                 metrics_post.update({f"close_{k}": v
                                      for k, v in self._jaw_close_trace.items()})
+            if self._pad_fidelity_trial is not None:
+                self._pad_fidelity_trial.final_bilateral_contact = bool(contact)
+                self._pad_fidelity_trial.final_weld_triggered = bool(weld_triggered)
+                self._pad_fidelity_trial.final_lifted = False
+                self._pad_fidelity_trial.final_success = False
+                metrics_post["pad_fidelity_summary"] = self._pad_fidelity_trial.summary()
             self.last_grasp_metrics = metrics_post
             return False, None
 
@@ -2719,6 +2809,12 @@ class EnvironmentSoArm:
             metrics_post["commanded_opening_m"] = float(opening)
             metrics_post.update({f"close_{k}": v
                                  for k, v in self._jaw_close_trace.items()})
+        if self._pad_fidelity_trial is not None:
+            self._pad_fidelity_trial.final_bilateral_contact = bool(contact)
+            self._pad_fidelity_trial.final_weld_triggered = bool(weld_triggered)
+            self._pad_fidelity_trial.final_lifted = bool(lifted)
+            self._pad_fidelity_trial.final_success = bool(success)
+            metrics_post["pad_fidelity_summary"] = self._pad_fidelity_trial.summary()
         self.last_grasp_metrics = metrics_post
 
         if success:
