@@ -194,15 +194,19 @@ class _SolveRecorder:
         eef_R = self.data.site_xmat[self.eef_site_id].reshape(3, 3).copy()
         self._set_qpos(saved)
         capture_pos = eef_pos + eef_R @ LOCAL_OFFSET
+        ori_err_deg = float(np.degrees(np.linalg.norm(
+            ppp.ArmIK._ori_error(eef_R, np.asarray(target_mat)))))
         if not hasattr(self, "_calls"):
             self._calls = []
         self._calls.append({
             "phase": phase,
             "target_pos": np.asarray(target_pos).tolist(),
+            "target_mat": np.asarray(target_mat).tolist(),
             "eef_pos": eef_pos.tolist(),
             "capture_pos": capture_pos.tolist(),
             "converged": bool(converged),
             "err_cm": float(err * 100),
+            "ori_err_deg": ori_err_deg,
             "qpos": np.asarray(result).tolist(),
         })
         return result, converged, err
