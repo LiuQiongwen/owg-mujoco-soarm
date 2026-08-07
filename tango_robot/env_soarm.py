@@ -715,6 +715,7 @@ class EnvironmentSoArm:
                  depth_noise_severity: Optional[str] = None,
                  depth_noise_seed: Optional[int] = None,
                  enable_close_window_diagnostics: bool = False,
+                 enable_jaw_metrology: bool = False,
                  **kwargs):
         self.vis        = vis
         self.debug      = debug
@@ -736,6 +737,19 @@ class EnvironmentSoArm:
         # the existing self.last_grasp_metrics dict -- no new external
         # plumbing needed, no monkey-patching required from callers.
         self.enable_close_window_diagnostics = bool(enable_close_window_diagnostics)
+        # Opt-in jaw metrology (default False = zero overhead, zero behaviour
+        # change). Added 2026-08-07: move_gripper()'s opening_m -> hinge-angle
+        # map and the 6 mm proxy-sphere colliders were both measured to
+        # misrepresent the real jaw (scripts/audit_jaw_opening.py), so the
+        # existing metrics cannot distinguish "the jaw never opened/closed far
+        # enough" from "the proxy geometry missed a contact the real pads would
+        # have made". This flag adds READ-ONLY measurement of the true
+        # fingertip opening, the proxy gap, and real-pad-to-object distance;
+        # it changes no control, no collision geometry and no success rule, so
+        # runs with it on are directly comparable to runs with it off.
+        self.enable_jaw_metrology = bool(enable_jaw_metrology)
+        self._jaw_metrology = None
+        self._jaw_close_trace: Optional[dict] = None
         # Opt-in synthetic D435i depth noise (default None = disabled, so
         # every existing caller's rendered depth is byte-identical to before
         # this was added). See _inject_depth_noise's docstring for the model.
@@ -836,6 +850,12 @@ class EnvironmentSoArm:
         self._renderer = mujoco.Renderer(self.model, height=IMG_SIZE, width=IMG_SIZE)
         self._cache_ids()
         self._simplify_jaw_collision()
+        # Built AFTER the proxy-sphere substitution so proxy_gap_m reports what
+        # is actually simulated; the finger meshes stay reachable regardless
+        # because _simplify_jaw_collision rewrites geom_type but not geom_dataid.
+        if getattr(self, "enable_jaw_metrology", False):
+            from tango_robot.jaw_metrology import JawMetrology
+            self._jaw_metrology = JawMetrology(self.model)
         # initialize arm to HOME_QPOS so _steps() after object spawn is stable
         for adr, q in zip(self._arm_qpos_adr, HOME_QPOS):
             self.data.qpos[adr] = q
@@ -2295,6 +2315,7 @@ class EnvironmentSoArm:
           2. Descend to the grasp Z with jaw-midpoint alignment maintained.
           3. Close gripper, wait, lift, verify.
         """
+        self._jaw_close_trace = None   # never carry a previous attempt's trace
         self.reset_robot()
 
         x, y, z = pos
@@ -2382,8 +2403,95 @@ class EnvironmentSoArm:
 
             self.step_simulation = _diag_step
 
+        # Jaw metrology trace over the same close+settle window. Wraps whatever
+        # step_simulation is at this point, so it composes with the close-window
+        # diagnostics above instead of clobbering them.
+        _orig_step_for_jaw = None
+        if self._jaw_metrology is not None:
+            _orig_step_for_jaw = self.step_simulation
+            _jm = self._jaw_metrology
+            _jaw_obj_id = self._nearest_obj_to_jaw(list(self.obj_ids))
+            _jaw_obj_slot = (self._obj_pool_slot(_jaw_obj_id)
+                             if _jaw_obj_id is not None else None)
+            _jaw_obj_gids = []
+            if _jaw_obj_slot is not None:
+                for _gn in _col_geom_names(self.model, _jaw_obj_slot):
+                    try:
+                        _jaw_obj_gids.append(self.model.geom(_gn).id)
+                    except Exception:
+                        pass
+            trace = {"min_true_opening_m": float("inf"),
+                     "true_opening_at_first_bilateral_m": None,
+                     "min_true_pad_dist_fixed_m": float("inf"),
+                     "min_true_pad_dist_moving_m": float("inf"),
+                     # exact signed proxy-collider distance; negative =
+                     # the 6 mm sphere is INSIDE the object
+                     "min_proxy_obj_dist_fixed_m": float("inf"),
+                     "min_proxy_obj_dist_moving_m": float("inf"),
+                     "pad_dist_at_first_bilateral_fixed_m": None,
+                     "pad_dist_at_first_bilateral_moving_m": None,
+                     "proxy_bilateral_ever": 0,
+                     "samples": 0}
+            self._jaw_close_trace = trace
+            _obj_bodies_jaw = {self.model.body(f"obj_{s}").id for s in self._pool_slots}
+
+            def _jaw_step(_n=[0]):
+                _orig_step_for_jaw()
+                _n[0] += 1
+                if _n[0] % 4:          # subsample: 4x cheaper, same extrema
+                    return
+                trace["samples"] += 1
+                q = float(self.data.qpos[self._grip_qpos_adr])
+                op = _jm.true_opening_m(q)
+                trace["min_true_opening_m"] = min(trace["min_true_opening_m"], op)
+                lc = rc = 0
+                for _ci in range(self.data.ncon):
+                    _c = self.data.contact[_ci]
+                    _b1 = self.model.geom_bodyid[_c.geom1]
+                    _b2 = self.model.geom_bodyid[_c.geom2]
+                    if not ({_b1, _b2} & _obj_bodies_jaw):
+                        continue
+                    if self._jaw_body_id in (_b1, _b2):
+                        lc += 1
+                    if self._jaw_mv_body_id in (_b1, _b2):
+                        rc += 1
+                d = None
+                if _jaw_obj_gids:
+                    from tango_robot.jaw_metrology import object_collision_verts
+                    V = object_collision_verts(self.model, self.data,
+                                               _jaw_obj_gids, max_pts=1200)
+                    d = _jm.tip_to_object_dist_m(self.data, V)
+                    trace["min_true_pad_dist_fixed_m"] = min(
+                        trace["min_true_pad_dist_fixed_m"], d["fixed"])
+                    trace["min_true_pad_dist_moving_m"] = min(
+                        trace["min_true_pad_dist_moving_m"], d["moving"])
+                    pd = _jm.proxy_to_object_dist_m(self.model, self.data,
+                                                    _jaw_obj_gids)
+                    trace["min_proxy_obj_dist_fixed_m"] = min(
+                        trace["min_proxy_obj_dist_fixed_m"], pd["fixed"])
+                    trace["min_proxy_obj_dist_moving_m"] = min(
+                        trace["min_proxy_obj_dist_moving_m"], pd["moving"])
+                if lc and rc:
+                    trace["proxy_bilateral_ever"] = 1
+                    if trace["true_opening_at_first_bilateral_m"] is None:
+                        trace["true_opening_at_first_bilateral_m"] = op
+                        if d is not None:
+                            trace["pad_dist_at_first_bilateral_fixed_m"] = d["fixed"]
+                            trace["pad_dist_at_first_bilateral_moving_m"] = d["moving"]
+
+            self.step_simulation = _jaw_step
+
         contact_servo_audit = self._close_with_contact_servo(opening)
         self._steps(120)   # let gripper settle and contacts stabilize
+
+        if self._jaw_metrology is not None:
+            self.step_simulation = _orig_step_for_jaw
+            for _k in ("min_true_opening_m", "min_true_pad_dist_fixed_m",
+                       "min_true_pad_dist_moving_m",
+                       "min_proxy_obj_dist_fixed_m",
+                       "min_proxy_obj_dist_moving_m"):
+                if self._jaw_close_trace[_k] == float("inf"):
+                    self._jaw_close_trace[_k] = None
 
         if self.enable_close_window_diagnostics:
             self.step_simulation = _orig_step_for_diag
@@ -2451,6 +2559,11 @@ class EnvironmentSoArm:
                                  "close_window_min_contact_dist_m":
                                      (close_window_diag["min_contact_dist_m"]
                                       if close_window_diag else None)})
+            if self._jaw_close_trace is not None:
+                metrics_post["requested_opening_m"] = float(gripper_opening_length)
+                metrics_post["commanded_opening_m"] = float(opening)
+                metrics_post.update({f"close_{k}": v
+                                     for k, v in self._jaw_close_trace.items()})
             self.last_grasp_metrics = metrics_post
             return False, None
 
@@ -2494,6 +2607,11 @@ class EnvironmentSoArm:
             "close_window_min_contact_dist_m": (close_window_diag["min_contact_dist_m"]
                                                  if close_window_diag else None),
         })
+        if self._jaw_close_trace is not None:
+            metrics_post["requested_opening_m"] = float(gripper_opening_length)
+            metrics_post["commanded_opening_m"] = float(opening)
+            metrics_post.update({f"close_{k}": v
+                                 for k, v in self._jaw_close_trace.items()})
         self.last_grasp_metrics = metrics_post
 
         if success:
@@ -2558,7 +2676,7 @@ class EnvironmentSoArm:
         total     = left_c + right_c
         symmetry  = abs(left_c - right_c) / max(1, total)
 
-        return {
+        out = {
             "ori_err_norm":       round(ori_err, 4),
             "jaw_obj_xy_gap":     round(jaw_obj_xy_gap, 4) if jaw_obj_xy_gap is not None else None,
             "bilateral_contacts": bilateral,
@@ -2567,6 +2685,60 @@ class EnvironmentSoArm:
             "symmetry_score":     round(symmetry, 3),
             "eef_z_axis":         R_cur[:, 2].round(3).tolist(),
         }
+        if self._jaw_metrology is not None:
+            nearest = obj_ids[0] if len(obj_ids) == 1 else self._nearest_obj_to_jaw(obj_ids)
+            out.update(self._jaw_metrology.snapshot(
+                self.data,
+                obj_verts=self._obj_collision_verts(nearest),
+                ctrl_id=self._grip_act_id,
+                model=self.model,
+                obj_geom_ids=self._obj_collision_geom_ids(nearest)))
+        return out
+
+    # ── jaw metrology helpers (read-only; active only when enabled) ───────────
+
+    def _nearest_obj_to_jaw(self, obj_ids) -> Optional[int]:
+        """obj_id whose CoM is closest in XY to the jaw midpoint."""
+        jaw_xy = 0.5 * (self.data.xpos[self._jaw_body_id][:2]
+                        + self.data.xpos[self._jaw_mv_body_id][:2])
+        best, best_d = None, float("inf")
+        for oid in obj_ids:
+            try:
+                d = float(np.linalg.norm(jaw_xy - self.get_obj_pos(oid)[:2]))
+            except Exception:
+                continue
+            if d < best_d:
+                best, best_d = oid, d
+        return best
+
+    def _obj_collision_geom_ids(self, obj_id: Optional[int]) -> list:
+        """Collision geom IDs of one object (all CoACD parts), or []."""
+        if obj_id is None:
+            return []
+        try:
+            slot = self._obj_pool_slot(obj_id)
+        except Exception:
+            return []
+        gids = []
+        for gname in _col_geom_names(self.model, slot):
+            try:
+                gids.append(self.model.geom(gname).id)
+            except Exception:
+                pass
+        return gids
+
+    def _obj_collision_verts(self, obj_id: Optional[int]):
+        """World-frame collision surface points of one object, or None."""
+        if obj_id is None or self._jaw_metrology is None:
+            return None
+        try:
+            from tango_robot.jaw_metrology import object_collision_verts
+            gids = self._obj_collision_geom_ids(obj_id)
+            if not gids:
+                return None
+            return object_collision_verts(self.model, self.data, gids)
+        except Exception:
+            return None
 
     def _execute_grasp_demo_attach(self, pos: tuple, roll: float,
                                    gripper_opening_length: float,
