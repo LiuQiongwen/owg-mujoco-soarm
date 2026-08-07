@@ -1,5 +1,16 @@
 # Small-scale solver/contact attribution experiment (2026-08-07)
 
+> **Correction (same day, later):** the follow-up stability sweep
+> (`docs/SOLREF_STABILITY_SWEEP_20260807.md`) found the "harmless, appeared
+> after all data was written" characterization of the QACC warning below was
+> too narrow — a properly-scoped recheck found a genuinely reproducible
+> warning on at least one specific trial, though NOT the whole-attempt
+> "1876 m/s" reading initially reported for it, which turned out to be a
+> measurement artifact (see that doc for the full account). The
+> `EXCESSIVE_PENETRATION_DOMINANT` 6/10→0/10 finding below is unaffected and
+> stands; do not treat this doc's implied "S1 is a safe default" framing as
+> validated — it isn't, yet.
+
 Answers the question left open by the pad-fidelity diagnostic: is the 100%
 excessive-penetration rate on legacy successes attributable to **contact
 softness** (fixable by solver configuration) or something else (actuator
