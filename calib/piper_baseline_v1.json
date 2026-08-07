@@ -1,0 +1,117 @@
+{
+ "name": "PIPER_BASELINE_V1",
+ "frozen_on": "2026-08-07",
+ "git_sha": "a961e9d9d3c98755603c4da358cf91dab100f197",
+ "piper_tree_dirty_at_freeze": false,
+ "versions": {
+  "robosuite": "1.5.2",
+  "mujoco": "3.8.1",
+  "numpy": "1.26.4",
+  "python": "3.10.20"
+ },
+ "asset_sha256_16": {
+  "tango_robot/piper_assets/piper_gripper.xml": "bf2fd440f8ad6bb0",
+  "tango_robot/piper_assets/robot_arm.xml": "8abfdf051e7f110b",
+  "tango_robot/piper_robosuite/piper_pick_and_place.py": "05539007b219d70b",
+  "tango_robot/piper_robosuite/piper_gripper.py": "19b8b6a9ceec53d9",
+  "tango_robot/piper_robosuite/piper_robot.py": "781d8bade66b9726",
+  "tango_robot/piper_robosuite/piper_controller_config.py": "6b144d7132fc68c4",
+  "tango_robot/piper_robosuite/piper_multi_object_scene.py": "5497376f78a26ca4",
+  "tango_robot/piper_robosuite/piper_ycb_objects.py": "b4478bfb985d5905"
+ },
+ "control": {
+  "controller_config": {
+   "type": "BASIC",
+   "body_parts": {
+    "right": {
+     "type": "JOINT_POSITION",
+     "input_type": "absolute",
+     "input_max": 3.14,
+     "input_min": -3.14,
+     "output_max": 3.14,
+     "output_min": -3.14,
+     "kp": 50,
+     "damping_ratio": 1,
+     "impedance_mode": "fixed",
+     "kp_limits": [
+      0,
+      300
+     ],
+     "damping_ratio_limits": [
+      0,
+      10
+     ],
+     "qpos_limits": null,
+     "interpolation": null,
+     "ramp_ratio": 0.2,
+     "gripper": {
+      "type": "GRIP",
+      "use_action_scaling": false
+     }
+    }
+   }
+  },
+  "control_freq_hz": 20
+ },
+ "geometry_constants": {
+  "SAFE_TRANSIT_Z": 1.05,
+  "GRASP_HEIGHT_OFFSET": 0.0,
+  "APPROACH_HEIGHT": 0.1,
+  "TRAY_DROP_HEIGHT": 0.06,
+  "GRIPPER_OPEN": -1.0,
+  "GRIPPER_CLOSE": 1.0,
+  "REAL_JOINT_LIMITS": [
+   [
+    -2.618,
+    2.618
+   ],
+   [
+    0.0,
+    3.14
+   ],
+   [
+    -1.637,
+    1.33
+   ],
+   [
+    -1.832,
+    1.832
+   ],
+   [
+    -1.22,
+    1.22
+   ],
+   [
+    -3.14,
+    3.14
+   ]
+  ],
+  "OBJECT_TOP_OFFSET": {
+   "banana": 0.034,
+   "cracker": 0.1019,
+   "clamp": 0.0987,
+   "mustard": 0.1075,
+   "pear": 0.0805,
+   "drill": 0.1837,
+   "can": 0.0437
+  },
+  "IK_TOL": 0.005,
+  "ORI_TOL": 0.02
+ },
+ "measured": {
+  "max_inner_face_opening_m": 0.1,
+  "note": "Measured on the live composed model at the actuator ctrlrange floor (-0.05). Supersedes the stale '~7.6cm' figure in OBJECT_NARROW_AXIS comments and is distinct from REAL_GRIP_OPEN_M=0.12 (a real-hardware figure)."
+ },
+ "success_definition": "robosuite Lift._check_success inherited unmodified: object height > table + 0.04m. run_pick_and_place additionally reports dist_to_tray; 'success' in these experiments is run_pick_and_place's own returned flag.",
+ "standing_rules": [
+  "Data collected before 2026-07-15 (gripper double-scaling fix) is NOT a valid baseline for current Piper experiments.",
+  "Variables derived from the outcome (e.g. dist_to_tray, which success is defined by) must never enter predictive or causal analysis.",
+  "A candidate separator requires pooled signal + within-object signal + direction consistency across objects before any intervention is designed around it."
+ ],
+ "withdrawn_claims": [
+  "transit_high non-convergence as dominant failure mode (tautological label; AUC 0.50, zero outcome information)",
+  "65.6mm eef_site-to-fingertip TCP offset (measurement artifact: the tip heuristic selected the finger mesh's proximal end)",
+  "grasp-height-above-object separator for can/banana (falsified by intervention: can succeeds 6/6 at that height)",
+  "bilateral-at-close as failure explanation (AUC 0.54)"
+ ]
+}
