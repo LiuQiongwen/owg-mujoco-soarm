@@ -1,0 +1,65 @@
+{
+ "opening_lut": [
+  {
+   "q": -0.05,
+   "true_tip_gap_m": 0.10399999941246613,
+   "in_ctrl_window": true
+  },
+  {
+   "q": -0.045000000000000005,
+   "true_tip_gap_m": 0.09399999941246613,
+   "in_ctrl_window": true
+  },
+  {
+   "q": -0.04,
+   "true_tip_gap_m": 0.08399999941246612,
+   "in_ctrl_window": true
+  },
+  {
+   "q": -0.035,
+   "true_tip_gap_m": 0.07399999941246613,
+   "in_ctrl_window": true
+  },
+  {
+   "q": -0.030000000000000002,
+   "true_tip_gap_m": 0.06399999941246612,
+   "in_ctrl_window": true
+  },
+  {
+   "q": -0.025,
+   "true_tip_gap_m": 0.05399999941246613,
+   "in_ctrl_window": true
+  },
+  {
+   "q": -0.020000000000000004,
+   "true_tip_gap_m": 0.043999999412466136,
+   "in_ctrl_window": true
+  },
+  {
+   "q": -0.015,
+   "true_tip_gap_m": 0.033999999412466134,
+   "in_ctrl_window": true
+  },
+  {
+   "q": -0.010000000000000002,
+   "true_tip_gap_m": 0.023999999412466135,
+   "in_ctrl_window": true
+  },
+  {
+   "q": -0.0050000000000000044,
+   "true_tip_gap_m": 0.013999999412466154,
+   "in_ctrl_window": true
+  },
+  {
+   "q": 0.0,
+   "true_tip_gap_m": 0.003999999412466221,
+   "in_ctrl_window": false
+  }
+ ],
+ "symmetry_error_m": 0.0,
+ "solref": [
+  0.002,
+  1.0
+ ],
+ "solref_timeconst_over_timestep": 1.0
+}
