@@ -1,0 +1,170 @@
+{
+ "settle_steps": 200,
+ "rows": [
+  {
+   "requested_opening_m": 0.005,
+   "target_q_rad": 0.0975,
+   "settled_q_rad": 0.09744772795093537,
+   "q_tracking_error_rad": -5.227204906463334e-05,
+   "settled_qvel_rad_s": -0.002873921102218906,
+   "still_moving": false,
+   "measured_opening_m": 0.02287495457192976,
+   "actuator_force": 0.057316095208875595,
+   "forcerange": [
+    -3.35,
+    3.35
+   ],
+   "actuator_saturated": false
+  },
+  {
+   "requested_opening_m": 0.01,
+   "target_q_rad": 0.145,
+   "settled_q_rad": 0.14493740994440482,
+   "q_tracking_error_rad": -6.259005559516861e-05,
+   "settled_qvel_rad_s": -0.0003871547327215874,
+   "still_moving": false,
+   "measured_opening_m": 0.026335365793086433,
+   "actuator_force": 0.06457327985509664,
+   "forcerange": [
+    -3.35,
+    3.35
+   ],
+   "actuator_saturated": false
+  },
+  {
+   "requested_opening_m": 0.02,
+   "target_q_rad": 0.24,
+   "settled_q_rad": 0.23995847801313824,
+   "q_tracking_error_rad": -4.1521986861747795e-05,
+   "settled_qvel_rad_s": 0.0013724587969347658,
+   "still_moving": false,
+   "measured_opening_m": 0.03327158364823776,
+   "actuator_force": 0.040433250207314586,
+   "forcerange": [
+    -3.35,
+    3.35
+   ],
+   "actuator_saturated": false
+  },
+  {
+   "requested_opening_m": 0.03,
+   "target_q_rad": 0.33499999999999996,
+   "settled_q_rad": 0.3349826170806822,
+   "q_tracking_error_rad": -1.7382919317743273e-05,
+   "settled_qvel_rad_s": 0.0007345879636768885,
+   "still_moving": false,
+   "measured_opening_m": 0.03982974585039487,
+   "actuator_force": 0.01665912603112929,
+   "forcerange": [
+    -3.35,
+    3.35
+   ],
+   "actuator_saturated": false
+  },
+  {
+   "requested_opening_m": 0.04,
+   "target_q_rad": 0.42999999999999994,
+   "settled_q_rad": 0.42999180338892173,
+   "q_tracking_error_rad": -8.196611078203908e-06,
+   "settled_qvel_rad_s": 0.00031577436422560134,
+   "still_moving": false,
+   "measured_opening_m": 0.044987686144674195,
+   "actuator_force": 0.007858229537418993,
+   "forcerange": [
+    -3.35,
+    3.35
+   ],
+   "actuator_saturated": false
+  },
+  {
+   "requested_opening_m": 0.05,
+   "target_q_rad": 0.525,
+   "settled_q_rad": 0.5249956877898098,
+   "q_tracking_error_rad": -4.3122101902604015e-06,
+   "settled_qvel_rad_s": 9.24461164663251e-05,
+   "still_moving": false,
+   "measured_opening_m": 0.04957990102730004,
+   "actuator_force": 0.004203218166821898,
+   "forcerange": [
+    -3.35,
+    3.35
+   ],
+   "actuator_saturated": false
+  },
+  {
+   "requested_opening_m": 0.06,
+   "target_q_rad": 0.62,
+   "settled_q_rad": 0.6199968121820365,
+   "q_tracking_error_rad": -3.1878179634903248e-06,
+   "settled_qvel_rad_s": 2.2350516057981024e-05,
+   "still_moving": false,
+   "measured_opening_m": 0.05408541881503641,
+   "actuator_force": 0.003155774591050431,
+   "forcerange": [
+    -3.35,
+    3.35
+   ],
+   "actuator_saturated": false
+  },
+  {
+   "requested_opening_m": 0.07,
+   "target_q_rad": 0.7150000000000001,
+   "settled_q_rad": 0.7149972159697155,
+   "q_tracking_error_rad": -2.7840302845305587e-06,
+   "settled_qvel_rad_s": 1.927937142850283e-06,
+   "still_moving": false,
+   "measured_opening_m": 0.058488341426055634,
+   "actuator_force": 0.002776160591338339,
+   "forcerange": [
+    -3.35,
+    3.35
+   ],
+   "actuator_saturated": false
+  },
+  {
+   "requested_opening_m": 0.08,
+   "target_q_rad": 0.8099999999999999,
+   "settled_q_rad": 0.809997431251356,
+   "q_tracking_error_rad": -2.5687486439052165e-06,
+   "settled_qvel_rad_s": -1.777896466890821e-07,
+   "still_moving": false,
+   "measured_opening_m": 0.06277467644267164,
+   "actuator_force": 0.0025642759746915544,
+   "forcerange": [
+    -3.35,
+    3.35
+   ],
+   "actuator_saturated": false
+  },
+  {
+   "requested_opening_m": 0.09,
+   "target_q_rad": 0.9049999999999999,
+   "settled_q_rad": 0.9049976673566696,
+   "q_tracking_error_rad": -2.332643330271722e-06,
+   "settled_qvel_rad_s": -1.694810110229857e-09,
+   "still_moving": false,
+   "measured_opening_m": 0.06693181835094164,
+   "actuator_force": 0.002328490043396414,
+   "forcerange": [
+    -3.35,
+    3.35
+   ],
+   "actuator_saturated": false
+  },
+  {
+   "requested_opening_m": 0.1,
+   "target_q_rad": 1.0,
+   "settled_q_rad": 0.9999979304805147,
+   "q_tracking_error_rad": -2.069519485337068e-06,
+   "settled_qvel_rad_s": 2.106192542893073e-14,
+   "still_moving": false,
+   "measured_opening_m": 0.07094821212049385,
+   "actuator_force": 0.0020658357406091454,
+   "forcerange": [
+    -3.35,
+    3.35
+   ],
+   "actuator_saturated": false
+  }
+ ]
+}
