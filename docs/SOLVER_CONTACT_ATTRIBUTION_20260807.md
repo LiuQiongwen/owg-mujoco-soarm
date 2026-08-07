@@ -10,6 +10,15 @@
 > `EXCESSIVE_PENETRATION_DOMINANT` 6/10→0/10 finding below is unaffected and
 > stands; do not treat this doc's implied "S1 is a safe default" framing as
 > validated — it isn't, yet.
+>
+> **Second correction:** `docs/CONTACT_ONSET_AUDIT_20260807.md` found this
+> doc's "fixtures only: settled opening vs known thickness" table (built from
+> `settled_true_opening_m`) is contaminated by a reference-surface mismatch
+> between `true_opening_m` and the actual pad collision geometry, unrelated
+> to contact physics. The `EXCESSIVE_PENETRATION_DOMINANT` classifier and
+> every named-object number are unaffected (never used `true_opening_m` for
+> this). The fixture table's numbers understate how well S1 performs; see the
+> audit doc for corrected figures.
 
 Answers the question left open by the pad-fidelity diagnostic: is the 100%
 excessive-penetration rate on legacy successes attributable to **contact

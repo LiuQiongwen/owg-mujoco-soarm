@@ -1,5 +1,15 @@
 # SO-101 blocked-closure contact microbenchmark (2026-08-07)
 
+> **Correction (same day, later):** `docs/CONTACT_ONSET_AUDIT_20260807.md`
+> found the `"gap vs known thickness"` numbers below (built from
+> `settled_true_opening_m`) are contaminated by a reference-surface mismatch
+> unrelated to contact physics -- `true_opening_m` measures a different point
+> set than the actual pad collision geometry. The box's `min_pad_dist`/
+> `steady_pad_dist` fields (also below) were **not** affected and are the
+> correct numbers: S1/S1b settle within 0.1mm of the true 30mm surface, not
+> "+6.71mm past it." Read the audit doc before trusting any `"gap vs known
+> thickness"` figure in this file.
+
 Zero production-code diff, confirmed by `git status`/`git diff` on
 `tango_robot/` before and after. Same pattern as every experiment in this
 thread: patches an already-compiled `MjModel`'s numeric fields from a

@@ -8,6 +8,15 @@ same pattern as every experiment in this thread: patches an already-compiled
 **This doc corrects an overclaim made earlier in this investigation.** Read
 that correction before the results — it changes what the results mean.
 
+> **Further correction (same day, later):** `docs/CONTACT_ONSET_AUDIT_20260807.md`
+> found that any table here reading "settled opening vs known thickness" for
+> a fixture is contaminated by a reference-surface mismatch between
+> `true_opening_m` and the actual pad collision geometry, unrelated to
+> solver/stability physics — see that doc for the mechanism and corrected
+> numbers on the one case it re-checked (FixtureBox30mm). The velocity/
+> warning-based stability findings below (the actual point of this sweep)
+> are unaffected, since they never depended on `true_opening_m`.
+
 ## The overclaim, and what was actually wrong with it
 
 Checking HammerC/seed=1 under S1 (5ms pad solref) directly, an earlier probe
