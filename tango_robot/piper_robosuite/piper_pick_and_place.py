@@ -132,52 +132,7 @@ SAFE_TRANSIT_Z = 1.05
 # hold (verified: pear rose from the table height it was closed at, ~0.78m,
 # to ~0.86m after the lift phase, tracking the gripper instead of staying
 # on the table). Found 2026-07-14.
-#
-# ⚠️ 2026-08-07 -- READ THIS BEFORE CHANGING EITHER THIS CONSTANT OR
-# T_EEF_CAPTURE_LOCAL BELOW. The comment above describes what this constant
-# was BELIEVED to do, and its empirical tuning result is real, but its
-# stated interpretation ("centring on the CoM") is wrong. This is an
-# EEF_SITE-frame offset, and `robot0_eef_site` is NOT the fingertip
-# midpoint -- the true fingertip midpoint sits 65.6mm away from it along
-# the gripper's own local -Z (measured, confirmed rigid to 0.000mm across
-# 5 arm poses x 3 gripper openings; see
-# docs/PIPER_CAPTURE_FRAME_CALIBRATION_20260807.md). With a level
-# (DOWN_ORIENTATION) grasp that puts the actual FINGERTIPS 65.6mm ABOVE
-# the commanded point. So the 2026-07-14 experiment above really compared
-# fingertips at CoM+65.6mm (stable, kept) against CoM+85.6mm (slipped,
-# rejected) -- it never tested fingertips at the CoM at all. The validated
-# physical grasp height is therefore CoM + 65.6mm, NOT the CoM.
-#
-# Consequence: this constant must NOT be read as "where the fingers close".
-# New code should target the capture frame explicitly via
-# grasp_capture_target()/eef_target_for_capture_target() below, which make
-# the fingertip midpoint the thing you actually specify. This constant is
-# kept at 0.0 only because piper_pick_and_place_mink.py imports it and
-# still uses legacy eef-site semantics.
 GRASP_HEIGHT_OFFSET = 0.0
-
-# T_eef_capture: the rigid transform from `robot0_eef_site` (what ArmIK
-# actually solves for) to the true fingertip midpoint -- the point that
-# physically closes on the object. Pure translation along the eef frame's
-# own local Z, zero rotational component, verified constant to 0.000mm
-# across 5 arm configurations x 3 gripper openings (15/15 samples, std
-# 0.000mm) in scripts/calibrate_piper_capture_frame.py.
-#
-#   capture_pos_world = eef_pos_world  + R_eef     @ T_EEF_CAPTURE_LOCAL
-#   eef_target_pos    = capture_target - R_capture @ T_EEF_CAPTURE_LOCAL
-T_EEF_CAPTURE_LOCAL = np.array([0.0, 0.0, -0.0656])
-
-# Intended fingertip-midpoint height above the object's CoM at grasp time.
-# +0.0656 is NOT a new tuning choice -- it is the height the 2026-07-14
-# experiment actually validated (see the GRASP_HEIGHT_OFFSET note above),
-# now stated in the frame where it means what it says. Combined with the
-# capture->eef conversion this reproduces the legacy eef trajectory EXACTLY
-# for level grasps (the two offsets cancel algebraically:
-# (obj + 0.0656) - 0.0656 == obj + GRASP_HEIGHT_OFFSET, regression-tested
-# in tests/test_piper_capture_frame.py). For TILTED grasp orientations the
-# two differ, and the capture-frame version is the correct one -- that is
-# the intended behaviour change, and the only one this refactor makes.
-GRASP_CAPTURE_HEIGHT_OFFSET = 0.0656
 TRAY_DROP_HEIGHT = 0.06
 GRIPPER_OPEN = -1.0
 GRIPPER_CLOSE = 1.0
@@ -193,42 +148,6 @@ DOWN_ORIENTATION = np.array([
 ])
 ORI_TOL = 2e-2
 ORI_WEIGHT = 0.3  # orientation error is in radians, position in metres -- downweight so position isn't sacrificed
-
-
-def capture_pose_from_eef(eef_pos, eef_mat):
-    """Where the fingertip midpoint actually is, given where eef_site is.
-    See T_EEF_CAPTURE_LOCAL."""
-    return np.asarray(eef_pos, dtype=float) + np.asarray(eef_mat, dtype=float) @ T_EEF_CAPTURE_LOCAL
-
-
-def eef_target_for_capture_target(capture_pos, capture_mat):
-    """Inverse of capture_pose_from_eef: the eef_site target IK must solve
-    for, to put the FINGERTIP MIDPOINT at `capture_pos` with orientation
-    `capture_mat`. Rotation is unchanged (T_eef_capture has no rotational
-    component), so only position is converted.
-
-    Use this for grasp-semantic targets only -- points that mean "put the
-    fingers HERE". Transit/hover/tray waypoints are independently-computed
-    clearance positions that were never expressed in capture-frame terms;
-    applying this to them moves the arm somewhere the pipeline never
-    intended (verified empirically: doing so collapsed Cracker from 7/10 to
-    0/10 with one IK solve diverging to 1283mm -- see
-    docs/PIPER_TCP_CORRECTION_AB_20260807.md)."""
-    return (np.asarray(capture_pos, dtype=float)
-            - np.asarray(capture_mat, dtype=float) @ T_EEF_CAPTURE_LOCAL)
-
-
-def grasp_capture_target(obj_pos, grasp_mat, height_offset=None):
-    """Single source of truth for the descend/grasp-commit IK target:
-    place the FINGERTIP MIDPOINT at `height_offset` above the object's
-    reference position, then convert to the eef_site target IK solves for.
-
-    Exactly equivalent to the legacy `obj_pos + [0,0,GRASP_HEIGHT_OFFSET]`
-    for level grasps; differs (correctly) only when grasp_mat is tilted."""
-    if height_offset is None:
-        height_offset = GRASP_CAPTURE_HEIGHT_OFFSET
-    capture_target = np.asarray(obj_pos, dtype=float) + np.array([0.0, 0.0, height_offset])
-    return eef_target_for_capture_target(capture_target, grasp_mat)
 
 # Diverse fallback seeds for solve_multi_seed: joint1 spread across most of
 # its [-2.618, 2.618] range, crossed with a couple of distinct elbow
@@ -867,12 +786,7 @@ def move_to_two_stage_align_descend(env, ik, obj_name, grasp_height_offset, use_
     corrected_obj_pos = true_centroid_xy(body_origin_pos2, quat2, obj_name)
     corrected_grasp_mat = grasp_orientation_from_quat(quat2, obj_name) if use_oriented_grasp else DOWN_ORIENTATION
 
-    # Grasp-semantic target -> capture frame (see grasp_capture_target).
-    # `align_target` above is deliberately NOT converted: it is a clearance
-    # waypoint defined relative to the object's top surface, not a
-    # "put the fingers here" point.
-    commit_target = grasp_capture_target(corrected_obj_pos, corrected_grasp_mat,
-                                          height_offset=grasp_height_offset)
+    commit_target = corrected_obj_pos + np.array([0.0, 0.0, grasp_height_offset])
     commit_qpos, converged, err, source = ik.solve_multi_seed(
         commit_target, primary_seed=align_qpos, target_mat=corrected_grasp_mat)
     move_to_interpolated(env, ik, commit_qpos, GRIPPER_OPEN,
@@ -1224,7 +1138,7 @@ def run_pick_and_place(env, obj_name, use_oriented_grasp=True, verbose=False,
     grasp_mat = compute_grasp_orientation(env, obj_name) if use_oriented_grasp else DOWN_ORIENTATION
     if use_oriented_grasp and wrist_friendly_orientation:
         grasp_mat = pick_wrist_friendly_orientation(
-            ik, grasp_capture_target(obj_pos, grasp_mat), grasp_mat, READY_QPOS,
+            ik, obj_pos + [0, 0, GRASP_HEIGHT_OFFSET], grasp_mat, READY_QPOS,
             angle_tolerance_deg=wrist_friendly_angle_tolerance_deg)
 
     candidate_log = None
@@ -1245,7 +1159,7 @@ def run_pick_and_place(env, obj_name, use_oriented_grasp=True, verbose=False,
             raise ValueError(f"noise_model must be 'kinematic' or 'perception', got {noise_model!r}")
 
         if candidate_selection == "best":
-            scores = [score_candidate_ik(ik, grasp_capture_target(pos, mat), mat, READY_QPOS)
+            scores = [score_candidate_ik(ik, pos + [0, 0, GRASP_HEIGHT_OFFSET], mat, READY_QPOS)
                       for pos, mat in candidates]
             chosen_idx = select_best(candidates, scores)
         elif candidate_selection == "consensus":
@@ -1397,7 +1311,7 @@ def run_pick_and_place(env, obj_name, use_oriented_grasp=True, verbose=False,
         if two_stage_descend:
             (qpos_seed, corrected_obj_pos, corrected_grasp_mat,
              converged, err_cm, source) = move_to_two_stage_align_descend(
-                env, ik, obj_name, GRASP_CAPTURE_HEIGHT_OFFSET, use_oriented_grasp,
+                env, ik, obj_name, GRASP_HEIGHT_OFFSET, use_oriented_grasp,
                 qpos_seed, align_clearance=align_clearance, step_hook=step_hook)
             phase_log["descend" + suffix] = {"converged": bool(converged), "err_cm": err_cm, "seed_source": source,
                                               "two_stage": True}
@@ -1413,7 +1327,7 @@ def run_pick_and_place(env, obj_name, use_oriented_grasp=True, verbose=False,
         elif cr_cfm_descend:
             _set_phase(step_hook, "descend" + suffix)
             target_qpos, converged, err, source = ik.solve_multi_seed(
-                grasp_capture_target(obj_pos, grasp_mat), primary_seed=qpos_seed, target_mat=grasp_mat)
+                obj_pos + [0, 0, GRASP_HEIGHT_OFFSET], primary_seed=qpos_seed, target_mat=grasp_mat)
             phase_log["descend" + suffix] = {"converged": bool(converged), "err_cm": float(err * 100),
                                               "seed_source": source, "cr_cfm": True}
             if verbose:
@@ -1445,8 +1359,7 @@ def run_pick_and_place(env, obj_name, use_oriented_grasp=True, verbose=False,
             phase_log["descend" + suffix]["z_trace"] = z_trace
             qpos_seed = final_wp
         else:
-            qpos_seed = solve_and_move("descend" + suffix, grasp_capture_target(obj_pos, grasp_mat),
-                                        descend_gripper_action,
+            qpos_seed = solve_and_move("descend" + suffix, obj_pos + [0, 0, GRASP_HEIGHT_OFFSET], descend_gripper_action,
                                         qpos_seed, interpolated=True, compliant=compliant_descend,
                                         force_compliant=force_compliant_descend)
 
@@ -1513,8 +1426,7 @@ def run_pick_and_place(env, obj_name, use_oriented_grasp=True, verbose=False,
     # problem really was impact velocity/momentum from a large single
     # jump. Reverted; the remaining high-drift Cracker failures need a
     # different fix (better target centering, not motion pacing).
-    qpos_seed = solve_and_move("descend_refresh", grasp_capture_target(obj_pos, grasp_mat),
-                                descend_gripper_action, qpos_seed)
+    qpos_seed = solve_and_move("descend_refresh", obj_pos + [0, 0, GRASP_HEIGHT_OFFSET], descend_gripper_action, qpos_seed)
 
     if verbose:
         print("[close gripper]")
