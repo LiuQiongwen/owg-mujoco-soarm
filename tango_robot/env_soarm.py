@@ -268,9 +268,55 @@ class _MockCamera:
 
 # ── scene XML builder ─────────────────────────────────────────────────────────
 
-def _so101_fragment() -> Tuple[str, str, str, str]:
+# ── jaw contact models ───────────────────────────────────────────────────────
+# "proxy_spheres" is the legacy behaviour: _simplify_jaw_collision swaps each
+# finger's collision mesh for one 6 mm sphere at the mesh's frame ORIGIN, which
+# is 5-76 mm from that mesh's own surface.  Measured 2026-08-07: those spheres do
+# not touch objects, they embed in them (up to 20.6 mm deep), and 18 of 25
+# diagnostic trials -- including 11 of 16 successes -- rested on that
+# interpenetration.  See docs/JAW_METROLOGY_FINDINGS_20260807.md.
+#
+# "measured_pads" keeps every proxy sphere in place so geom_xpos, and therefore
+# the jaw-midpoint IK that targets it, is bit-identical -- but makes the spheres
+# non-collidable and puts the contact on box pads derived from the finger meshes
+# by scripts/derive_jaw_pads.py.  Approach and control are unchanged; only the
+# contact geometry differs, which is what makes the two modes a clean A/B.
+# "measured_pads_aimed" additionally points the jaw-midpoint IK at the pad
+# midpoint.  This is needed because the legacy IK target is itself defined by the
+# wrong geometry -- it drives the midpoint of the finger meshes' frame ORIGINS
+# onto the object, 52-57 mm from the gripping faces -- so a pads-only swap leaves
+# the arm aiming a point the pads are nowhere near.  The two errors were anchored
+# to the same wrong location and so masked each other; separating them needs
+# three arms, not two.
+JAW_CONTACT_PROXY_SPHERES = "proxy_spheres"
+JAW_CONTACT_MEASURED_PADS = "measured_pads"
+JAW_CONTACT_MEASURED_PADS_AIMED = "measured_pads_aimed"
+
+_JAW_CONTACT_MODELS = (JAW_CONTACT_PROXY_SPHERES, JAW_CONTACT_MEASURED_PADS,
+                       JAW_CONTACT_MEASURED_PADS_AIMED)
+
+
+def _so101_fragment(jaw_pads: Optional[dict] = None) -> Tuple[str, str, str, str]:
+    """Serialise the SO-101 model fragments for injection into a scene.
+
+    `jaw_pads` maps body name -> geom XML string (from
+    scripts/derive_jaw_pads.pad_geom_xml) and, when given, appends that geom to
+    the named body.  MuJoCo has no runtime geom-creation API, so pads have to be
+    added here, before compilation.
+    """
     tree = ET.parse(SO101_XML)
     root = tree.getroot()
+
+    if jaw_pads:
+        found = set()
+        for body in root.iter("body"):
+            name = body.get("name")
+            if name in jaw_pads:
+                body.append(ET.fromstring(jaw_pads[name]))
+                found.add(name)
+        missing = set(jaw_pads) - found
+        if missing:
+            raise ValueError(f"jaw pad target bodies not in {SO101_XML}: {missing}")
 
     def _s(elem):
         return ET.tostring(elem, encoding="unicode")
@@ -611,8 +657,23 @@ def _park_pos(slot: int) -> list:
     return [2.0 + slot * 0.5, 0.0, 0.15]
 
 
-def _build_scene_xml(obj_names: List[str]) -> str:
-    so_defaults, so_assets, so_wbody, so_acts = _so101_fragment()
+def _build_scene_xml(obj_names: List[str],
+                     jaw_contact_model: str = JAW_CONTACT_PROXY_SPHERES) -> str:
+    jaw_pads = None
+    contact_excludes = ""
+    if jaw_contact_model in (JAW_CONTACT_MEASURED_PADS,
+                             JAW_CONTACT_MEASURED_PADS_AIMED):
+        from tango_robot.jaw_pads import derive, pad_geom_xml
+        jaw_pads = pad_geom_xml(derive())
+        # The two finger meshes' convex hulls overlap 13.6 mm at the hinge at
+        # EVERY joint angle, so any finger-finger contact is a modelling
+        # artefact.  Excluding the pair is what makes real finger collision
+        # geometry usable at all -- it is the reason the sphere hack existed.
+        contact_excludes = (
+            '  <contact>\n'
+            '    <exclude body1="gripper" body2="moving_jaw_so101_v1"/>\n'
+            '  </contact>\n')
+    so_defaults, so_assets, so_wbody, so_acts = _so101_fragment(jaw_pads)
     ycb_assets = ""
     ycb_bodies = ""
     weld_eqs   = ""
@@ -672,6 +733,7 @@ def _build_scene_xml(obj_names: List[str]) -> str:
   <equality>
 {weld_eqs}  </equality>
 
+{contact_excludes}
   {so_acts}
 </mujoco>"""
 
@@ -716,6 +778,7 @@ class EnvironmentSoArm:
                  depth_noise_seed: Optional[int] = None,
                  enable_close_window_diagnostics: bool = False,
                  enable_jaw_metrology: bool = False,
+                 jaw_contact_model: str = JAW_CONTACT_PROXY_SPHERES,
                  **kwargs):
         self.vis        = vis
         self.debug      = debug
@@ -750,6 +813,12 @@ class EnvironmentSoArm:
         self.enable_jaw_metrology = bool(enable_jaw_metrology)
         self._jaw_metrology = None
         self._jaw_close_trace: Optional[dict] = None
+        if jaw_contact_model not in _JAW_CONTACT_MODELS:
+            raise ValueError(
+                f"jaw_contact_model must be one of {_JAW_CONTACT_MODELS}, "
+                f"got {jaw_contact_model!r}")
+        self.jaw_contact_model = jaw_contact_model
+        self._jaw_pad_geom_ids: list = []
         # Opt-in synthetic D435i depth noise (default None = disabled, so
         # every existing caller's rendered depth is byte-identical to before
         # this was added). See _inject_depth_noise's docstring for the model.
@@ -841,8 +910,19 @@ class EnvironmentSoArm:
                 self.model.geom_size[gid, 1] = 0.0
                 self.model.geom_size[gid, 2] = 0.0
 
+        if self.jaw_contact_model != JAW_CONTACT_PROXY_SPHERES:
+            # Keep the spheres exactly where they are -- _get_jaw_geom_midpoint,
+            # and therefore the jaw-midpoint IK, reads geom_xpos, which is
+            # computed regardless of contype.  Only their collidability goes
+            # away, so approach and control stay bit-identical to legacy and the
+            # A/B isolates contact geometry.
+            for gid in (self._jaw_fixed_geom_id, self._jaw_mv_geom_id):
+                if gid >= 0:
+                    self.model.geom_contype[gid] = 0
+                    self.model.geom_conaffinity[gid] = 0
+
     def _rebuild_model(self):
-        xml = _build_scene_xml(self._pool_names)
+        xml = _build_scene_xml(self._pool_names, self.jaw_contact_model)
         self.model = mujoco.MjModel.from_xml_string(xml)
         self.data  = mujoco.MjData(self.model)
         if self._renderer is not None:
@@ -906,6 +986,18 @@ class EnvironmentSoArm:
             self._jaw_mv_body_id    = -1
             self._jaw_fixed_geom_id = -1
             self._jaw_mv_geom_id    = -1
+
+        self._jaw_pad_geom_ids = []
+        if self.jaw_contact_model != JAW_CONTACT_PROXY_SPHERES:
+            for pad in ("jaw_pad_fixed", "jaw_pad_moving"):
+                try:
+                    self._jaw_pad_geom_ids.append(int(self.model.geom(pad).id))
+                except Exception:
+                    pass
+            if len(self._jaw_pad_geom_ids) != 2:
+                raise RuntimeError(
+                    f"{self.jaw_contact_model} requires both jaw pad geoms; "
+                    f"found {self._jaw_pad_geom_ids}")
 
         self._grasp_weld_eq_ids: list = []
         for i in range(len(self._pool_names)):
@@ -1263,12 +1355,27 @@ class EnvironmentSoArm:
                       self.data.xpos[self._jaw_mv_body_id])
 
     def _get_jaw_geom_midpoint(self) -> np.ndarray:
-        """World-frame midpoint of the actual jaw tip GEOM centres.
+        """World-frame point the jaw-midpoint IK drives onto the grasp target.
 
-        Uses wrist_roll_follower (fixed finger) and moving_jaw_so101_v1 geom
-        centres — the true gripping surfaces, offset ~2 cm from body centres.
-        Falls back to body midpoint when geom IDs are unavailable.
+        ⚠ The legacy value is NOT the gripping point.  It is the midpoint of the
+        two finger geoms' frame ORIGINS, and the docstring here used to claim
+        those were "the true gripping surfaces".  Measured 2026-08-07: those
+        origins sit 52–57 mm from the fingers' actual gripping faces (see
+        `tango_robot/jaw_pads.py` and docs/JAW_METROLOGY_FINDINGS_20260807.md).
+        Aiming this point at an object therefore parks the finger ROOTS on the
+        object while the fingers themselves extend past it -- which is also
+        exactly where `_simplify_jaw_collision` puts the proxy spheres, so the
+        approach error and the contact error are anchored to the same wrong
+        location and cancel out of view.
+
+        Kept as the default regardless, because every recorded result was
+        produced with it; JAW_CONTACT_MEASURED_PADS_AIMED opts into targeting
+        the measured pad midpoint instead.
         """
+        if (self.jaw_contact_model == JAW_CONTACT_MEASURED_PADS_AIMED
+                and len(self._jaw_pad_geom_ids) == 2):
+            return 0.5 * (self.data.geom_xpos[self._jaw_pad_geom_ids[0]] +
+                          self.data.geom_xpos[self._jaw_pad_geom_ids[1]])
         if self._jaw_fixed_geom_id < 0:
             return self._get_jaw_midpoint()
         return 0.5 * (self.data.geom_xpos[self._jaw_fixed_geom_id] +
@@ -2693,6 +2800,15 @@ class EnvironmentSoArm:
                 ctrl_id=self._grip_act_id,
                 model=self.model,
                 obj_geom_ids=self._obj_collision_geom_ids(nearest)))
+            pad_d = self._pad_to_obj_dist(self._obj_collision_geom_ids(nearest))
+            if pad_d:
+                out["pad_obj_dist_fixed_m"] = round(pad_d["fixed"], 5)
+                out["pad_obj_dist_moving_m"] = round(pad_d["moving"], 5)
+        # Only stamped off the legacy default: adding a key unconditionally
+        # would change the metrics dict for every pre-existing caller, which is
+        # exactly the comparability this work is trying to preserve.
+        if self.jaw_contact_model != JAW_CONTACT_PROXY_SPHERES:
+            out["jaw_contact_model"] = self.jaw_contact_model
         return out
 
     # ── jaw metrology helpers (read-only; active only when enabled) ───────────
@@ -2710,6 +2826,23 @@ class EnvironmentSoArm:
             if d < best_d:
                 best, best_d = oid, d
         return best
+
+    def _pad_to_obj_dist(self, obj_geom_ids) -> dict:
+        """Exact signed distance from each measured pad to an object, or {}.
+
+        Same ground truth as the proxy measurement it replaces: mj_geomDistance
+        on the geoms the solver collides, verified equal to contact.dist.
+        """
+        if len(self._jaw_pad_geom_ids) != 2 or not obj_geom_ids:
+            return {}
+        out = {}
+        for tag, gid in zip(("fixed", "moving"), self._jaw_pad_geom_ids):
+            best = float("inf")
+            for ogid in obj_geom_ids:
+                best = min(best, float(mujoco.mj_geomDistance(
+                    self.model, self.data, gid, int(ogid), 1.0, np.zeros(6))))
+            out[tag] = best
+        return out
 
     def _obj_collision_geom_ids(self, obj_id: Optional[int]) -> list:
         """Collision geom IDs of one object (all CoACD parts), or []."""
