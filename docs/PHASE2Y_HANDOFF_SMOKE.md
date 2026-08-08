@@ -373,6 +373,38 @@ branch was exact. It distinguishes static bundle qualification from dynamic
 path qualification. No larger margin is selected here; the transient must be
 diagnosed before changing the preregistered correction.
 
+## P2Y-5B first-step Z-loss localisation
+
+The loss is in waypoint semantics, not restored velocity or an unexplained
+controller transient:
+
+```text
+corrected root clearance             +0.2969mm
+corrected first-command clearance   -19.7442mm
+root EEF Z                            0.806231m
+first commanded target EEF Z         0.785349m
+commanded descent                   -20.8820mm
+root EEF vertical velocity           +0.0000147m/s
+```
+
+One-control-step ablations confirmed the classification:
+
+```text
+first action, restored qvel          -0.6141mm clearance
+first action, arm qvel zero          -0.6127mm
+first action, all qvel zero          -0.6127mm
+hold corrected root, restored qvel   +0.3110mm
+hold corrected root, all qvel zero   +0.3114mm
+```
+
+Zeroing velocity does not rescue clearance, while holding the root does. The
+first recorded action is still the legacy `descend_refresh` target roughly
+20.9mm below the root. Adding +2.50mm uniformly to that target cannot make its
+path table-clear. Therefore clearance correction must be specified at the
+pre-contact path level; a corrected root plus a constant target offset is not a
+qualified execution semantic. No planner, margin, or production behavior is
+changed by this audit.
+
 ## Δz_clear = 2.50mm requalification — verdict UNRESOLVED (not FAIL)
 
 ```
