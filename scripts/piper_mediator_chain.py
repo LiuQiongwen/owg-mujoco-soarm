@@ -117,8 +117,16 @@ def run_trial(obj_name, seed, offset):
             rec["descend_ik_ori_residual_deg"] = c.get("ori_err_deg")
             rec["descend_min_joint_margin_rad"] = float(min(margins))
             rec["descend_converged"] = bool(c["converged"])
+            # INVALID -- kept only so the column is not silently reused.
+            # _SolveRecorder logs the target it was CALLED with, but
+            # AimOffsetArmIK applies the offset inside _solve_impl, so
+            # c["target_pos"] is the UNOFFSET target. Differencing the
+            # achieved eef against it measures the deliberate offset, not
+            # tracking error. Confirmed by
+            # scripts/piper_decompose_descend_error.py: this term reads
+            # ~15.0mm at a +/-15mm offset, i.e. exactly the offset.
             if tracer.eef_at_descend_settle is not None:
-                rec["descend_tracking_error_mm"] = float(np.linalg.norm(
+                rec["descend_tracking_error_mm_INVALID"] = float(np.linalg.norm(
                     tracer.eef_at_descend_settle - np.array(c["target_pos"]))) * 1000
         rec["rel_dist_at_descend_mm"] = tracer.rel_dist_mm
         s_close = tracer.snaps.get("lift")
