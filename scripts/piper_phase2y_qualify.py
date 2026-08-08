@@ -37,9 +37,15 @@ def geom_groups(m, fingers):
         n = (m.geom(i).name or "")
         if i in fingers:
             continue
+        # Membership is decided by contype/conaffinity, NOT by name suffix:
+        # robot0_g*_vis carry contype=1/conaffinity=1 and DO collide despite
+        # the "_vis" name. Trusting the suffix would have wrongly concluded
+        # the arm has no collision geometry.
+        if not (m.geom_contype[i] or m.geom_conaffinity[i]):
+            continue
         if "table" in n:
             g["table"].add(i)
-        elif "robot0_link" in n or "base_link" in n:
+        elif n.startswith("robot0_g") or "mount0" in n:
             g["arm"].add(i)
         elif "gripper" in n or "eef" in n or "hand" in n:
             g["palm"].add(i)
@@ -115,6 +121,7 @@ def run(seed, dY_mm, patch):
                                      candidate_selection=None,
                                      wrist_friendly_orientation=True, step_hook=q)
         return {"seed": seed, "dY": dY_mm, "measured": measured,
+                "group_sizes": {k: len(v) for k, v in groups.items()},
                 "success": bool(res.get("success")), "pos": np.array(q.pos),
                 "mat": np.array(q.mat), "refresh": q.refresh,
                 "first_obj_contact": q.first_obj_contact,
@@ -136,20 +143,43 @@ def cmp_traj(a, b, upto=None):
 
 
 def check(c, keys=("max_pos_m","rms_pos_m","max_ori_deg","refresh_pos_m")):
-    return all(c[k] <= TH[k] for k in keys), {k: (c[k], TH[k], c[k] <= TH[k]) for k in keys}
+    fails = [k for k in keys if c[k] > TH[k]]
+    return (not fails), {k: (c[k], TH[k], c[k] <= TH[k]) for k in keys}, fails
 
 
 def main():
     print("frozen thresholds:", {k: f"{v:.3e}" for k, v in TH.items()}, "\n")
     base = {s: run(s, 0.0, False) for s in SEEDS}
 
+    # Gate 4 precondition: geom groups must be non-empty, else the distance
+    # checks are vacuous rather than passing (R1).
+    ng = base[SEEDS[0]]["group_sizes"]
+    print(f"geom group sizes: {ng}")
+    # An empty group is INVALID only if the model actually has such geometry
+    # and the matcher missed it. Verified against the model: the Piper
+    # gripper's ONLY colliding geoms are finger7/8_collision -- there is no
+    # palm collision geometry -- so an empty "palm" group is a genuine model
+    # property (N/A), not a matching bug. An empty "arm" or "table" group
+    # WOULD be a matcher fault, since those geoms demonstrably exist.
+    NA_OK = {"palm"}
+    bad = [k for k, v in ng.items() if v == 0 and k not in NA_OK]
+    na = [k for k, v in ng.items() if v == 0 and k in NA_OK]
+    if na:
+        print(f"  note: {na} absent from model (no such collision geometry) -> N/A, not checked")
+    if bad:
+        print(f"GATE 4 INVALID_INSTRUMENTATION: empty geom group(s) {bad}")
+        print("Cannot qualify. Fix group matching before re-running.")
+        return
+
     print("GATE 1  dY=0 vs baseline")
     g1 = True
     for s in SEEDS:
         z = run(s, 0.0, True)
-        ok, det = check(cmp_traj(base[s], z)); g1 &= ok and (z["success"] == base[s]["success"])
-        print(f"  seed={s} succ {base[s]['success']}->{z['success']}  " +
-              "  ".join(f"{k.split('_')[0]}={v:.2e}{'OK' if p else 'FAIL'}" for k,(v,t,p) in det.items()))
+        ok, det, fails = check(cmp_traj(base[s], z))
+        g1 &= ok and (z["success"] == base[s]["success"])
+        print(f"  seed={s} succ {base[s]['success']}->{z['success']}  "
+              + "  ".join(f"{k}={v:.2e}" for k,(v,t,pp) in det.items())
+              + f"  {'OK' if ok else 'FAIL:'+','.join(fails)}")
 
     print("\nGATE 2 / 3 / 4  (dY = -15, +15)")
     g2 = g3 = g4 = True
@@ -157,16 +187,29 @@ def main():
         for s in SEEDS:
             r = run(s, dY, True)
             e = abs(r["measured"] - dY); g2 &= e < 0.1
-            w = r["first_obj_contact"] or len(r["pos"])
-            ok3, d3 = check(cmp_traj(base[s], r, upto=w), ("max_pos_m","rms_pos_m","max_ori_deg"))
-            g3 &= ok3
+
+            # Gate 3: NO silent fallback. Undetected contact -> not evaluable.
+            fc = r["first_obj_contact"]
+            if fc is None or fc < 2:
+                g3 = False
+                verdict3 = "NOT_EVALUABLE_PRECONTACT"
+                d3str = ""
+            else:
+                ok3, d3, f3 = check(cmp_traj(base[s], r, upto=fc - 1),
+                                    ("max_pos_m","rms_pos_m","max_ori_deg"))
+                g3 &= ok3
+                verdict3 = "OK" if ok3 else "FAIL:" + ",".join(f3)
+                d3str = "  ".join(f"{k}={v:.2e}" for k,(v,t,pp) in d3.items())
+
+            # Gate 4: baseline-relative, not absolute.
             newt = [k for k, v in r["touch"].items()
                     if v is not None and base[s]["touch"].get(k) is None]
-            g4 &= not newt
-            print(f"  dY={dY:+6.1f} seed={s} shift_err={e:.3f}mm "
-                  f"preC_max={d3['max_pos_m'][0]:.2e}({'OK' if ok3 else 'FAIL'}) "
-                  f"window={w} newcontacts={newt or 'none'} "
-                  f"mindist={{{', '.join(f'{k}:{v:.3f}' for k,v in r['mindist'].items())}}}")
+            deltas = {k: r["mindist"][k] - base[s]["mindist"][k] for k in r["mindist"]}
+            worsened = [k for k, dv in deltas.items() if dv < -1e-3]   # >1mm deeper
+            g4 &= (not newt) and (not worsened)
+            print(f"  dY={dY:+6.1f} seed={s} shift_err={e:.3f}mm  win={fc}  {verdict3}  {d3str}")
+            print(f"        G4 new={newt or 'none'} worsened={worsened or 'none'} "
+                  f"delta_mindist={{{', '.join(f'{k}:{v:+.4f}' for k,v in deltas.items())}}}")
 
     print(f"\nGATE 1 {'PASS' if g1 else 'FAIL'}   GATE 2 {'PASS' if g2 else 'FAIL'}   "
           f"GATE 3 {'PASS' if g3 else 'FAIL'}   GATE 4 {'PASS' if g4 else 'FAIL'}")

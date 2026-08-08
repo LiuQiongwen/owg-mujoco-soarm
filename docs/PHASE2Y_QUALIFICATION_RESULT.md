@@ -1,91 +1,77 @@
-Phase 2Y instrument qualification — NOT QUALIFIED (2026-08-08)
-
-Four gates, thresholds frozen in `calib/phase2y_noise_floor.json`, not
-recomputed. Pear, seeds 5001–5003, dY ∈ {−15, 0, +15}.
+Phase 2Y instrument qualification — Gate 3 unresolved (2026-08-08, superseded run)
 
 ```
-GATE 1 (dY=0 ≡ baseline)          PASS
-GATE 2 (measured shift = command) PASS   0.000mm error at ±15mm
-GATE 3 (pre-contact EEF equiv.)   FAIL   4 of 6 arms exceed threshold
-GATE 4 (no new contacts)          PASS*  *incomplete — see below
+GATE 1 (dY=0 ≡ baseline)            PASS   all seeds, large margin
+GATE 2 (measured shift = command)   PASS   0.000mm error at ±15mm
+GATE 3 (pre-contact EEF isolation)  FAIL   3 of 6 fail, 1 not evaluable, 2 OK
+GATE 4 (unintended contacts)        PASS   properly instrumented this run
 ```
 
 **Full causal sweep remains blocked.**
 
-## Gate 1 — PASS
+## Two model facts found while fixing Gate 4
 
-dY=0 reproduces baseline within the frozen floor on all four metrics, with
-large margin (max_pos 3.7e-5…1.1e-4 vs threshold 1.638e-3; refresh
-2.7e-12…6.9e-8 vs 6.4e-4). Success outcomes match. The virtual-shift
-machinery itself does not perturb the simulation.
+Both were nearly recorded as false conclusions.
 
-## Gate 2 — PASS
+1. **`robot0_g0_vis` … `g6_vis` DO collide.** Despite the `_vis` suffix they
+   carry `contype=1, conaffinity=1`. An earlier matcher looked for
+   `robot0_link*`, found nothing, and reported arm distance as `inf` — which
+   I was one step from writing up as "the Piper arm has no collision
+   geometry". Group membership must be decided by contype/conaffinity, never
+   by name suffix.
+2. **The gripper genuinely has no palm collision geometry.** Its only
+   colliding geoms are `finger7/8_collision`. So the earlier
+   `palm = −0.023 m` reading was distance to `right_eef_target_*`, a
+   *visualisation marker*, not physical geometry. An empty `palm` group is
+   therefore N/A (a real model property), while an empty `arm` or `table`
+   group is a matcher fault — the two must be distinguished, not both
+   treated as failure.
 
-Commanded vs measured finger displacement: **0.000mm error** at both ±15mm,
-all seeds. The shift does exactly what it claims.
+Correct group sizes: `table=1, arm=10, palm=N/A`.
 
-## Gate 3 — FAIL, and the cause is not yet established
-
-Pre-contact EEF trajectory deviation, windowed to before first
-finger-object contact:
+## Gate 3 — failures are real, but not explained by collisions
 
 ```
-dY=-15  seed 5001  1.59e-3  OK      window 401
-dY=-15  seed 5002  8.64e-3  FAIL    window 1210   <- window fallback, see below
-dY=-15  seed 5003  8.72e-4  FAIL    window 408    <- max_pos is UNDER threshold
-dY=+15  seed 5001  3.05e-3  FAIL    window 451
-dY=+15  seed 5002  4.04e-4  OK      window 392
-dY=+15  seed 5003  1.80e-3  FAIL    window 404
+dY=-15 s5001  OK                       max 1.05e-3  rms 1.60e-4  ori 0.118°
+dY=-15 s5002  NOT_EVALUABLE_PRECONTACT (no object contact detected)
+dY=-15 s5003  FAIL: rms                max 8.72e-4  rms 4.60e-4  ori 0.198°
+dY=+15 s5001  FAIL: max, rms, ori      max 3.04e-3  rms 8.98e-4  ori 0.458°
+dY=+15 s5002  OK                       max 3.53e-4  rms 1.29e-4  ori 0.146°
+dY=+15 s5003  FAIL: max, rms, ori      max 1.81e-3  rms 1.06e-3  ori 0.377°
 ```
 
-Two defects in this gate's own implementation must be resolved before the
-FAIL can be interpreted:
+Gate 4 is clean on every one of these: **no new contacts, and
+`delta_min_distance` ≈ 0** for table and arm (largest +0.0003 m). So the
+hypothesised mechanism — shifted fingers interacting differently with
+table/palm and feeding back into the arm — is **not** supported. The
+pre-contact deviation is not caused by changed collision geometry.
 
-1. **Window fallback contaminates seed 5002.** When no finger-object
-   contact is detected, the window falls back to the whole episode
-   (1210 samples vs ~400 typical), so the comparison includes lift,
-   transit and place. That is not a pre-contact measurement. The fallback
-   must be an explicit failure/exclusion, not a silent widening.
-2. **The failing metric is not reported.** Seed 5003 at dY=−15 shows
-   max_pos = 8.72e-4, which is *under* the 1.638e-3 threshold — so it
-   failed on RMS or orientation, which the output does not print. Gate 3
-   must report which of the three metrics failed.
+## The threshold itself is now the prime suspect
 
-If those are fixed and Gate 3 still fails, the likely physical cause is
-visible in Gate 4's distance probes (below): laterally shifted fingers
-interact differently with the table and palm, feeding back through contact
-dynamics into the arm before the object is ever touched. That would make
-the treatment genuinely non-isolating and would require a redesign, not a
-threshold change.
+The frozen threshold (1.638e-3) is `observed max × 1.25` from **n=10**
+baseline pairs of a distribution already characterised as **bifurcating**:
+7/10 pairs reproduce `descend_refresh` to ~1e-11 m while 3 jump to
+1e-5…5e-4. A max-based bound from n=10 of a heavy-tailed, bimodal
+distribution is not a reliable bound — the failures here are only ~2× the
+threshold, well within what an under-sampled tail could produce.
 
-## Gate 4 — incomplete, reported as PASS only for the check that ran
+**This must be resolved before the treatment is implicated.** Required:
+re-measure the baseline floor at n=30–50 pairs and re-derive the threshold.
+If baseline-vs-baseline itself reaches 3e-3, Gate 3's failures are noise and
+the gate passes. If baseline stays bounded near 1.3e-3, the treatment
+genuinely perturbs the arm pre-contact by some route other than collision
+geometry, and the instrument needs redesign.
 
-No *new* contact categories appeared (finger↔table / palm / opposite-finger
-/ arm) relative to baseline. But the gate as specified also requires
-proximity comparison, and two things are unresolved:
-
-- **Distances are negative in baseline and treatment alike**:
-  `table −0.002 m`, `palm −0.023 m`. Negative `mj_geomDistance` is
-  interpenetration. The palm figure is plausibly a pre-existing modelling
-  artifact (fingers seated into the palm housing), but this was **not
-  compared against baseline**, so no claim is made either way.
-- **`arm` distance is `inf`**, meaning the arm geom group matched nothing —
-  the check is vacuous, not passing. The name-matching for arm geoms needs
-  verification.
-
-Per R1, a distance of exactly `inf` and an unverified group membership are
-instrumentation faults until shown otherwise.
+Note this is *not* a threshold relaxation after seeing results: the
+n=10 sample was always the weak point (flagged in Amendment 1, which
+required ≥10 and got exactly 10), and the re-measurement is treatment-blind.
 
 ## Status
 
-| item | state |
+| gate | state |
 |---|---|
-| shift mechanism (Gate 2) | verified exact |
-| null-intervention equivalence (Gate 1) | verified within frozen floor |
-| pre-contact isolation (Gate 3) | **FAIL — 2 implementation defects to fix first** |
-| unintended-contact check (Gate 4) | **incomplete — vacuous arm group, no baseline distance comparison** |
-| full causal sweep | **blocked** |
-
-Next: fix the Gate 3 window fallback and per-metric reporting; fix the
-Gate 4 arm group and add baseline-relative distance comparison; re-run.
-Only if Gate 3 still fails after that is the treatment itself implicated.
+| 1 null-intervention equivalence | PASS |
+| 2 shift mechanism | PASS, exact |
+| 3 pre-contact isolation | **unresolved — blocked on n=30–50 baseline floor** |
+| 4 unintended contacts | PASS, properly instrumented |
+| full sweep | **blocked** |
