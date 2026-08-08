@@ -93,3 +93,65 @@ MUJOCO_LOG.TXT
 .agents/task.md
 
 .venv-research-agent/
+
+# --- generated research artifacts and build products (history cleanup 2026-08-08) ---
+
+# Raw camera captures
+/cameras/captures/
+
+# Paper build products
+/paper_final.pdf
+/paper_tro.pdf
+/paper_final.aux
+/paper_final.log
+/paper_final.out
+
+# Reproducibly generated TRO figures
+/figures/fig_critic_results.pdf
+/figures/fig_offline_vs_live_consistency.pdf
+
+# World-model and Paper A trial data
+/paperA_data/worldmodel_trajs/
+/paperA_data/phase0_diag_extended/*.jsonl
+/paperA_data/phase0_diag_extended/data_with_contact_feats_new3.json
+/paperA_data/phase0_diag_extended/data_with_lateral_score_powerdrill.json
+/paperA_data/phase0_diag_extended/ui_grasp_exec_snapshot_new3.jsonl
+/paperA_data/phase1_matched_n10/*.jsonl
+/paperA_data/phase1_v2/*.jsonl
+/paperA_data/formal_results/*.csv
+
+# Generated diagnostic outputs; retain approved compact Phase 2Y summaries
+/outputs/*
+!/outputs/phase2y_4d_cross_instance_audit_summary.json
+!/outputs/phase2y_5a_clearance_qualification.json
+!/outputs/phase2y_5b_dynamic_clearance_summary.json
+!/outputs/phase2y_clearance_uniformity.json
+!/outputs/phase2y_gate3_endpoint_summary.json
+
+# Generated Piper experiment results
+/tango_robot/piper_robosuite/consensus_results_*.json
+/tango_robot/piper_robosuite/experiment_results_*.json
+/tango_robot/piper_robosuite/final_pilot_*.json
+/tango_robot/piper_robosuite/pairwise_results_*.json
+/tango_robot/piper_robosuite/pairwise_results_v2_*.json
+/tango_robot/piper_robosuite/stage2_results.json
+/tango_robot/piper_robosuite/stage2_v2_results.json
+
+# Generated research-agent evaluation products; retain approved report/table files
+# (per the KEEP ruling on the four human-readable files in this subtree)
+# '/dir/*' not '/dir/': git will not descend into an excluded directory, so
+# negations for files inside one never take effect.
+/research_agent_pilots/lggsn_analysis/outputs/*
+!/research_agent_pilots/lggsn_analysis/outputs/power_analysis.md
+!/research_agent_pilots/lggsn_analysis/outputs/statistical_summary.md
+!/research_agent_pilots/lggsn_analysis/outputs/tables/
+/research_agent_pilots/lggsn_analysis/outputs/tables/*
+!/research_agent_pilots/lggsn_analysis/outputs/tables/pairwise_summary.tex
+!/research_agent_pilots/lggsn_analysis/outputs/tables/per_query_breakdown.tex
+/research_agent_pilots/lggsn_analysis/pair_results/
+/research_agent_pilots/lggsn_suite/eval_outputs/
+
+# Generated intermediate statistics and agent state
+/results/**/intermediate_stats_*.json
+/REVIEW_STATE.json
+*.bak
