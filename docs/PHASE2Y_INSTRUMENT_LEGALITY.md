@@ -96,3 +96,44 @@ carry `contype/conaffinity` (R7 — do not trust the `_collision` name), and
 the shift must be applied along the axis that maps to eef-local Y, which
 `eef_local_axis_in_body()` in `piper_phase2y_smoke.py` already computes and
 which Gate 2 verified to 0.000mm.
+
+## P2Y-3 blocker: `run_pick_and_place` state is not snapshottable
+
+The branching design assumes the pre-treatment state can be saved and
+restored. For MuJoCo that is true (`mjSTATE_INTEGRATION`). For robosuite
+controller state it is awkward but tractable. **For the pipeline itself it
+is not possible as currently written.**
+
+`run_pick_and_place` is a single ~400-line function. Its execution state at
+`descend_refresh` — current phase, `qpos_seed`, `grasp_mat` (reassigned at
+the pre-close refresh), `retry_count`, `descend_gripper_action`, the
+`while True` retry loop position — exists only as **local variables in that
+function's stack frame**. No state API can capture it, and there is no
+re-entry point: the function runs start to finish or not at all.
+
+So "snapshot at descend_refresh, branch five treatments" cannot be built on
+`run_pick_and_place` without one of:
+
+- **(a)** restructuring it into resumable phase steps — a substantial
+  production change, and one this investigation has explicitly avoided;
+- **(b)** re-running the prefix per branch — which reintroduces the
+  from-episode-start bifurcation the branching design exists to remove,
+  making it pointless;
+- **(c)** snapshotting MuJoCo + controller state at `descend_refresh`, then
+  driving the remaining phases (close → lift → verify) from a **separate
+  minimal driver** rather than resuming `run_pick_and_place`.
+
+**(c) is the viable route**, and it is narrower than it sounds: the segment
+after `descend_refresh` is close, lift, and success check. It needs no IK
+and no candidate logic — the descend target is already reached and the
+gripper command sequence is fixed. A short driver reproducing just that
+segment is far less code than restructuring the pipeline, and it keeps
+production untouched.
+
+Consequence for the sweep: what gets compared across treatments is the
+**post-snapshot segment**, not the full episode. That is arguably the more
+honest comparison anyway, since the prefix is by construction identical.
+But it must be stated explicitly — the resulting success rates are
+"success of the closing segment from a common state", not end-to-end
+episode success, and they are therefore **not** directly comparable to P2's
+numbers without care.
