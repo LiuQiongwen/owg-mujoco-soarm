@@ -1,4 +1,4 @@
-P2Y-3/4 handoff smoke — 4A passes exactly, 4B ambiguous (2026-08-08)
+P2Y-3/4 handoff smoke — 4A and same-instance 4B pass exactly (2026-08-08)
 
 Action-replay design: rather than reimplementing close/lift (blocked by
 `run_pick_and_place`'s stack-frame state), the action sequence from
@@ -22,40 +22,44 @@ the restored MuJoCo state. 900 actions captured, state dim 281.
 and time to **exactly zero difference**. The MuJoCo half of the handoff is
 sound.
 
-## 4B: fails, but the cause is NOT established
+## P2Y-4B first-divergence diagnosis
 
-The script initially concluded "missing state is outside MuJoCo". **That
-overclaims and has been corrected in place.** Two causes are consistent with
-this result and the test cannot separate them:
+The initial fresh-env replay was ambiguous. The follow-up compared original
+against five zero-treatment replay conditions and added a same-env/model
+replay. The handoff was moved to the actual action boundary immediately before
+the first recorded `env.step`, rather than the earlier phase notification.
 
-- **(a)** state missing outside MuJoCo — robosuite controller, interpolator,
-  phase counters, RNG;
-- **(b)** inherent floating-point nondeterminism amplified through contact.
+```
+same env/model instance:  max|d(eef,obj)| = 0.000e+00 over 900 steps
+fresh env:                first divergence at step 0
+fresh + controller reset: first divergence at step 0
+fresh + gripper state:    first divergence at step 0
+```
 
-(b) is a live explanation, not a formality: both replays are constructed
-identically (same seed, same fresh env) and restore identically (4A exact),
-so *no* state difference is required to produce divergence. The measured
-1.92e-2 m is ~15× the whole-episode baseline-vs-baseline floor (1.31e-3),
-which is consistent with amplification through the contact-heavy close
-segment — this platform was already characterised as bifurcating rather
-than smoothly noisy.
+This localises the failure to cross-instance reconstruction. Contact-heavy
+floating-point amplification cannot be the primary cause because restoring and
+replaying in the original env/model instance is bit-exact through the same
+contact-active close/lift segment. `PiperGripper.current_action` is confirmed
+missing Python state and materially reduces cross-instance error, but it is not
+sufficient. Explicit composite-controller reset does not repair the mismatch.
 
-## How to distinguish (next step)
+## Next diagnostic boundary
 
-- Compare each replay against the **original** trajectory, not only against
-  each other. If replay tracks the original for a while and then departs,
-  that is amplification; if it departs immediately, that is missing state.
-- Locate **divergence onset** per step (`Δqpos/Δqvel/Δctrl/ncon`). Missing
-  controller state should manifest at or near step 1.
-- Replay with the controller explicitly re-initialised vs not, and compare.
+- Audit mutable MuJoCo model arrays and robosuite env/robot state across the
+  original and freshly constructed instances before adding more snapshot
+  fields.
+- Replace raw `ncon` changes with explicit finger-object contact onset; the
+  handoff currently starts with 11 contacts already active.
+- Do not run the Phase 2Y treatment sweep until cross-instance common-state
+  construction passes or the treatment driver is redesigned to branch within
+  one model instance with a validated model-parameter intervention.
 
 ## Consequence
 
-Gate 3 cannot be restored on this evidence, and the five-level sweep stays
-blocked. But the branching design is not refuted either — if (b) dominates,
-exact rollout identity may be unattainable on this platform and Gate 3's
-criterion would need re-deriving in terms of the close-segment noise floor
-specifically, measured the same way as the episode-level floor was.
+Gate 3 remains suspended for the planned cross-instance treatment driver, so
+the five-level sweep stays blocked. Exact same-instance replay is attainable;
+there is no evidence here for replacing Gate 3 with a stochastic close-segment
+floor.
 
 Outcome field naming (`conditional_lift_success`, never `success`) is
 implemented in the driver but not yet exercised, since no treatment
@@ -232,3 +236,41 @@ current approach/descend semantics permit the gripper to enter table contact
 before closing. Belongs on the `piper-execution-v1` freeze checklist:
 re-examine table clearance, candidate grasp height, and approach
 termination, since it affects contact sequence and sim-to-real.
+
+## Decision: option 1 (fix execution semantics first). Confound to pre-register
+
+Chosen route: diagnostics-only table-clearance-corrected execution branch,
+then legacy (L0) vs corrected (L1) under the original P2 five-level design,
+to ask whether the Pear offset effect survives removal of the
+finger↔table path.
+
+**Confound that must be pre-registered, not discovered later:** achieving
+clearance requires raising the grasp/descend pose along the approach axis.
+That changes *where on the object the fingers close* — and grasp height is
+already known to matter on this platform (the `GRASP_HEIGHT_OFFSET` /
+capture-frame work). So L1 differs from L0 in **two** respects, not one:
+
+```
+L0 -> L1 :  table contact removed  AND  grasp height raised
+```
+
+The magnitude is not negligible. Measured penetration is 0.48mm (finger7)
+and **2.14mm** (finger8), so the minimum correction is ~2.1mm+ — the same
+scale as the contact-level effects under study. A null result in L1 could
+then mean "the table path was the mechanism" **or** "the grasp height moved
+off its validated value", and the design as stated cannot separate them.
+
+Options to keep them separable, to be decided before running:
+
+- **Report the correction magnitude per trial** as a covariate, and check
+  whether the L0→L1 effect size correlates with it.
+- **Add a third arm** — grasp height raised by the same amount *without*
+  removing the table path (e.g. table lowered, or a taller object) — so
+  height and table-contact are crossed rather than confounded.
+- **Verify the correction is uniform** across the five dY levels. If the
+  required lift differs per treatment, L1 silently applies a
+  treatment-dependent height change, which would be worse than the original
+  leakage.
+
+The third check is cheap and should come first: compute required clearance
+correction at each dY level before building anything.
