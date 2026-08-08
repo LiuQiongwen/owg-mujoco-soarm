@@ -126,3 +126,24 @@ build one compile-time variant with the finger geoms shifted in XML, and
 compare it against the runtime-mutated model from an identical state. If
 the two diverge, runtime mutation is unsafe on this model, confirmed
 directly.
+
+## R9 — Rules must be executable guards, not documentation
+
+R1–R8 are only binding where they are implemented in code. A rule written
+in a document does not protect a one-off query.
+
+Demonstrated the hard way: R7 (select collision geoms by
+`contype`/`conaffinity`, never by name) was written up after it caused a
+near-false conclusion about the Piper arm — and was then violated in an
+ad-hoc clearance query days later, which selected a non-colliding
+`table_visual` geom, returned exactly `0.000000`, and invalidated a
+margin measurement. The gated scripts obeyed R7; the throwaway query did
+not, because nothing forced it to.
+
+`scripts/piper_collision_geoms.py` now provides `collision_geoms()`,
+`require_nonempty()` and `min_distance()`. Diagnostics must use these
+rather than matching geom names directly.
+
+Corollary: when a rule is added, ask what code change makes it
+unavoidable. If the answer is "none", expect it to be violated in the next
+ad-hoc script.

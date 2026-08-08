@@ -43,23 +43,52 @@ contact-active close/lift segment. `PiperGripper.current_action` is confirmed
 missing Python state and materially reduces cross-instance error, but it is not
 sufficient. Explicit composite-controller reset does not repair the mismatch.
 
-## Next diagnostic boundary
+## P2Y-4D resolution: cross-instance reconstruction contract
 
-- Audit mutable MuJoCo model arrays and robosuite env/robot state across the
-  original and freshly constructed instances before adding more snapshot
-  fields.
+The forensic audit found no mutable `mjModel` differences. Immediately after
+restore, selected integration inputs were equal. The first difference appeared
+after controller evaluation:
+
+```text
+before controller:       0 differing selected data fields
+after controller:        ctrl differs
+after force evaluation:  qfrc_actuator / qacc differ
+after integration:       qpos / qvel differ
+```
+
+The fresh controller retained reset-state `joint_pos` / `joint_vel` caches with
+`new_update=False`. Consequently its first `set_goal()` skipped cache refresh
+and generated a different torque command. `composite_controller.reset()` did
+not fix this because it resets goals from the same stale cache.
+
+The validated reconstruction sequence is:
+
+```text
+mj_setState(mjSTATE_INTEGRATION)
+restore PiperGripper.current_action
+composite_controller.update_state()
+each part controller.update(force=True)
+replay actions
+```
+
+With this sequence, a fresh dY=0 compiled instance reproduced the original for
+all 900 steps with `max|d(eef,obj)| = 0.000e+00`.
+
+## Next Gate 3 boundary
+
 - Replace raw `ncon` changes with explicit finger-object contact onset; the
   handoff currently starts with 11 contacts already active.
-- Do not run the Phase 2Y treatment sweep until cross-instance common-state
-  construction passes or the treatment driver is redesigned to branch within
-  one model instance with a validated model-parameter intervention.
+- Add a regression assertion for the complete cross-instance reconstruction
+  sequence before enabling any treatment comparison.
+- Keep compile-time treatment variants; do not replace them with runtime
+  `model.geom_pos` mutation.
 
 ## Consequence
 
-Gate 3 remains suspended for the planned cross-instance treatment driver, so
-the five-level sweep stays blocked. Exact same-instance replay is attainable;
-there is no evidence here for replacing Gate 3 with a stochastic close-segment
-floor.
+Cross-instance dY=0 identity is restored, but Gate 3 remains suspended until
+the explicit finger-object contact definition and reconstruction regression are
+part of the formal driver. The treatment sweep therefore remains blocked in
+this step.
 
 Outcome field naming (`conditional_lift_success`, never `success`) is
 implemented in the driver but not yet exercised, since no treatment
@@ -274,3 +303,60 @@ Options to keep them separable, to be decided before running:
 
 The third check is cheap and should come first: compute required clearance
 correction at each dY level before building anything.
+
+## Five-level clearance-correction uniformity probe
+
+Using the same reconstructed seed-5001 handoff root in five separately
+compiled legal variants, the minimum vertical correction needed to place both
+finger collision meshes at or above the table was:
+
+```text
+dY=-15.0mm   2.0042mm
+dY= -7.5mm   2.0714mm
+dY=  0.0mm   2.1385mm
+dY= +7.5mm   2.2057mm
+dY=+15.0mm   2.2729mm
+spread       0.2687mm (12.6% of the mean correction)
+```
+
+The required minima are therefore not exactly uniform; applying each level's
+own minimum would introduce a monotone treatment-dependent grasp-height change.
+However, a single common correction of **2.2729mm** (plus any separately
+pre-registered safety margin) clears all five roots while keeping the applied
+height correction identical across treatment levels. This is a geometry-only
+result: no close/lift action or treatment outcome was run.
+
+## Δz_clear = 2.50mm requalification — verdict UNRESOLVED (not FAIL)
+
+```
+dY(mm)   min signed dist    finger↔table contacts
+-15.0         0.000000              0
+ -7.5         0.000000              0
+  0.0         0.000297              0
+ +7.5         0.000230              0
++15.0         0.000162              0
+```
+
+**Trustworthy:** `finger↔table contacts = 0` on all five dY levels. This
+comes from `data.contact`, which contains only real collisions. So
+`Δz_clear = 2.50mm` does eliminate the table contact that 2.30mm left at
+dY=+15.
+
+**Invalid:** the signed-distance column, and therefore the FAIL verdict
+(which was computed as `min_dist > 0`). Two red flags: values landing on
+exactly `0.000000` (R1), and a monotonicity violation — at Δz=2.30mm these
+levels read +0.000236 and +0.000169, so lifting a further 0.2mm cannot
+reduce them to zero.
+
+**Cause:** the query selected table geoms by `'table' in name` without
+filtering on `contype`/`conaffinity` — an R7 violation, in an ad-hoc script,
+after R7 had already been written up. A non-colliding `table_visual` geom
+returns 0.0 and wins the `min()`.
+
+**Re-run required** with `scripts/piper_collision_geoms.py`'s
+`min_distance()`. No expected values are recorded here deliberately, so the
+re-run is not anchored by a guess.
+
+**Status:** `Δz_clear=2.50mm` contact-clearance PASS by actual contacts;
+signed-distance margin UNRESOLVED; treatment sweep remains blocked until the
+corrected margin check runs.
