@@ -108,3 +108,54 @@ any finger↔object contact — or Gate 3 needs a different discriminator.
 This is one cheap query against the existing capture (classify `data.contact`
 pairs at the handoff step) and should be answered first, since it decides
 whether the handoff point is usable at all.
+
+## Handoff contact classification — passes literally, fails in spirit
+
+```
+contacts at descend_refresh: 12
+  finger <-> TARGET_OBJECT     0
+  finger <-> table             2      <-- treatment-sensitive
+  object <-> table            10
+
+  table_collision <-> finger7_collision   dist = -0.00048 m
+  table_collision <-> finger8_collision   dist = -0.00214 m
+```
+
+**Zero finger↔target-object contacts**, so by the frozen rule the handoff is
+effectively pre-contact for treatment purposes and Gate 3's validity
+condition survives.
+
+**But both fingers are in contact with — and penetrating — the table**
+(0.48mm and 2.14mm). This is the third case in the decision rule: a
+non-object contact that the dY treatment will move. The finger-shift
+treatment displaces exactly the geoms that are currently pressed into the
+table, so there is a causal path from treatment to dynamics that does not
+pass through the object at all.
+
+Two consequences:
+
+1. **This is the likely cause of the earlier Gate 3 failure** in the
+   runtime-mutation instrument, which was never explained: Gate 4 found no
+   *new* contacts and ~zero distance deltas, yet the EEF diverged
+   pre-object-contact. An existing finger↔table contact being perturbed by
+   the geometry shift produces precisely that — no new contact category, no
+   large distance change, but altered constraint forces from step 0.
+2. **The handoff point is still not clean**, despite passing the literal
+   test. Whether the leakage is material depends on whether a *lateral*
+   (local-Y) shift changes table penetration: the table is planar, so depth
+   should be unchanged, but contact point locations, contact count and
+   constraint conditioning can still shift.
+
+## Required before P2Y-4C
+
+Measure it rather than reason about it: for the compile-time dY=0 and
+dY=+15 variants, compare at the handoff state the finger↔table contact
+count, penetration depths, and contact positions. If those are identical,
+the leakage is benign and Phase 2Y can proceed. If they differ, the
+snapshot must move to a point where the fingers are clear of the table —
+which likely means **earlier in descend, not later**.
+
+Note also that fingers penetrating the table by up to 2.1mm at
+`descend_refresh` is a finding about the pipeline in its own right,
+independent of Phase 2Y: the gripper is being pressed into the table
+surface during descend.
