@@ -1,0 +1,18 @@
+execution_semantics_version: pre-freeze
+label_status: provisional
+eligible_for_critic_training: false
+phase2y_gate_status: suspended
+planner:
+  interface: plan_transit(candidate, constraints)
+  implementation: unset
+  constraints:
+    clearance_m: null
+capture_semantics:
+  frame: finger_collision_midpoint
+  status: provisional
+close_lift_semantics:
+  implementation: unset
+  status: phase2y_blocked
+success_definition:
+  implementation: unset
+  status: pre-freeze
