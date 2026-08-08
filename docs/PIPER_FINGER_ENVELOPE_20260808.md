@@ -54,12 +54,13 @@ seed-pairs, p=8.9e-16; mustard p=1.3e-3; replicated at n=180) and
 currently measure**.
 
 That is the honest state, and it is worth recording as a result rather than
-a gap. It also bounds what a static candidate critic can be expected to
-learn: if the dominant controllable factor in these outcomes is not
-expressible in the geometric, kinematic or contact features available
-before execution, a pre-execution critic will have a real ceiling — which
-is exactly what P1.2 measured independently (no promoted pre-execution
-separator; first separation only at descend).
+a gap. Scope of the claim, stated precisely: **this audited set of static
+features is insufficient to explain or separate the effect.** That is not
+the same as "no static feature could" — an unexamined representation
+(learned local geometry, richer contact descriptors) might still carry the
+signal. What is demonstrated is that the geometric, kinematic and contact
+quantities audited here do not, which P1.2 found independently (no promoted
+pre-execution separator; first separation only at descend).
 
 ## What would be worth trying next, if resumed
 
