@@ -1,0 +1,28 @@
+schema_version: piper-embodiment-v1alpha1
+status: pre-freeze
+model_variant_id: piper-robosuite-gripper-compile-v1
+source_assets:
+  arm: tango_robot/piper_assets/robot_arm.xml
+  gripper: tango_robot/piper_assets/piper_gripper.xml
+hardware_gate_1_status: pending
+arm:
+  joint_order: [joint1, joint2, joint3, joint4, joint5, joint6]
+  joint_limits_rad:
+    - [-2.618, 2.618]
+    - [0.0, 3.14]
+    - [-1.637, 1.33]
+    - [-1.832, 1.832]
+    - [-1.22, 1.22]
+    - [-3.14, 3.14]
+gripper:
+  actuator_control_range_m: [-0.05, -0.004]
+  maximum_measured_tip_opening_m: 0.10399999941246613
+  collision_geoms: [finger7_collision, finger8_collision]
+capture_frame:
+  parent_frame: eef_site
+  child_frame: finger_collision_midpoint
+  translation_parent_m: [-0.0000013405957056, -0.0000213732554237, -0.0656254116056627]
+  calibration_artifact: calib/piper_capture_frame_calibration.json
+notes:
+  - Simulation values only; signs, ordering, TCP, and gripper mapping await Hardware Gate 1.
+  - Contact-frame feature selection awaits Phase 2Y.

@@ -1,0 +1,147 @@
+{
+  "audit": "P2Y-5A-clearance-corrected-bundle-qualification",
+  "config": "configs/piper/phase2y_clearance_corrected.yaml",
+  "checks": {
+    "all_ik_converged": true,
+    "residual_spread_le_0_1mm": true,
+    "all_finger_table_contacts_zero": true,
+    "all_signed_distances_positive": true,
+    "requested_delta_exactly_identical": true,
+    "realized_delta_identical_across_dY": true,
+    "ik_residual_identical_across_dY": true,
+    "candidate_target_xy_exact": true,
+    "candidate_target_orientation_exact": true,
+    "object_pose_exact": true,
+    "gripper_state_exact": true,
+    "controller_semantics_identical": true
+  },
+  "pass": true,
+  "rows": [
+    {
+      "dY_mm": -15.0,
+      "ik_converged": true,
+      "ik_source": "primary",
+      "ik_residual_m": 6.688700597327592e-05,
+      "requested_delta_z_m": 0.0025,
+      "applied_eef_delta_m": [
+        -1.905985202310667e-05,
+        -3.435533661590162e-06,
+        0.002435978201232758
+      ],
+      "applied_delta_z_error_m": 6.402179876724206e-05,
+      "eef_xy_drift_m": 1.9367004174178374e-05,
+      "orientation_matrix_max_abs_diff": 1.0665683753005584e-05,
+      "minimum_physical_finger_table_distance_m": 0.0004312785382880602,
+      "finger_table_contact_count": 0,
+      "target_finger_contact": false,
+      "invariants": {
+        "candidate_target_xy_unchanged": true,
+        "candidate_target_orientation_unchanged": true,
+        "object_initial_pose_unchanged": true,
+        "gripper_python_state_unchanged": true
+      },
+      "controller_model_hash": "039a08d436f20396e934337b7b8386439864f0ca002cdacaf957c1877a28affa"
+    },
+    {
+      "dY_mm": -7.5,
+      "ik_converged": true,
+      "ik_source": "primary",
+      "ik_residual_m": 6.688700597327592e-05,
+      "requested_delta_z_m": 0.0025,
+      "applied_eef_delta_m": [
+        -1.905985202310667e-05,
+        -3.435533661590162e-06,
+        0.002435978201232758
+      ],
+      "applied_delta_z_error_m": 6.402179876724206e-05,
+      "eef_xy_drift_m": 1.9367004174178374e-05,
+      "orientation_matrix_max_abs_diff": 1.0665683753005584e-05,
+      "minimum_physical_finger_table_distance_m": 0.00036406977665492946,
+      "finger_table_contact_count": 0,
+      "target_finger_contact": false,
+      "invariants": {
+        "candidate_target_xy_unchanged": true,
+        "candidate_target_orientation_unchanged": true,
+        "object_initial_pose_unchanged": true,
+        "gripper_python_state_unchanged": true
+      },
+      "controller_model_hash": "039a08d436f20396e934337b7b8386439864f0ca002cdacaf957c1877a28affa"
+    },
+    {
+      "dY_mm": 0.0,
+      "ik_converged": true,
+      "ik_source": "primary",
+      "ik_residual_m": 6.688700597327592e-05,
+      "requested_delta_z_m": 0.0025,
+      "applied_eef_delta_m": [
+        -1.905985202310667e-05,
+        -3.435533661590162e-06,
+        0.002435978201232758
+      ],
+      "applied_delta_z_error_m": 6.402179876724206e-05,
+      "eef_xy_drift_m": 1.9367004174178374e-05,
+      "orientation_matrix_max_abs_diff": 1.0665683753005584e-05,
+      "minimum_physical_finger_table_distance_m": 0.00029686101502190976,
+      "finger_table_contact_count": 0,
+      "target_finger_contact": false,
+      "invariants": {
+        "candidate_target_xy_unchanged": true,
+        "candidate_target_orientation_unchanged": true,
+        "object_initial_pose_unchanged": true,
+        "gripper_python_state_unchanged": true
+      },
+      "controller_model_hash": "039a08d436f20396e934337b7b8386439864f0ca002cdacaf957c1877a28affa"
+    },
+    {
+      "dY_mm": 7.5,
+      "ik_converged": true,
+      "ik_source": "primary",
+      "ik_residual_m": 6.688700597327592e-05,
+      "requested_delta_z_m": 0.0025,
+      "applied_eef_delta_m": [
+        -1.905985202310667e-05,
+        -3.435533661590162e-06,
+        0.002435978201232758
+      ],
+      "applied_delta_z_error_m": 6.402179876724206e-05,
+      "eef_xy_drift_m": 1.9367004174178374e-05,
+      "orientation_matrix_max_abs_diff": 1.0665683753005584e-05,
+      "minimum_physical_finger_table_distance_m": 0.00022965225338877904,
+      "finger_table_contact_count": 0,
+      "target_finger_contact": false,
+      "invariants": {
+        "candidate_target_xy_unchanged": true,
+        "candidate_target_orientation_unchanged": true,
+        "object_initial_pose_unchanged": true,
+        "gripper_python_state_unchanged": true
+      },
+      "controller_model_hash": "039a08d436f20396e934337b7b8386439864f0ca002cdacaf957c1877a28affa"
+    },
+    {
+      "dY_mm": 15.0,
+      "ik_converged": true,
+      "ik_source": "primary",
+      "ik_residual_m": 6.688700597327592e-05,
+      "requested_delta_z_m": 0.0025,
+      "applied_eef_delta_m": [
+        -1.905985202310667e-05,
+        -3.435533661590162e-06,
+        0.002435978201232758
+      ],
+      "applied_delta_z_error_m": 6.402179876724206e-05,
+      "eef_xy_drift_m": 1.9367004174178374e-05,
+      "orientation_matrix_max_abs_diff": 1.0665683753005584e-05,
+      "minimum_physical_finger_table_distance_m": 0.00016244349175564832,
+      "finger_table_contact_count": 0,
+      "target_finger_contact": false,
+      "invariants": {
+        "candidate_target_xy_unchanged": true,
+        "candidate_target_orientation_unchanged": true,
+        "object_initial_pose_unchanged": true,
+        "gripper_python_state_unchanged": true
+      },
+      "controller_model_hash": "039a08d436f20396e934337b7b8386439864f0ca002cdacaf957c1877a28affa"
+    }
+  ],
+  "outcome_collection_performed": false
+}

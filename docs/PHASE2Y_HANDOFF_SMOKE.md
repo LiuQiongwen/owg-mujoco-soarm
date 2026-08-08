@@ -326,37 +326,106 @@ pre-registered safety margin) clears all five roots while keeping the applied
 height correction identical across treatment levels. This is a geometry-only
 result: no close/lift action or treatment outcome was run.
 
-## Δz_clear = 2.50mm requalification — verdict UNRESOLVED (not FAIL)
+## P2Y-5A fixed +2.50mm qualification
 
+The diagnostics-only correction is frozen in
+`configs/piper/phase2y_clearance_corrected.yaml` as a common **+2.50mm**
+world-Z EEF target shift. Its 0.2271mm design margin is not a hardware safety
+margin; Hardware Gate 1 remains responsible for that value.
+
+Across all five legal compiled dY variants from the same reconstructed root:
+
+- IK converged with identical 0.066887mm residual;
+- the requested +2.50mm target and realized EEF delta were identical across
+  dY (realized Z delta 2.43598mm due to the common IK residual);
+- finger-table contact count was zero for every level;
+- minimum physical signed distance stayed positive, with the worst case
+  +0.1624mm at dY=+15mm;
+- candidate target XY/orientation, object pose, gripper state, and controller
+  semantics remained fixed.
+
+This qualifies the static corrected bundle geometry only. No close/lift action
+or treatment outcome was executed, and no claim separates height from table
+contact causally.
+
+## Gate 3 endpoint dynamic qualification — FAIL
+
+The minimal corrected `dY=0` versus `dY=+15mm` close/lift test was run from the
+same reconstructed root. Reconstruction remained exact and both branches
+generated `conditional_lift_success=true`, but the causal gate failed:
+
+```text
+reconstruction replica first divergence   none (exact)
+endpoint first dynamics divergence         step 0
+first finger-target contact                step 88 (dY=0), step 89 (+15)
+finger-table contact at corrected root     zero
+finger-table contact after first step      present
 ```
-dY(mm)   min signed dist    finger↔table contacts
--15.0         0.000000              0
- -7.5         0.000000              0
-  0.0         0.000297              0
- +7.5         0.000230              0
-+15.0         0.000162              0
+
+At step 0, finger8 penetrated the table by approximately 0.614mm (`dY=0`) and
+0.720mm (`dY=+15`). Thus the static +2.50mm root clearance is consumed by the
+first controller transition, reopening the treatment-dependent table path well
+before target contact. The endpoint test therefore does **not** qualify Gate 3,
+and the five-level sweep remains blocked.
+
+This failure does not reopen reconstruction: the duplicate reconstructed dY=0
+branch was exact. It distinguishes static bundle qualification from dynamic
+path qualification. No larger margin is selected here; the transient must be
+diagnosed before changing the preregistered correction.
+
+## P2Y-5B first-step Z-loss localisation
+
+The loss is in waypoint semantics, not restored velocity or an unexplained
+controller transient:
+
+```text
+corrected root clearance             +0.2969mm
+corrected first-command clearance   -19.7442mm
+root EEF Z                            0.806231m
+first commanded target EEF Z         0.785349m
+commanded descent                   -20.8820mm
+root EEF vertical velocity           +0.0000147m/s
 ```
 
-**Trustworthy:** `finger↔table contacts = 0` on all five dY levels. This
-comes from `data.contact`, which contains only real collisions. So
-`Δz_clear = 2.50mm` does eliminate the table contact that 2.30mm left at
-dY=+15.
+One-control-step ablations confirmed the classification:
 
-**Invalid:** the signed-distance column, and therefore the FAIL verdict
-(which was computed as `min_dist > 0`). Two red flags: values landing on
-exactly `0.000000` (R1), and a monotonicity violation — at Δz=2.30mm these
-levels read +0.000236 and +0.000169, so lifting a further 0.2mm cannot
-reduce them to zero.
+```text
+first action, restored qvel          -0.6141mm clearance
+first action, arm qvel zero          -0.6127mm
+first action, all qvel zero          -0.6127mm
+hold corrected root, restored qvel   +0.3110mm
+hold corrected root, all qvel zero   +0.3114mm
+```
 
-**Cause:** the query selected table geoms by `'table' in name` without
-filtering on `contype`/`conaffinity` — an R7 violation, in an ad-hoc script,
-after R7 had already been written up. A non-colliding `table_visual` geom
-returns 0.0 and wins the `min()`.
+Zeroing velocity does not rescue clearance, while holding the root does. The
+first recorded action is still the legacy `descend_refresh` target roughly
+20.9mm below the root. Adding +2.50mm uniformly to that target cannot make its
+path table-clear. Therefore clearance correction must be specified at the
+pre-contact path level; a corrected root plus a constant target offset is not a
+qualified execution semantic. No planner, margin, or production behavior is
+changed by this audit.
 
-**Re-run required** with `scripts/piper_collision_geoms.py`'s
-`min_distance()`. No expected values are recorded here deliberately, so the
-re-run is not anchored by a guess.
+## Superseded / invalid instrumentation notes
 
-**Status:** `Δz_clear=2.50mm` contact-clearance PASS by actual contacts;
-signed-distance margin UNRESOLVED; treatment sweep remains blocked until the
-corrected margin check runs.
+Retained for traceability. Neither entry is part of the authoritative state
+above; do not cite them as current evidence.
+
+**Δz_clear = 2.50mm requalification — SUPERSEDED.** An ad-hoc query reported
+a FAIL verdict from a signed-distance column that was invalid: it selected
+table geoms by name without filtering `contype`/`conaffinity`, so a
+non-colliding `table_visual` geom returned exactly `0.000000` and won the
+`min()`. That is an R7 violation and the reason R7 is now enforced in code
+(`scripts/piper_collision_geoms.py`, R9). The question it was attempting to
+answer had already been settled correctly by the R7-compliant P2Y-5A
+qualification above, which reports the same five levels with valid margins
+(worst case +0.16244mm at dY=+15mm). The only part of the ad-hoc result that
+was ever sound — zero finger-table contacts at all five levels, read from
+`data.contact` — is subsumed by 5A.
+
+**Commit 719ebed provenance caveat.** That commit contains Phase 2Y handoff
+documentation beyond the scope its message describes, because the document
+was staged wholesale from a dirty working tree that already held another
+instance's P2Y-4D content. History is deliberately NOT rewritten: the
+content is correct and the ancestry is traceable. The lesson is procedural —
+treat commit messages, and file snapshots alone, as insufficient for result
+attribution; verify against the recorded outputs.

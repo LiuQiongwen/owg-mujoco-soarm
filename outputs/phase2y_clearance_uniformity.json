@@ -1,0 +1,148 @@
+{
+  "audit": "P2Y-clearance-correction-uniformity",
+  "seed": 5001,
+  "levels_mm": [
+    -15.0,
+    -7.5,
+    0.0,
+    7.5,
+    15.0
+  ],
+  "variant_paths": {
+    "-15.0": "diagnostics/phase2y_variants/piper_gripper_dY_m15.xml",
+    "-7.5": "diagnostics/phase2y_variants/piper_gripper_dY_m7_5.xml",
+    "0.0": "diagnostics/phase2y_variants/piper_gripper_dY_p0.xml",
+    "7.5": "diagnostics/phase2y_variants/piper_gripper_dY_p7_5.xml",
+    "15.0": "diagnostics/phase2y_variants/piper_gripper_dY_p15.xml"
+  },
+  "margin_mm": 0.0,
+  "uniform_tolerance_mm": null,
+  "correction_spread_mm": 0.26868232987342644,
+  "relative_spread": 0.1256384244830599,
+  "exactly_uniform": false,
+  "uniform_within_tolerance": null,
+  "minimum_common_correction_mm": 2.2728774525327955,
+  "rows": [
+    {
+      "dY_mm": -15.0,
+      "table_top_z_m": 0.8,
+      "requested_margin_m": 0.0,
+      "fingers": [
+        {
+          "name": "gripper0_right_finger7_collision",
+          "minimum_mesh_z_m": 0.7996559179762173,
+          "clearance_to_table_m": -0.00034408202378277686,
+          "required_vertical_correction_m": 0.00034408202378277686
+        },
+        {
+          "name": "gripper0_right_finger8_collision",
+          "minimum_mesh_z_m": 0.7979958048773407,
+          "clearance_to_table_m": -0.002004195122659369,
+          "required_vertical_correction_m": 0.002004195122659369
+        }
+      ],
+      "required_vertical_correction_m": 0.002004195122659369,
+      "finger_table_contact_count": 2,
+      "maximum_contact_penetration_m": 0.002004195122659369,
+      "target_finger_contact": false,
+      "common_correction_headroom_mm": 0.26868232987342644
+    },
+    {
+      "dY_mm": -7.5,
+      "table_top_z_m": 0.8,
+      "requested_margin_m": 0.0,
+      "fingers": [
+        {
+          "name": "gripper0_right_finger7_collision",
+          "minimum_mesh_z_m": 0.7995887473937489,
+          "clearance_to_table_m": -0.000411252606251189,
+          "required_vertical_correction_m": 0.000411252606251189
+        },
+        {
+          "name": "gripper0_right_finger8_collision",
+          "minimum_mesh_z_m": 0.7979286342948723,
+          "clearance_to_table_m": -0.002071365705127781,
+          "required_vertical_correction_m": 0.002071365705127781
+        }
+      ],
+      "required_vertical_correction_m": 0.002071365705127781,
+      "finger_table_contact_count": 2,
+      "maximum_contact_penetration_m": 0.002071365705127781,
+      "target_finger_contact": false,
+      "common_correction_headroom_mm": 0.20151174740501432
+    },
+    {
+      "dY_mm": 0.0,
+      "table_top_z_m": 0.8,
+      "requested_margin_m": 0.0,
+      "fingers": [
+        {
+          "name": "gripper0_right_finger7_collision",
+          "minimum_mesh_z_m": 0.7995215768112804,
+          "clearance_to_table_m": -0.0004784231887196011,
+          "required_vertical_correction_m": 0.0004784231887196011
+        },
+        {
+          "name": "gripper0_right_finger8_collision",
+          "minimum_mesh_z_m": 0.797861463712404,
+          "clearance_to_table_m": -0.0021385362875960823,
+          "required_vertical_correction_m": 0.0021385362875960823
+        }
+      ],
+      "required_vertical_correction_m": 0.0021385362875960823,
+      "finger_table_contact_count": 2,
+      "maximum_contact_penetration_m": 0.0021385362875960823,
+      "target_finger_contact": false,
+      "common_correction_headroom_mm": 0.13434116493671322
+    },
+    {
+      "dY_mm": 7.5,
+      "table_top_z_m": 0.8,
+      "requested_margin_m": 0.0,
+      "fingers": [
+        {
+          "name": "gripper0_right_finger7_collision",
+          "minimum_mesh_z_m": 0.7994544062288121,
+          "clearance_to_table_m": -0.0005455937711879022,
+          "required_vertical_correction_m": 0.0005455937711879022
+        },
+        {
+          "name": "gripper0_right_finger8_collision",
+          "minimum_mesh_z_m": 0.7977942931299356,
+          "clearance_to_table_m": -0.0022057068700644944,
+          "required_vertical_correction_m": 0.0022057068700644944
+        }
+      ],
+      "required_vertical_correction_m": 0.0022057068700644944,
+      "finger_table_contact_count": 2,
+      "maximum_contact_penetration_m": 0.0022057068700644944,
+      "target_finger_contact": false,
+      "common_correction_headroom_mm": 0.0671705824683011
+    },
+    {
+      "dY_mm": 15.0,
+      "table_top_z_m": 0.8,
+      "requested_margin_m": 0.0,
+      "fingers": [
+        {
+          "name": "gripper0_right_finger7_collision",
+          "minimum_mesh_z_m": 0.7993872356463437,
+          "clearance_to_table_m": -0.0006127643536563143,
+          "required_vertical_correction_m": 0.0006127643536563143
+        },
+        {
+          "name": "gripper0_right_finger8_collision",
+          "minimum_mesh_z_m": 0.7977271225474672,
+          "clearance_to_table_m": -0.0022728774525327955,
+          "required_vertical_correction_m": 0.0022728774525327955
+        }
+      ],
+      "required_vertical_correction_m": 0.0022728774525327955,
+      "finger_table_contact_count": 2,
+      "maximum_contact_penetration_m": 0.0022728774525327955,
+      "target_finger_contact": false,
+      "common_correction_headroom_mm": 0.0
+    }
+  ],
+  "interpretation": "geometry-only; no close/lift treatment outcome was executed"
+}

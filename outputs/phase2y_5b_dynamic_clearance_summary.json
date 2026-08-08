@@ -1,0 +1,49 @@
+{
+ "_note": "Compact extraction of outputs/phase2y_5b_dynamic_clearance_audit.json as of 5ae7ea0. Values copied verbatim except commanded_descent_m, explicitly marked derived. Raw audit (19,750 B) kept out of Git per artifact policy, not size.",
+ "_source_blob_sha256": "159b06cdbf2ca707371c775dd525bddeabe748996f7db43f1c10b7600322e53c",
+ "_source_bytes": 19750,
+ "audit": "P2Y-5B-dynamic-clearance-preservation",
+ "dY_mm": 0.0,
+ "delta_z_mm": 2.5,
+ "root_static": {
+  "eef_z_m": 0.8062311803069102,
+  "eef_vertical_velocity_m_s": 1.468891489487044e-05,
+  "min_finger_table_signed_distance_m": 0.00029686101519255104,
+  "finger_table_contact": false
+ },
+ "first_commanded_target_static": {
+  "eef_z_m": 0.7853491919714866,
+  "min_finger_table_signed_distance_m": -0.0197442218676932,
+  "finger_table_contact": true
+ },
+ "commanded_descent_m": {
+  "_derived": "first_commanded_target_static.eef_z_m - root_static.eef_z_m",
+  "value": -0.02088198833542365
+ },
+ "one_control_step_probes": {
+  "first_action_restored_qvel": {
+   "after_min_finger_table_signed_distance_m": -0.0006141032856306072
+  },
+  "first_action_arm_qvel_zero": {
+   "after_min_finger_table_signed_distance_m": -0.0006127471917366512
+  },
+  "first_action_all_qvel_zero": {
+   "after_min_finger_table_signed_distance_m": -0.0006127476552963973
+  },
+  "hold_root_restored_qvel": {
+   "after_min_finger_table_signed_distance_m": 0.0003109980678781543
+  },
+  "hold_root_all_qvel_zero": {
+   "after_min_finger_table_signed_distance_m": 0.00031142327386068924
+  }
+ },
+ "first_action_ik": {
+  "phase": "descend_refresh",
+  "residual_m": 6.631568739584388e-05,
+  "source": "primary"
+ },
+ "failure_layer": "descend_refresh waypoint semantics",
+ "treatment_comparison_performed": false,
+ "margin_changed": false,
+ "claim_boundary": "The static corrected root is dynamically invalid because the first legacy descend_refresh waypoint immediately drives the gripper back into the table-clearance-violating region. The loss is not explained by reconstruction, root qvel, or an unspecified controller transient."
+}

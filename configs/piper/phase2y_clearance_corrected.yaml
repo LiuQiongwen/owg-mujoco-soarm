@@ -1,0 +1,12 @@
+schema_version: piper-phase2y-clearance-v1
+status: diagnostics-only
+correction:
+  applied_vertical_mm: 2.50
+  maximum_measured_minimum_mm: 2.2728774525327955
+  common_design_margin_mm: 0.2271225474672045
+  applied_identically_to_dY_levels_mm: [-15.0, -7.5, 0.0, 7.5, 15.0]
+claims:
+  design_margin: experimental geometry margin, not hardware-validated safety margin
+  hardware_margin_freeze_gate: Hardware Gate 1
+  estimand: ordered dY effect under joint clearance-corrected execution semantics
+prohibited_claim: removing table contact alone causes any change in the P2 effect
