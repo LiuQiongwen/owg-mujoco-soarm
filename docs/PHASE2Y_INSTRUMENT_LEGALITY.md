@@ -67,3 +67,32 @@ a valuable localisation in its own right.
 
 Gate 1 PASS · Gate 2 PASS · Gate 4 PASS · **Gate 3 suspended pending
 instrument legality (P2Y-0)**. Full sweep blocked.
+
+## Implementation note for P2Y-1 (variant generation point)
+
+Variants must be generated at the **gripper XML** level, not on the composed
+model. robosuite composes the final scene at runtime from the robot,
+gripper, mount and arena; there is no single on-disk XML to edit.
+
+`PiperGripper` (`tango_robot/piper_robosuite/piper_gripper.py`) is a
+`GripperModel` that loads `tango_robot/piper_assets/piper_gripper.xml`. The
+variant path is therefore:
+
+1. copy `piper_gripper.xml` into a diagnostic directory, once per dY level;
+2. edit only the `pos` of `finger7_collision` / `finger8_collision` along
+   the gripper's local Y;
+3. subclass `PiperGripper` per variant, pointing at the variant XML;
+4. register each under a distinct name and select it via `robots=`/gripper
+   config, leaving `tango_robot/piper_robosuite/` and
+   `tango_robot/piper_assets/` untouched (zero production diff, as
+   throughout this investigation).
+
+Note the collision geoms are `<mesh>` geoms, so shifting `pos` moves the
+mesh instance without altering the mesh asset — the mesh is shared across
+variants, which is what makes the P2Y-2 diff meaningful.
+
+Two things to verify at step 3, since both have bitten already: the geoms
+carry `contype/conaffinity` (R7 — do not trust the `_collision` name), and
+the shift must be applied along the axis that maps to eef-local Y, which
+`eef_local_axis_in_body()` in `piper_phase2y_smoke.py` already computes and
+which Gate 2 verified to 0.000mm.
