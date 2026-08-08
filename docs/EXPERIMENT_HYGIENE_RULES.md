@@ -80,3 +80,26 @@ than accumulating smoothly.
 
 Corollary: report RMS alongside max. Max is spike-dominated — here it is
 8–40× the RMS on the same trajectory pair.
+
+## R7 — Collision groups come from physics attributes, never from names
+
+Two distinct faults that look identical in logs (`inf` distance, empty set),
+both hit during Phase 2Y Gate 4:
+
+1. **Name-based matching is unsound.** Piper's `robot0_g0_vis` …
+   `g6_vis` geoms carry `contype=1, conaffinity=1` and **do** collide,
+   despite the `_vis` suffix. A matcher keyed on `robot0_link*` found
+   nothing and reported arm distance as `inf` — one step from being written
+   up as "the Piper arm has no collision geometry". Always select by
+   `geom_contype` / `geom_conaffinity`, then filter by name.
+2. **"Group absent" ≠ "matcher failed".** The Piper gripper genuinely has
+   no palm collision geometry (its only colliding geoms are
+   `finger7/8_collision`), so an empty palm group is a real model property
+   (N/A). An empty *arm* group was a matcher bug. Treating both as failure
+   blocks valid runs; treating both as N/A silently skips real checks. They
+   must be distinguished explicitly, with the model-property case justified
+   in code.
+
+Corollary: a distance reading against a group you have not verified is
+physical may be measuring a **visualisation marker**. Phase 2Y's earlier
+`palm = −0.023 m` was distance to `right_eef_target_*`, a render-only geom.

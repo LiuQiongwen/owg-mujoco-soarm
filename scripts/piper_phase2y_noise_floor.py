@@ -22,8 +22,8 @@ from tango_robot.piper_robosuite import piper_pick_and_place as ppp
 from tango_robot.piper_robosuite.piper_multi_object_scene import PiperMultiObjectScene
 from scripts.piper_tcp_correction_ab import scene_objects_for, PhaseTracker
 
-OUT = ROOT / "calib" / "phase2y_noise_floor.json"
-N_PAIRS = 10
+OUT = ROOT / "calib" / "phase2y_noise_floor_n40.json"
+N_PAIRS = int(sys.argv[1]) if len(sys.argv) > 1 else 10
 
 
 class Rec(PhaseTracker):
@@ -89,19 +89,31 @@ def main():
               f"succ_match={c['success_match']}")
 
     def agg(k):
-        v = [r[k] for r in rows if not np.isnan(r[k])]
-        return {"max": float(np.max(v)), "mean": float(np.mean(v)),
-                "threshold_1.25x": float(np.max(v) * 1.25)}
+        v = np.array([r[k] for r in rows if not np.isnan(r[k])])
+        # Full distribution, not just a max: this quantity is bifurcating,
+        # so an observed max from a small n is an unstable tail estimate.
+        return {"n": int(len(v)), "median": float(np.median(v)),
+                "p90": float(np.percentile(v, 90)), "p95": float(np.percentile(v, 95)),
+                "max": float(np.max(v)), "mean": float(np.mean(v))}
 
     floor = {k: agg(k) for k in ("max_pos_m", "rms_pos_m", "max_ori_deg", "refresh_pos_m")}
     floor["n_pairs"] = N_PAIRS
     floor["success_match_rate"] = f"{sum(r['success_match'] for r in rows)}/{len(rows)}"
-    floor["rule"] = "threshold = baseline-baseline observed maximum x 1.25 (frozen pre-treatment)"
+    # Branch split: this distribution is bimodal (near-exact vs diverged).
+    ref = np.array([r["refresh_pos_m"] for r in rows if not np.isnan(r["refresh_pos_m"])])
+    floor["branch_exact_like_frac"] = float(np.mean(ref < 1e-9))
+    floor["branch_diverged_frac"] = float(np.mean(ref >= 1e-9))
+    floor["rule"] = ("DISTRIBUTION ONLY -- no threshold set here. Gate 3 rule is "
+                     "frozen separately in Amendment 2 after inspecting this "
+                     "baseline distribution and BEFORE re-examining treatment data.")
 
-    print("\nFROZEN GATE THRESHOLDS (baseline-baseline max x 1.25):")
+    print("\nBASELINE REPRODUCIBILITY DISTRIBUTION (no threshold set here):")
     for k, v in floor.items():
         if isinstance(v, dict):
-            print(f"  {k:16s} max={v['max']:.3e}  ->  threshold={v['threshold_1.25x']:.3e}")
+            print(f"  {k:16s} n={v['n']:3d} median={v['median']:.3e} p90={v['p90']:.3e} "
+                  f"p95={v['p95']:.3e} max={v['max']:.3e}")
+    print(f"  branch: exact-like {floor['branch_exact_like_frac']:.2f} / "
+          f"diverged {floor['branch_diverged_frac']:.2f}")
     print(f"  success match: {floor['success_match_rate']}")
     OUT.write_text(json.dumps({"pairs": rows, "floor": floor}, indent=1))
     print(f"\nwrote {OUT}")
