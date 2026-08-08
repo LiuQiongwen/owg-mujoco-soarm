@@ -405,37 +405,27 @@ pre-contact path level; a corrected root plus a constant target offset is not a
 qualified execution semantic. No planner, margin, or production behavior is
 changed by this audit.
 
-## Δz_clear = 2.50mm requalification — verdict UNRESOLVED (not FAIL)
+## Superseded / invalid instrumentation notes
 
-```
-dY(mm)   min signed dist    finger↔table contacts
--15.0         0.000000              0
- -7.5         0.000000              0
-  0.0         0.000297              0
- +7.5         0.000230              0
-+15.0         0.000162              0
-```
+Retained for traceability. Neither entry is part of the authoritative state
+above; do not cite them as current evidence.
 
-**Trustworthy:** `finger↔table contacts = 0` on all five dY levels. This
-comes from `data.contact`, which contains only real collisions. So
-`Δz_clear = 2.50mm` does eliminate the table contact that 2.30mm left at
-dY=+15.
+**Δz_clear = 2.50mm requalification — SUPERSEDED.** An ad-hoc query reported
+a FAIL verdict from a signed-distance column that was invalid: it selected
+table geoms by name without filtering `contype`/`conaffinity`, so a
+non-colliding `table_visual` geom returned exactly `0.000000` and won the
+`min()`. That is an R7 violation and the reason R7 is now enforced in code
+(`scripts/piper_collision_geoms.py`, R9). The question it was attempting to
+answer had already been settled correctly by the R7-compliant P2Y-5A
+qualification above, which reports the same five levels with valid margins
+(worst case +0.16244mm at dY=+15mm). The only part of the ad-hoc result that
+was ever sound — zero finger-table contacts at all five levels, read from
+`data.contact` — is subsumed by 5A.
 
-**Invalid:** the signed-distance column, and therefore the FAIL verdict
-(which was computed as `min_dist > 0`). Two red flags: values landing on
-exactly `0.000000` (R1), and a monotonicity violation — at Δz=2.30mm these
-levels read +0.000236 and +0.000169, so lifting a further 0.2mm cannot
-reduce them to zero.
-
-**Cause:** the query selected table geoms by `'table' in name` without
-filtering on `contype`/`conaffinity` — an R7 violation, in an ad-hoc script,
-after R7 had already been written up. A non-colliding `table_visual` geom
-returns 0.0 and wins the `min()`.
-
-**Re-run required** with `scripts/piper_collision_geoms.py`'s
-`min_distance()`. No expected values are recorded here deliberately, so the
-re-run is not anchored by a guess.
-
-**Status:** `Δz_clear=2.50mm` contact-clearance PASS by actual contacts;
-signed-distance margin UNRESOLVED; treatment sweep remains blocked until the
-corrected margin check runs.
+**Commit 719ebed provenance caveat.** That commit contains Phase 2Y handoff
+documentation beyond the scope its message describes, because the document
+was staged wholesale from a dirty working tree that already held another
+instance's P2Y-4D content. History is deliberately NOT rewritten: the
+content is correct and the ancestry is traceable. The lesson is procedural —
+treat commit messages, and file snapshots alone, as insufficient for result
+attribution; verify against the recorded outputs.
