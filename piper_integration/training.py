@@ -40,7 +40,6 @@ def require_frozen_sample(sample: Mapping[str, Any], expected_execution_version:
 
     checks = {
         "label_status": "frozen",
-        "eligible_for_critic_training": True,
         "execution_semantics_version": expected_execution_version,
     }
     for key, expected in checks.items():
@@ -50,6 +49,18 @@ def require_frozen_sample(sample: Mapping[str, Any], expected_execution_version:
             raise CriticDataRejected(
                 f"{key}={provenance[key]!r}; expected {expected!r}"
             )
+
+    # Identity, not equality. Python evaluates 1 == True and 1.0 == True, so
+    # an equality check would admit eligible_for_critic_training=1. The
+    # contract is that the flag was deliberately set to the boolean True.
+    if "eligible_for_critic_training" not in provenance:
+        raise CriticDataRejected(
+            "missing required training field: eligible_for_critic_training")
+    eligibility = provenance["eligible_for_critic_training"]
+    if eligibility is not True:
+        raise CriticDataRejected(
+            f"eligible_for_critic_training must be exactly True, got "
+            f"{type(eligibility).__name__}: {eligibility!r}")
 
     for key in REQUIRED_PROVENANCE_FIELDS:
         if key not in provenance:

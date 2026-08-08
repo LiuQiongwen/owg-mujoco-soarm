@@ -153,6 +153,41 @@ def test_formal_loader_rejects_truthy_non_string_provenance(field, value):
             {"provenance": complete_provenance(**{field: value})}, "piper-execution-v1")
 
 
+@pytest.mark.parametrize("eligible", [
+    1,          # Python: 1 == True, so equality admitted this
+    1.0,        # Python: 1.0 == True
+    "True",
+    [1],
+    {"a": 1},
+    object(),
+    False,
+    None,
+], ids=["int_1", "float_1", "str_True", "list", "dict", "object", "False", "None"])
+def test_eligibility_flag_requires_identity_not_equality(eligible):
+    """eligible_for_critic_training must be exactly True.
+
+    Regression guard: an earlier implementation compared with ==, and because
+    Python evaluates 1 == True the loader admitted eligible=1.
+    """
+    with pytest.raises(CriticDataRejected, match="must be exactly True"):
+        require_frozen_sample(
+            {"provenance": complete_provenance(eligible_for_critic_training=eligible)},
+            "piper-execution-v1")
+
+
+def test_eligibility_flag_accepts_boolean_true():
+    require_frozen_sample(
+        {"provenance": complete_provenance(eligible_for_critic_training=True)},
+        "piper-execution-v1")
+
+
+def test_eligibility_flag_must_be_present():
+    provenance = complete_provenance()
+    del provenance["eligible_for_critic_training"]
+    with pytest.raises(CriticDataRejected, match="eligible_for_critic_training"):
+        require_frozen_sample({"provenance": provenance}, "piper-execution-v1")
+
+
 def test_string_fields_cover_every_non_seed_required_field():
     assert set(STRING_PROVENANCE_FIELDS) == set(REQUIRED_PROVENANCE_FIELDS) - {"seed"}
 
