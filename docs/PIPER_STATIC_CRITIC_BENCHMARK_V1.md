@@ -82,3 +82,39 @@ does not establish that no static representation could succeed.
 Per the charter, the useful next step is more failure-balanced data before
 richer models — a stronger encoder on 32 failures will overfit and the
 per-object reports will not be able to detect it.
+
+## Addendum: the P2 grid is already a robustness dataset
+
+The proposed shift from binary labels (`candidate → one rollout → 0/1`) to
+robustness labels (`candidate → N perturbed rollouts → success rate`) can be
+evaluated on data already collected: the P2 aim-offset grid is exactly
+nominal ± local perturbation, 5 offsets × 12 seeds × 3 objects.
+
+Computing `robust_success_rate` per (object, seed) over its 5 perturbations:
+
+```
+cracker  mean=0.80 std=0.36   distribution over 0..5/5: [1,1,1,0,0,9]
+mustard  mean=0.67 std=0.37   distribution over 0..5/5: [2,1,0,1,4,4]
+pear     mean=0.65 std=0.25   distribution over 0..5/5: [0,1,2,5,1,3]
+
+all-or-nothing (0/5 or 5/5):  19/36 candidates
+partially robust (1/5..4/5):  17/36 candidates
+```
+
+**Nearly half of candidates (17/36) have graded robustness that a binary
+label discards entirely.** Pear is the clearest case — its candidates
+cluster at 2/5–3/5 rather than at the extremes (std 0.25, the lowest of the
+three), i.e. pear candidates are genuinely perturbation-sensitive rather
+than simply good or bad.
+
+This is a direct argument for robustness labels over binary ones on this
+platform, and it reframes the P2 finding: perturbation sensitivity is not
+an anomaly to be explained away by a single mediator, it is **signal about
+the candidate** that the current label format throws away.
+
+It also suggests why the benchmark above is at chance within object. The
+label it was trained on ("did this exact pose succeed") is partly a coin
+flip for 17/36 candidates, so the ceiling on within-object AUC is bounded
+by label noise before any feature is considered. A robustness-labelled
+benchmark is the correct comparison, and it is the recommended next
+milestone.
