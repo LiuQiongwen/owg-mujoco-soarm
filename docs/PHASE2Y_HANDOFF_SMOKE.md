@@ -159,3 +159,76 @@ Note also that fingers penetrating the table by up to 2.1mm at
 `descend_refresh` is a finding about the pipeline in its own right,
 independent of Phase 2Y: the gripper is being pressed into the table
 surface during descend.
+
+## dY=0 vs dY=+15 at the handoff: LEAKAGE CONFIRMED
+
+Same handoff state (captured in the dY=0 world) restored into both
+compile-time variants, compared before any step:
+
+```
+dY=0    finger7 dist=-0.000478  pos=[-0.04306, 0.09061, 0.79976]
+        finger8 dist=-0.002139  pos=[-0.12387, 0.02331, 0.79893]
+dY=+15  finger7 dist=-0.000613  pos=[-0.05253, 0.10224, 0.79969]
+        finger8 dist=-0.002273  pos=[-0.13334, 0.03494, 0.79886]
+
+contact count   2 vs 2   (matches)
+max |Δdist|     1.343e-04 m
+max |Δpos|      1.163e-02 m
+```
+
+Count matches, but **penetration depth and contact position both differ
+systematically at step 0** — 11.6mm of contact-position shift and 0.13mm of
+extra penetration, before a single step. The treatment perturbs table
+constraint forces immediately, via a path that never touches the object.
+**The `descend_refresh` handoff is invalid as a branch root.**
+
+Note this also corrects the earlier reasoning that a planar table would
+leave penetration depth unchanged under a lateral shift. Depth moved too.
+Measured, not argued.
+
+It further demotes the missing-Python-state diagnosis: the step-0
+original-vs-replay divergence (~6.5e-4 m) is the same order as this
+leakage, so both effects were present and the earlier attribution of the
+whole discrepancy to missing state was too confident.
+
+## Structural problem: moving the root earlier does not fix isolation
+
+An earlier, contact-free root makes the *root* clean but does not make the
+*branch* isolated. The event ordering in this scenario is:
+
+```
+root  ->  finger↔table contact  ->  finger↔object contact  ->  close/lift
+```
+
+Finger↔table contact is **treatment-relevant** (just shown) and occurs
+**before** any object contact. So on any root, the treatment acquires a
+table-mediated path before the object-mediated path it is meant to test.
+Gate 3's condition ("no divergence before the first treatment-relevant
+contact") would then only be checkable in the short window between root and
+table contact, and any downstream success difference remains attributable
+to either path.
+
+This appears intrinsic to the scenario rather than to the root choice:
+`pear` spans +14…+80mm above the grasp reference and sits on the table, so
+a gripper reaching its CoM height necessarily brings the fingers to the
+table surface. The fingers penetrating the table by 0.5–2.1mm at
+`descend_refresh` is the same phenomenon.
+
+**Options, none yet chosen:**
+- fix the table-penetration issue in the pipeline first (a production change,
+  and the honest prerequisite) — this is on the `piper-execution-v1` freeze
+  checklist regardless;
+- run Phase 2Y on a *taller* object where the grasp height keeps fingers
+  clear of the table, accepting that pear (the strongest P2 effect) cannot
+  be tested this way;
+- accept a table-mediated path and redefine what Phase 2Y measures — but
+  then it no longer isolates the finger↔object relationship, which was the
+  entire purpose.
+
+## Independent pipeline finding (do not fix mid-investigation)
+
+`descend_refresh` has both fingers penetrating the table by 0.5–2.1mm. The
+current approach/descend semantics permit the gripper to enter table contact
+before closing. Belongs on the `piper-execution-v1` freeze checklist:
+re-examine table clearance, candidate grasp height, and approach
+termination, since it affects contact sequence and sim-to-real.
