@@ -22,6 +22,8 @@ REQUIRED_PROVENANCE_FIELDS = (
     "candidate_schema_version",
 )
 
+STRING_PROVENANCE_FIELDS = tuple(f for f in REQUIRED_PROVENANCE_FIELDS if f != "seed")
+
 
 def require_frozen_sample(sample: Mapping[str, Any], expected_execution_version: str) -> None:
     """Admit a sample into formal critic training, or refuse it.
@@ -55,15 +57,25 @@ def require_frozen_sample(sample: Mapping[str, Any], expected_execution_version:
         value = provenance[key]
         if value is None:
             raise CriticDataRejected(f"provenance field {key} is null")
+
         if key == "seed":
-            # bool is an int subclass; a boolean seed is a schema error, and
-            # seed 0 is legitimate so truthiness must not be used here.
+            # bool is an int subclass, so a boolean seed is a schema error.
+            # Truthiness must not be used here: seed=0 is legitimate.
             if isinstance(value, bool) or not isinstance(value, int):
-                raise CriticDataRejected(f"provenance field seed must be an int, got {value!r}")
-        elif isinstance(value, str):
-            if not value.strip():
-                raise CriticDataRejected(f"provenance field {key} is empty")
-        elif not value:
+                raise CriticDataRejected(
+                    f"provenance field seed must be an int, got "
+                    f"{type(value).__name__}: {value!r}")
+            continue
+
+        # Every other required field must be EXACTLY str and non-empty after
+        # strip. Type is checked before emptiness: a truthy non-string (int,
+        # list, dict, arbitrary object) is not a valid identifier or hash and
+        # must not be admitted merely for being truthy.
+        if type(value) is not str:
+            raise CriticDataRejected(
+                f"provenance field {key} must be a string, got "
+                f"{type(value).__name__}: {value!r}")
+        if not value.strip():
             raise CriticDataRejected(f"provenance field {key} is empty")
 
     if provenance.get("legacy_execution_confounded", False):

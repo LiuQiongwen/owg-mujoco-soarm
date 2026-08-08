@@ -11,7 +11,8 @@ from piper_integration.contracts import (
 from piper_integration.feasibility import IKResult, PiperFeasibilityAdapter
 from piper_integration.metadata import load_embodiment_metadata, validate_metadata_against_assets
 from piper_integration.training import (
-    REQUIRED_PROVENANCE_FIELDS, CriticDataRejected, require_frozen_sample)
+    REQUIRED_PROVENANCE_FIELDS, STRING_PROVENANCE_FIELDS, CriticDataRejected,
+    require_frozen_sample)
 
 
 def candidate():
@@ -131,9 +132,41 @@ def test_formal_loader_rejects_empty_or_mistyped_provenance(field, value):
             {"provenance": complete_provenance(**{field: value})}, "piper-execution-v1")
 
 
+@pytest.mark.parametrize("field", STRING_PROVENANCE_FIELDS)
+@pytest.mark.parametrize("value", [
+    1234567890,                 # int
+    ["a" * 64],                 # list
+    {"sha": "abc"},             # dict
+    object(),                   # arbitrary object
+    3.14,                       # float
+    ("a",),                     # tuple
+], ids=["int", "list", "dict", "object", "float", "tuple"])
+def test_formal_loader_rejects_truthy_non_string_provenance(field, value):
+    """A truthy non-string is not a valid hash or identifier.
+
+    Regression guard: an earlier implementation type-checked only strings and
+    let every other truthy value fall through the emptiness branch, silently
+    admitting int hashes, list hashes, mapping commits and arbitrary objects.
+    """
+    with pytest.raises(CriticDataRejected, match="must be a string"):
+        require_frozen_sample(
+            {"provenance": complete_provenance(**{field: value})}, "piper-execution-v1")
+
+
+def test_string_fields_cover_every_non_seed_required_field():
+    assert set(STRING_PROVENANCE_FIELDS) == set(REQUIRED_PROVENANCE_FIELDS) - {"seed"}
+
+
 def test_seed_zero_is_a_legitimate_value():
     """seed=0 must not be rejected by a truthiness check."""
     require_frozen_sample({"provenance": complete_provenance(seed=0)}, "piper-execution-v1")
+
+
+@pytest.mark.parametrize("bad_seed", ["5001", True, False, 1.0, None, [1], {"s": 1}])
+def test_formal_loader_rejects_non_integer_seed(bad_seed):
+    with pytest.raises(CriticDataRejected):
+        require_frozen_sample(
+            {"provenance": complete_provenance(seed=bad_seed)}, "piper-execution-v1")
 
 
 def test_formal_loader_accepts_only_matching_frozen_data():
