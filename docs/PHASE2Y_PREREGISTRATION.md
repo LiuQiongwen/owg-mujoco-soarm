@@ -106,3 +106,61 @@ Stop working on placement entirely. Move to the full dynamic-contact
 trajectory: approach path → first-contact topology → object motion before
 bilateral capture → retention. Swept-volume representations may still
 matter there, but no claim that lateral placement is the mediator.
+
+---
+
+## AMENDMENT 1 (2026-08-08, after smoke, before any sweep)
+
+Recorded transparently: this changes an **instrument** criterion, justified
+by a treatment-independent measurement. No outcome criterion is touched.
+
+### Smoke result
+
+```
+GATE 2 (measured shift == commanded):     PASS  (error 0.000mm at ±15mm)
+GATE 1/3 (dY=0 == baseline, byte-ident):  FAIL  (max|ΔEEF| 1.6–4.3 ×10⁻⁴ m)
+```
+
+### Diagnosis: the platform, not the instrument
+
+Baseline vs baseline — identical code path, no patching whatsoever —
+differs by the same order:
+
+```
+baseline vs baseline   max|ΔEEF| = 1.06, 0.87, 2.65  ×10⁻⁴ m
+dY=0     vs baseline   max|ΔEEF| = 1.62, 1.66, 4.33  ×10⁻⁴ m
+```
+
+**The Piper sim is not bit-reproducible run-to-run at trajectory level.**
+The EEF noise floor is ~0.1–0.3mm, consistent with the ~1e-13 multithreaded
+BLAS noise characterised earlier in the DLS solver, amplified through a
+full PD-controlled rollout. Success outcomes remain stable (all matched
+here; 8/8 in the earlier same-seed reproduction test) — trajectories do not.
+
+A "byte-identical" gate therefore cannot be met by *any* pair of runs,
+including a run against itself. The original threshold was unmeetable, not
+merely strict.
+
+### Amended Gates 1 and 3
+
+- **Gate 1:** `dY=0` must match baseline in **success outcome**, and its
+  `max|ΔEEF|` must fall within the measured baseline-vs-baseline noise
+  distribution — not below 1e-12.
+- **Gate 3:** `max|ΔEEF|` for a *shifted* arm must likewise be compared
+  against that noise floor, not against zero.
+- The noise floor must be re-measured with ≥10 baseline pairs before the
+  full sweep, so "within the distribution" is a quantified claim rather
+  than an eyeball comparison at n=3.
+
+### Consequence for sensitivity (unchanged conclusion)
+
+The treatment (±15mm, ±7.5mm) is 20–150× the 0.1–0.3mm noise floor, so the
+experiment remains well-powered. This also retroactively supports P2's
+levels: its smallest step (7.5mm) is ~25× the floor.
+
+### Status
+
+Gate 2 passed exactly. Gates 1/3 are unresolved pending the amended
+noise-floor measurement. Gate 4 (no new table/palm/self collisions) is not
+yet implemented. **The full sweep must not run until amended Gates 1, 3
+and 4 pass.**
