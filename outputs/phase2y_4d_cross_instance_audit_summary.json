@@ -1,0 +1,72 @@
+{
+ "_note": "Compact extraction of outputs/phase2y_4d_cross_instance_audit.json as of 5ae7ea0. Values copied verbatim; nothing derived or interpreted. Full forensic dump intentionally not committed.",
+ "_source_blob_sha256": "4d925d8b5b97b969a1a7b6973069883131f1d9157ac300a4747a1cc4f5540ab7",
+ "_source_bytes": 40830,
+ "audit": "P2Y-4D-cross-instance-state-equivalence",
+ "seed": 5001,
+ "treatment": "dY=0-only",
+ "n_actions": 900,
+ "boundary_diff": {
+  "model_different_count": 0,
+  "data_different_count": 16
+ },
+ "boundary_diff_after_forced_controller_sync": {
+  "model_different_count": 0,
+  "data_different_count": 16
+ },
+ "first_substep_diff": {
+  "before": {
+   "different_count": 0,
+   "fields": []
+  },
+  "after_controller": {
+   "different_count": 1,
+   "fields": [
+    "ctrl"
+   ]
+  },
+  "after_force": {
+   "different_count": 4,
+   "fields": [
+    "ctrl",
+    "qacc",
+    "qfrc_actuator",
+    "qfrc_constraint"
+   ]
+  },
+  "after_step": {
+   "different_count": 7,
+   "fields": [
+    "ctrl",
+    "qacc",
+    "qacc_warmstart",
+    "qfrc_actuator",
+    "qfrc_constraint",
+    "qpos",
+    "qvel"
+   ]
+  }
+ },
+ "finger_object_contact_before": {
+  "original": {
+   "active": {
+    "finger7_collision": false,
+    "finger8_collision": false
+   },
+   "pairs": {
+    "finger7_collision": [],
+    "finger8_collision": []
+   }
+  },
+  "fresh": {
+   "active": {
+    "finger7_collision": false,
+    "finger8_collision": false
+   },
+   "pairs": {
+    "finger7_collision": [],
+    "finger8_collision": []
+   }
+  }
+ }
+}
