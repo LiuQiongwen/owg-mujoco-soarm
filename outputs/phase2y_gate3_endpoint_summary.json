@@ -1,0 +1,68 @@
+{
+ "_note": "Compact extraction of outputs/phase2y_gate3_endpoint.json as of 5ae7ea0. Values copied verbatim; nothing derived. The 7,203,104-byte raw trace (481 per-step records x2 branches) is deliberately not committed.",
+ "_source_blob_sha256": "84169f8eee7f9c2c0607b87f4e9297d5d5ab0ed234d042619c813ba247dfcd2f",
+ "_source_bytes": 7203104,
+ "audit": "P2Y-Gate3-endpoint-dynamic-qualification",
+ "endpoints_dY_mm": [
+  0.0,
+  15.0
+ ],
+ "delta_z_applied_mm": 2.5,
+ "n_corrected_actions": 480,
+ "formal_five_level_sweep_performed": false,
+ "reconstruction_replica_first_divergence_step": null,
+ "first_divergence_step": 0,
+ "first_divergence_magnitudes": {
+  "qpos": 0.0001009972712071594,
+  "qvel": 0.005922033997714293,
+  "ctrl": 0.1870392765652058,
+  "qfrc_actuator": 0.1870392765652058,
+  "qacc": 0.2531966719242682,
+  "eef_pos": 2.783190224775467e-05,
+  "object_pos": 0.0,
+  "object_quat": 0.0
+ },
+ "earliest_target_contact_step": 88,
+ "per_branch": {
+  "0.0": {
+   "target_contact_step": 88,
+   "object_delta_z_m": 0.09155142716840059,
+   "conditional_lift_success": true,
+   "step0_finger_table_contacts": [
+    {
+     "index": 0,
+     "geom1": "table_collision",
+     "geom2": "gripper0_right_finger8_collision",
+     "distance_m": -0.0006141032857831519,
+     "target_finger": false,
+     "finger_table": true
+    }
+   ]
+  },
+  "15.0": {
+   "target_contact_step": 89,
+   "object_delta_z_m": 0.09254196998008402,
+   "conditional_lift_success": true,
+   "step0_finger_table_contacts": [
+    {
+     "index": 0,
+     "geom1": "table_collision",
+     "geom2": "gripper0_right_finger8_collision",
+     "distance_m": -0.0007202943750269641,
+     "target_finger": false,
+     "finger_table": true
+    }
+   ]
+  }
+ },
+ "checks": {
+  "cross_instance_reconstruction_replay_exact": true,
+  "both_target_contact_onsets_observed": true,
+  "first_divergence_not_before_target_contact": false,
+  "finger_table_zero_before_target_contact": false,
+  "non_target_contacts_identical_before_target_contact": true,
+  "conditional_lift_success_generated": true
+ },
+ "pass": false,
+ "claim_boundary": "Gate 3 FAIL means endpoint differences cannot be attributed to finger-object interaction, because treatment-dependent finger-table contact reappears before target contact."
+}

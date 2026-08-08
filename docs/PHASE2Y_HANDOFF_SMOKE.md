@@ -348,6 +348,31 @@ This qualifies the static corrected bundle geometry only. No close/lift action
 or treatment outcome was executed, and no claim separates height from table
 contact causally.
 
+## Gate 3 endpoint dynamic qualification — FAIL
+
+The minimal corrected `dY=0` versus `dY=+15mm` close/lift test was run from the
+same reconstructed root. Reconstruction remained exact and both branches
+generated `conditional_lift_success=true`, but the causal gate failed:
+
+```text
+reconstruction replica first divergence   none (exact)
+endpoint first dynamics divergence         step 0
+first finger-target contact                step 88 (dY=0), step 89 (+15)
+finger-table contact at corrected root     zero
+finger-table contact after first step      present
+```
+
+At step 0, finger8 penetrated the table by approximately 0.614mm (`dY=0`) and
+0.720mm (`dY=+15`). Thus the static +2.50mm root clearance is consumed by the
+first controller transition, reopening the treatment-dependent table path well
+before target contact. The endpoint test therefore does **not** qualify Gate 3,
+and the five-level sweep remains blocked.
+
+This failure does not reopen reconstruction: the duplicate reconstructed dY=0
+branch was exact. It distinguishes static bundle qualification from dynamic
+path qualification. No larger margin is selected here; the transient must be
+diagnosed before changing the preregistered correction.
+
 ## Δz_clear = 2.50mm requalification — verdict UNRESOLVED (not FAIL)
 
 ```
