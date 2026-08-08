@@ -1,7 +1,16 @@
 execution_semantics_version: pre-freeze
 label_status: provisional
 eligible_for_critic_training: false
-phase2y_gate_status: suspended
+# Gate 3 endpoint dynamic qualification FAILED: pre-target finger-table
+# recontact occurs (step 0), so endpoint differences cannot be attributed to
+# finger-object interaction. The five-level treatment sweep is consequently
+# blocked. This is a failure, not a pause -- see
+# outputs/phase2y_gate3_endpoint_summary.json and
+# docs/PHASE2Y_HANDOFF_SMOKE.md.
+phase2y_gate_status: gate3_failed_sweep_blocked
+phase2y_gate3_verdict: failed
+phase2y_gate3_failure_reason: pre-target finger-table recontact
+phase2y_sweep_status: blocked
 planner:
   interface: plan_transit(candidate, constraints)
   implementation: unset

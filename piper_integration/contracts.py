@@ -11,6 +11,12 @@ from typing import Any, Mapping, Sequence
 CANDIDATE_SCHEMA_VERSION = "owg-piper-candidate-v1alpha1"
 PRE_FREEZE_EXECUTION_VERSION = "pre-freeze"
 
+# Gate 3 endpoint dynamic qualification FAILED (pre-target finger-table
+# recontact); the five-level treatment sweep is blocked as a consequence.
+# This is an explicit failure state, not "suspended" -- serialising a softer
+# value would let records disagree with the authoritative repo state.
+PHASE2Y_GATE_STATUS = "gate3_failed_sweep_blocked"
+
 
 def stable_hash(value: Any) -> str:
     """Return a deterministic sha256 for JSON-compatible configuration."""
@@ -118,7 +124,7 @@ class Provenance:
     execution_semantics_version: str = PRE_FREEZE_EXECUTION_VERSION
     label_status: str = "provisional"
     eligible_for_critic_training: bool = False
-    phase2y_gate_status: str = "suspended"
+    phase2y_gate_status: str = PHASE2Y_GATE_STATUS
     legacy_execution_confounded: bool = False
 
     def __post_init__(self) -> None:
