@@ -103,3 +103,26 @@ both hit during Phase 2Y Gate 4:
 Corollary: a distance reading against a group you have not verified is
 physical may be measuring a **visualisation marker**. Phase 2Y's earlier
 `palm = −0.023 m` was distance to `right_eef_target_*`, a render-only geom.
+
+## R8 — A treatment must be legal under the simulator's model-update semantics
+
+"I modified a variable" is not the same as "the simulator supports modifying
+that variable at runtime". Before any runtime model mutation, establish
+whether the field is safe to change post-compile, whether it invalidates
+collision-acceleration structures, and whether it requires `mj_setConst` or
+a recompile.
+
+Live case: Phase 2Y's finger-shift instrument mutates `model.geom_pos`
+after compile (`piper_phase2y_smoke.py:74`,
+`piper_phase2y_qualify.py:115`). MuJoCo's documentation lists
+`geom_pos/geom_quat/geom_size/geom_rbound/geom_aabb` among unsafe runtime
+modifications, because compile-time collision structures are derived from
+them. If that applies here, Gate 3's pre-contact trajectory divergence is
+an artifact of an illegal mutation rather than a physical effect — and no
+amount of enlarging the baseline noise envelope would have revealed it.
+
+**Decisive empirical test** (does not require trusting documentation):
+build one compile-time variant with the finger geoms shifted in XML, and
+compare it against the runtime-mutated model from an identical state. If
+the two diverge, runtime mutation is unsafe on this model, confirmed
+directly.
