@@ -326,6 +326,28 @@ pre-registered safety margin) clears all five roots while keeping the applied
 height correction identical across treatment levels. This is a geometry-only
 result: no close/lift action or treatment outcome was run.
 
+## P2Y-5A fixed +2.50mm qualification
+
+The diagnostics-only correction is frozen in
+`configs/piper/phase2y_clearance_corrected.yaml` as a common **+2.50mm**
+world-Z EEF target shift. Its 0.2271mm design margin is not a hardware safety
+margin; Hardware Gate 1 remains responsible for that value.
+
+Across all five legal compiled dY variants from the same reconstructed root:
+
+- IK converged with identical 0.066887mm residual;
+- the requested +2.50mm target and realized EEF delta were identical across
+  dY (realized Z delta 2.43598mm due to the common IK residual);
+- finger-table contact count was zero for every level;
+- minimum physical signed distance stayed positive, with the worst case
+  +0.1624mm at dY=+15mm;
+- candidate target XY/orientation, object pose, gripper state, and controller
+  semantics remained fixed.
+
+This qualifies the static corrected bundle geometry only. No close/lift action
+or treatment outcome was executed, and no claim separates height from table
+contact causally.
+
 ## Δz_clear = 2.50mm requalification — verdict UNRESOLVED (not FAIL)
 
 ```

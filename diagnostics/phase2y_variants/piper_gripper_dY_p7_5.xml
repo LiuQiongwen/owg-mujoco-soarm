@@ -54,7 +54,7 @@
                           fullinertia="9.99782474142963E-06 6.17952362333486E-06 1.42102248648757E-05 -1.57547666236405E-07 2.71355834243046E-08 1.58939503259658E-06"/>
                 <joint name="joint7" range="-0.05 0" type="slide" damping="0.005" frictionloss="0.01"/>
                 <geom type="mesh" mesh="link7" material="linkgray" group="1" name="finger7_visual" contype="0" conaffinity="0"/>
-                <geom type="mesh" mesh="link7" group="0" name="finger7_collision" pos="0.015000000 0.000000000 0.000000000" conaffinity="1" contype="1" condim="4" friction="1 0.005 0.0001"
+                <geom type="mesh" mesh="link7" group="0" name="finger7_collision" pos="0.007500000 0.000000000 0.000000000" conaffinity="1" contype="1" condim="4" friction="1 0.005 0.0001"
                       solimp="0.998 0.998 0.001" solref="0.002 1"/>
             </body>
             <body name="link8" pos="0 0 0" quat="1 -1 -1 1">
@@ -63,7 +63,7 @@
                           fullinertia="9.99782474142963E-06 6.17952362333486E-06 1.42102248648757E-05 -1.57547666236405E-07 2.71355834243046E-08 1.58939503259658E-06"/>
                 <joint name="joint8" range="-0.05 0" type="slide" damping="0.005" frictionloss="0.01"/>
                 <geom type="mesh" mesh="link8" material="linkgray" group="1" name="finger8_visual" contype="0" conaffinity="0"/>
-                <geom type="mesh" mesh="link8" group="0" name="finger8_collision" pos="0.015000000 0.000000000 0.000000000" conaffinity="1" contype="1" condim="4" friction="1 0.005 0.0001"
+                <geom type="mesh" mesh="link8" group="0" name="finger8_collision" pos="0.007500000 0.000000000 0.000000000" conaffinity="1" contype="1" condim="4" friction="1 0.005 0.0001"
                       solimp="0.998 0.998 0.001" solref="0.002 1"/>
             </body>
         </body>

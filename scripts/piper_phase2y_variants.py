@@ -52,6 +52,7 @@ def make_variant(dY_mm, axes):
     xml = SRC.read_text()
     for gname, ax in axes.items():
         p = ax * (dY_mm / 1000.0)
+        p[np.abs(p) < 0.5e-9] = 0.0  # stable XML: never emit negative zero
         pos = f'pos="{p[0]:.9f} {p[1]:.9f} {p[2]:.9f}" '
         # insert pos into that geom's opening tag only
         pat = re.compile(r'(<geom type="mesh" mesh="link[78]" group="0" name="' + gname + r'" )')
