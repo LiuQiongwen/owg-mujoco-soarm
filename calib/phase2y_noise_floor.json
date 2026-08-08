@@ -1,0 +1,109 @@
+{
+ "pairs": [
+  {
+   "max_pos_m": 6.847258525008267e-05,
+   "rms_pos_m": 3.7712412201216445e-06,
+   "max_ori_deg": 0.029107471699977853,
+   "refresh_pos_m": 1.5492235762471518e-11,
+   "success_match": true,
+   "seed": 5001
+  },
+  {
+   "max_pos_m": 8.44287573119826e-05,
+   "rms_pos_m": 4.707254771632604e-06,
+   "max_ori_deg": 0.023638220450066996,
+   "refresh_pos_m": 2.8371163336643452e-11,
+   "success_match": true,
+   "seed": 5002
+  },
+  {
+   "max_pos_m": 0.00024169756342915557,
+   "rms_pos_m": 2.7840312095794874e-05,
+   "max_ori_deg": 0.04624825658698706,
+   "refresh_pos_m": 3.842355673410485e-05,
+   "success_match": true,
+   "seed": 5003
+  },
+  {
+   "max_pos_m": 6.131072463162197e-05,
+   "rms_pos_m": 3.35734046642183e-06,
+   "max_ori_deg": 0.003808157409796237,
+   "refresh_pos_m": 1.0391504641414146e-09,
+   "success_match": true,
+   "seed": 5004
+  },
+  {
+   "max_pos_m": 0.00011671097911227417,
+   "rms_pos_m": 6.581187684274267e-06,
+   "max_ori_deg": 0.018109243814137397,
+   "refresh_pos_m": 1.8989469095468948e-11,
+   "success_match": true,
+   "seed": 5005
+  },
+  {
+   "max_pos_m": 0.000178659041267823,
+   "rms_pos_m": 1.0848798259189424e-05,
+   "max_ori_deg": 0.03653062488373781,
+   "refresh_pos_m": 4.1276219855874145e-10,
+   "success_match": true,
+   "seed": 5006
+  },
+  {
+   "max_pos_m": 0.00046424977312110643,
+   "rms_pos_m": 0.00010603816139647402,
+   "max_ori_deg": 0.09561276865060592,
+   "refresh_pos_m": 1.3901869037556538e-05,
+   "success_match": true,
+   "seed": 5007
+  },
+  {
+   "max_pos_m": 0.0013102504362606283,
+   "rms_pos_m": 0.00015952535170556662,
+   "max_ori_deg": 0.2456702363500158,
+   "refresh_pos_m": 0.0005140319302938176,
+   "success_match": true,
+   "seed": 5008
+  },
+  {
+   "max_pos_m": 0.00010783590170828661,
+   "rms_pos_m": 5.4703996765398194e-06,
+   "max_ori_deg": 0.029863435824321022,
+   "refresh_pos_m": 1.3828918280850541e-11,
+   "success_match": true,
+   "seed": 5009
+  },
+  {
+   "max_pos_m": 7.187899064593181e-05,
+   "rms_pos_m": 4.2405609345892855e-06,
+   "max_ori_deg": 0.0138031530953119,
+   "refresh_pos_m": 1.736486223716911e-11,
+   "success_match": true,
+   "seed": 5010
+  }
+ ],
+ "floor": {
+  "max_pos_m": {
+   "max": 0.0013102504362606283,
+   "mean": 0.0002705494752738893,
+   "threshold_1.25x": 0.0016378130453257853
+  },
+  "rms_pos_m": {
+   "max": 0.00015952535170556662,
+   "mean": 3.323806082106044e-05,
+   "threshold_1.25x": 0.00019940668963195826
+  },
+  "max_ori_deg": {
+   "max": 0.2456702363500158,
+   "mean": 0.054239156876495796,
+   "threshold_1.25x": 0.30708779543751974
+  },
+  "refresh_pos_m": {
+   "max": 0.0005140319302938176,
+   "mean": 5.6635890202479035e-05,
+   "threshold_1.25x": 0.000642539912867272
+  },
+  "n_pairs": 10,
+  "success_match_rate": "10/10",
+  "rule": "threshold = baseline-baseline observed maximum x 1.25 (frozen pre-treatment)"
+ }
+}

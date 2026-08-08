@@ -48,3 +48,35 @@ Established in P1.1: under an i.i.d. rate of 0.825, observing 4/12 has
 probability ~1e-4, yet that occurred — outcome is strongly driven by the
 spawn draw. Small paired designs across *ordered* levels (P2's 5-level
 sweep, 50/0 concordant) remain valid; single n=12 comparisons do not.
+
+## R6 — A null criterion must first be achievable by the unmodified system against itself
+
+Before requiring `A ≡ B`, measure `A ≡ A`. An equivalence threshold that
+the system cannot meet when compared to a rerun of itself is a
+specification error, not a failing result.
+
+Concrete case: Phase 2Y pre-registered a "byte-identical trajectory"
+validity gate (`max|ΔEEF| < 1e-12`). The instrument failed it — but so did
+the *unmodified baseline compared to itself*, at the same order of
+magnitude. The gate was unmeetable by any pair of runs on this platform.
+
+Measured baseline-vs-baseline floor for the Piper sim (n=10 paired reruns,
+`calib/phase2y_noise_floor.json`):
+
+| metric | observed max | frozen threshold (×1.25) |
+|---|---|---|
+| max EEF position deviation | 1.310e-3 m | 1.638e-3 m |
+| RMS EEF position deviation | 1.595e-4 m | 1.994e-4 m |
+| max EEF orientation deviation | 0.246° | 0.307° |
+| position at `descend_refresh` | 5.140e-4 m | 6.425e-4 m |
+
+Two properties worth carrying: **success outcomes matched 10/10** while
+trajectories did not, so outcome reproducibility and trajectory
+reproducibility are different claims. And the divergence is *bifurcating,
+not uniform* — 7/10 seeds reproduce `descend_refresh` position to ~1e-11 m
+(numerically exact) while 3 diverge to 1e-5…5e-4 m, consistent with tiny
+noise being amplified across a threshold (IK branch, contact onset) rather
+than accumulating smoothly.
+
+Corollary: report RMS alongside max. Max is spike-dominated — here it is
+8–40× the RMS on the same trajectory pair.
