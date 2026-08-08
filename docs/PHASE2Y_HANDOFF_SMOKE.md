@@ -60,3 +60,51 @@ specifically, measured the same way as the episode-level floor was.
 Outcome field naming (`conditional_lift_success`, never `success`) is
 implemented in the driver but not yet exercised, since no treatment
 comparison has run.
+
+## TEST 1 result: cause localised to missing Python-side state
+
+```
+orig vs replayA :  first |Δ|>1e-9 at step 0/900,  |Δ|=6.48e-04 m  -> final 2.26e-02
+orig vs replayB :  first |Δ|>1e-9 at step 0/900,  |Δ|=6.65e-04 m  -> final 2.25e-02
+replayA vs B    :  first |Δ|>1e-9 at step 0/900,  |Δ|=1.65e-05 m  -> final 2.16e-04
+```
+
+Divergence is **immediate (step 0)**, and the magnitudes separate cleanly:
+original-vs-replay starts 40× larger than replay-vs-replay. Pure FP
+amplification would start both pairs at the same noise level and separate
+later; instead the two replays agree with each other far better than either
+agrees with the original. That is a systematic offset introduced by the
+restore — **state the original had that a freshly-constructed env does
+not.**
+
+**Conclusion: (a) missing Python-side state, not (b) contact amplification.**
+Do NOT build a close-segment noise floor — that would absorb a real
+missing-state defect as noise, the same trap as widening the episode-level
+envelope earlier.
+
+## Open problem: the handoff point is NOT contact-free
+
+`ncon = 11` already at step 0, with the first contact-count *increase* at
+step 3. So `descend_refresh` is a **common active-contact handoff state**,
+not a pre-contact one. Two consequences, the second potentially serious:
+
+1. **Naming/claims.** Phase 2Y tests "same active-contact state → different
+   finger treatment → close/lift outcome". It is not "divergence begins
+   from a contact-free state".
+2. **Gate 3's validity condition may be untestable at this point.** The
+   condition was: first divergence must occur *after* finger/object
+   interaction begins. If finger/object contact has already begun at the
+   handoff, that condition is trivially satisfied and discriminates
+   nothing.
+
+**Unresolved and required before P2Y-4C is worth building:** of the 11
+contacts at handoff, how many are finger↔object versus object↔table /
+object↔object? The scene holds three objects on a table, so most may be
+unrelated to the gripper. If **zero** are finger↔object, the handoff is
+effectively pre-contact for treatment purposes and Gate 3's condition
+survives intact. If some are, the snapshot point must move earlier — before
+any finger↔object contact — or Gate 3 needs a different discriminator.
+
+This is one cheap query against the existing capture (classify `data.contact`
+pairs at the handoff step) and should be answered first, since it decides
+whether the handoff point is usable at all.

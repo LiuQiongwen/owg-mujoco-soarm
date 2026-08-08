@@ -47,6 +47,8 @@ class Capture(PhaseTracker):
         super().__init__(env=env, obj_name="pear")
         self.bundle = None
         self.actions = []
+        self.traj = []
+        self.ncon = []
         self._armed = False
         self._env_ref = env
         self._orig_step = env.step
@@ -55,7 +57,14 @@ class Capture(PhaseTracker):
     def _step(self, action):
         if self._armed:
             self.actions.append(np.array(action, dtype=float).copy())
-        return self._orig_step(action)
+        r = self._orig_step(action)
+        if self._armed:
+            m, d = self._env.sim.model._model, self._env.sim.data._data
+            self.traj.append(np.concatenate([
+                d.site_xpos[m.site("robot0_eef_site").id],
+                d.xpos[self._env.object_body_ids["pear"]]]))
+            self.ncon.append(int(d.ncon))
+        return r
 
     def set_phase(self, name):
         super().set_phase(name)
@@ -91,12 +100,13 @@ def replay(seed, bundle, actions, gripper=None):
         m, d = env.sim.model._model, env.sim.data._data
         eef = m.site("robot0_eef_site").id
         bid = env.object_body_ids["pear"]
-        traj = []
+        traj, ncon = [], []
         for a in actions:
             env.step(a)
             traj.append(np.concatenate([d.site_xpos[eef], d.xpos[bid]]))
+            ncon.append(int(d.ncon))
         obj_z = float(d.xpos[bid][2])
-        return {"zero_step": zs, "traj": np.array(traj), "obj_z": obj_z}
+        return {"zero_step": zs, "traj": np.array(traj), "ncon": ncon, "obj_z": obj_z}
     finally:
         env.close()
 
@@ -131,6 +141,28 @@ def main():
     print(f"\n4B rollout identity (dY=0 vs dY=0, {n} replayed steps):")
     print(f"   max|d(eef,obj)| = {dmax:.3e}   {'OK' if dmax < 1e-9 else 'FAIL'}")
     print(f"   final object z: {a['obj_z']:.6f} vs {b['obj_z']:.6f}")
+    # TEST 1: divergence ONSET, original vs replay -- immediate departure
+    # implies missing state, delayed departure implies FP amplification.
+    def onset(t1, t2, eps=1e-9):
+        n = min(len(t1), len(t2))
+        dd = np.max(np.abs(np.asarray(t1)[:n] - np.asarray(t2)[:n]), axis=1)
+        idx = np.argmax(dd > eps) if (dd > eps).any() else None
+        return (None if idx is None else int(idx)), dd
+
+    o_orig = np.array(cap.traj)
+    for label, r in (("orig-vs-replayA", a), ("orig-vs-replayB", b), ("replayA-vs-B", None)):
+        t1, t2 = (o_orig, a["traj"]) if label == "orig-vs-replayA" else \
+                 (o_orig, b["traj"]) if label == "orig-vs-replayB" else (a["traj"], b["traj"])
+        i, dd = onset(t1, t2)
+        if i is None:
+            print(f"\nTEST1 {label:18s}: identical throughout")
+        else:
+            first_contact = next((k for k, c in enumerate(cap.ncon) if c > cap.ncon[0]), None)
+            print(f"\nTEST1 {label:18s}: first |d|>1e-9 at step {i}/{len(dd)} "
+                  f"(|d| there = {dd[i]:.2e}, final = {dd[-1]:.2e})")
+            print(f"       ncon at onset = {cap.ncon[i] if i < len(cap.ncon) else '?'}, "
+                  f"ncon at step0 = {cap.ncon[0]}, first ncon increase at step {first_contact}")
+
     print(f"\n4A {'PASS' if ok4a else 'FAIL'}   4B {'PASS' if dmax < 1e-9 else 'FAIL'}")
     if ok4a and dmax >= 1e-9:
         print("   -> AMBIGUOUS. Two candidate causes this test cannot separate:")
